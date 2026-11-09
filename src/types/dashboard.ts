@@ -178,6 +178,12 @@ export interface DashboardData {
   spend: SpendRow[];
   /** 일별 광고비 (최근 수집 구간만) — 없으면 일·기간 선택은 월 단위로 보여 준다 */
   spendDaily: SpendDailyRow[];
+  /** 매체별 최근 일별 구간의 첫 날 (첫 응답에 함께 오는 구간) */
+  dailyRecentFrom: Record<string, string>;
+  /** 매체별로 일별 과거분이 쌓여 있는 달 */
+  dailyHistMonths: Record<string, string[]>;
+  /** 일별 과거분을 받아 spendDaily 에 합친 달 */
+  dailyLoadedMonths: string[];
   manual: ManualRow[];
   mapping: MappingRow[];
   quotes: QuoteRow[];
@@ -356,6 +362,7 @@ export interface RawApiPayload {
   g_campaign_monthly?: RawSpendApiRow[];
   n_adgroup_monthly?: RawSpendApiRow[];
   g_adgroup_daily?: RawSpendApiRow[];
+  daily_hist_months?: Record<string, string[]>;
   n_adgroup_daily?: RawSpendApiRow[];
   manual?: RawManualApiRow[];
   mapping?: MappingRow[];

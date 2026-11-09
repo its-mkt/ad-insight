@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ViewId } from './types/dashboard';
 import { VALID_VIEWS, VIEW_TITLES } from './utils/constants';
 import { THIS_M, THIS_Y } from './utils/format';
-import { useDashboardData } from './hooks/useDashboardData';
+import { fetchDailyHist, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
@@ -24,7 +24,8 @@ import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
 import { dayPeriodOf, type DayRange } from './utils/dayRange';
-import { applyDayRange, rangeCovered } from './utils/dayData';
+import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
+import type { SpendDailyRow } from './types/dashboard';
 
 /** 주소의 해시 → 화면과 검색어 (#keywords, #search?q=HPE) */
 function parseHash(): { view: ViewId; query: string } {
@@ -123,10 +124,36 @@ export const App: React.FC = () => {
   // 검색 결과의 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
   const [searchDay, setSearchDay] = useState<DayRange | null>(null);
   // 일·기간 — 일별 광고비 구간 안이면 그 기간의 광고비·견적으로 다시 모은 자료를 화면에 준다 (구간 밖이면 월 단위)
-  const dayCovered = !!searchDay && rangeCovered(data, searchDay);
+  // 최근 구간보다 앞선 날짜를 고르면 그 달의 일별 광고비를 추가로 받아 합친다
+  const [dailyHist, setDailyHist] = useState<{ rows: SpendDailyRow[]; months: string[] }>({ rows: [], months: [] });
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const dailyFailed = useRef(new Set<string>());
+  const fullData = useMemo(() => withDailyHist(data, dailyHist.rows, dailyHist.months), [data, dailyHist]);
+  useEffect(() => {
+    const need = searchDay ? dailyMonthsToLoad(fullData, searchDay).filter((m) => !dailyFailed.current.has(m)).slice(0, 48) : [];
+    if (!need.length) {
+      setDailyLoading(false);
+      return;
+    }
+    let alive = true;
+    setDailyLoading(true);
+    fetchDailyHist(need)
+      .then((rows) => {
+        if (alive) setDailyHist((p) => ({ rows: [...p.rows, ...rows], months: [...p.months, ...need] }));
+      })
+      .catch((err) => {
+        console.warn('일별 과거분 불러오기 실패', err);
+        need.forEach((m) => dailyFailed.current.add(m));
+        if (alive) setDailyLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [searchDay, fullData]);
+  const dayCovered = !!searchDay && rangeCovered(fullData, searchDay);
   const viewData = useMemo(
-    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(data, searchDay, { quotes: currentView !== 'search' }) : data),
-    [data, searchDay, currentView]
+    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : data),
+    [data, fullData, searchDay, currentView]
   );
   const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
   const searchMonth = searchPeriod.month || maxAvailableMonth;
@@ -337,7 +364,9 @@ export const App: React.FC = () => {
                 searchDay && !isSearchView
                   ? dayCovered
                     ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
-                    : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
+                    : dailyLoading
+                      ? '일별 데이터를 불러오는 중입니다…'
+                      : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
               onSelectDayRange={(r) => {

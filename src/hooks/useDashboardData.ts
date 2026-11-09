@@ -58,6 +58,9 @@ function emptyData(): DashboardData {
     sources: { google: '', naver: '' },
     spend: [],
     spendDaily: [],
+    dailyRecentFrom: {},
+    dailyHistMonths: {},
+    dailyLoadedMonths: [],
     manual: [],
     mapping: [],
     quotes: [],
@@ -145,6 +148,15 @@ export function quoteStatsOf(data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 
   };
 }
 
+/** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
+export async function fetchDailyHist(months: string[]): Promise<SpendDailyRow[]> {
+  const c = getCfg();
+  const res = await fetch(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`);
+  const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
+  if (j.error) throw new Error(j.error);
+  return fromApi({ g_adgroup_daily: j.g_adgroup_daily_hist, n_adgroup_daily: j.n_adgroup_daily_hist } as RawApiPayload).spendDaily;
+}
+
 export function fromApi(j: RawApiPayload): DashboardData {
   const n = (v: unknown) => Number(v) || 0;
 
@@ -181,6 +193,11 @@ export function fromApi(j: RawApiPayload): DashboardData {
     ...(j.g_adgroup_daily || []).map((r) => toDailyRow('Google', r)),
     ...(j.n_adgroup_daily || []).map((r) => toDailyRow('Naver', r)),
   ].filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+
+  const dailyRecentFrom: Record<string, string> = {};
+  spendDaily.forEach((r) => {
+    if (!dailyRecentFrom[r.media] || r.date < dailyRecentFrom[r.media]) dailyRecentFrom[r.media] = r.date;
+  });
 
   const manual: ManualRow[] = (j.manual || [])
     .map((r) => ({
@@ -313,6 +330,9 @@ export function fromApi(j: RawApiPayload): DashboardData {
     sources: { google: upd(j.g_meta), naver: upd(j.n_meta), quote: upd(j.q_meta) },
     spend,
     spendDaily,
+    dailyRecentFrom,
+    dailyHistMonths: j.daily_hist_months || {},
+    dailyLoadedMonths: [],
     manual,
     mapping: j.mapping || [],
     quotes: (j.quotes_monthly || []).map((r) => {
