@@ -12,6 +12,7 @@ import {
   toDayKey,
   type DayRange,
 } from '../../utils/dayRange';
+import { Dropdown } from './Dropdown';
 
 interface DatePickerProps {
   /** 지금 고른 일·기간 — 없으면 월 단위로 보는 중 */
@@ -46,7 +47,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, min, max, onChang
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || rootRef.current?.querySelector('.dd.open')) return; // 연·월 목록이 열려 있으면 목록만 닫는다
       setOpen(false);
       triggerRef.current?.focus({ preventScroll: true });
     };
@@ -73,6 +74,20 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, min, max, onChang
   const viewM = +view.slice(5, 7);
   const prevView = viewM === 1 ? ym(viewY - 1, 12) : ym(viewY, viewM - 1);
   const nextView = viewM === 12 ? ym(viewY + 1, 1) : ym(viewY, viewM + 1);
+
+  const firstYear = +minMonth.slice(0, 4);
+  const lastYear = +maxMonth.slice(0, 4);
+  const yearOptions = Array.from({ length: lastYear - firstYear + 1 }, (_, i) => lastYear - i).map((y) => ({ value: y, label: `${y}년` }));
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1).map((m) => ({
+    value: m,
+    label: `${m}월`,
+    disabled: ym(viewY, m) < minMonth || ym(viewY, m) > maxMonth,
+  }));
+  // 연도를 바꿔 고를 수 없는 달이 되면 가장 가까운 달로 맞춘다
+  const selectYear = (y: number) => {
+    const next = ym(y, viewM);
+    setView(next < minMonth ? minMonth : next > maxMonth ? maxMonth : next);
+  };
 
   const cells = useMemo(() => {
     const lead = fromDayKey(`${view}-01`).getDay();
@@ -146,9 +161,10 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, min, max, onChang
             <button type="button" className="dp-nav" aria-label="이전 달" disabled={prevView < minMonth} onClick={() => setView(prevView)}>
               <ChevronLeft strokeWidth={2.25} aria-hidden="true" />
             </button>
-            <strong className="dp-title">
-              {viewY}년 {viewM}월
-            </strong>
+            <div className="dp-title">
+              <Dropdown ariaLabel="연도 선택" value={viewY} options={yearOptions} onChange={selectYear} />
+              <Dropdown ariaLabel="월 선택" value={viewM} options={monthOptions} onChange={(m) => setView(ym(viewY, m))} />
+            </div>
             <button type="button" className="dp-nav" aria-label="다음 달" disabled={nextView > maxMonth} onClick={() => setView(nextView)}>
               <ChevronRight strokeWidth={2.25} aria-hidden="true" />
             </button>

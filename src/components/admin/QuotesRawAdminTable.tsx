@@ -101,6 +101,7 @@ const CategoryPicker: React.FC<{ value: string; changed: boolean; onChange: (cat
     <div className="qr-cat-pair">
       <Dropdown
         className={cls}
+        fixedMenu
         ariaLabel="1차 카테고리 선택"
         value={cat1}
         options={cat1Options}
@@ -108,6 +109,7 @@ const CategoryPicker: React.FC<{ value: string; changed: boolean; onChange: (cat
       />
       <Dropdown
         className={cls}
+        fixedMenu
         ariaLabel="2차 카테고리 선택"
         value={cat2}
         disabled={!node || cat2List.length === 0}

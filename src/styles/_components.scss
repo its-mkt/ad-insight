@@ -1799,8 +1799,16 @@ td.future {
   }
 
   .dp-title {
+    display: inline-flex;
+    gap: 0.25rem;
     font-size: 0.875rem;
     font-weight: 700;
+
+    .dd-trigger {
+      height: 1.75rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
   }
 
   .dp-nav,
