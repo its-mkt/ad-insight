@@ -103,7 +103,8 @@ function syncAllBody_(t0) {
     try { fn(); console.log('✓ ' + label + ' 동기화 완료'); } catch (e) { fail_(name, e); }
   }
   // 일별 과거분은 시트를 많이 건드리므로 견적 등 다른 수집이 모두 끝난 뒤에 받는다
-  if (pendingNaverHist_) collectNaverDailyHist_(SpreadsheetApp.openById(CFG.SHEET_ID), t0, pendingNaverHist_.groups, pendingNaverHist_.gById);
+  // 전용 채우기(fillNaverDailyHist)가 도는 중이면 겹치지 않게 건너뛴다
+  if (pendingNaverHist_ && Date.now() - Number(PROPS.getProperty('NAVER_HIST_FILLING') || 0) > 15 * 60 * 1000) collectNaverDailyHist_(SpreadsheetApp.openById(CFG.SHEET_ID), t0, pendingNaverHist_.groups, pendingNaverHist_.gById);
   console.log('=== [its-ad-insight] 전체 매체 통합 동기화 완료 (' + Math.round((Date.now() - t0) / 1000) + '초 소요) ===');
 }
 
@@ -302,7 +303,7 @@ let pendingNaverHist_ = null; // 이번 실행의 네이버 수집에서 읽은 
  * 지난달까지의 광고그룹 × 일을 달 단위로 n_adgroup_daily_hist 에 쌓는다 (한 번 받은 달은 다시 받지 않는다).
  * 최신 달부터, 한 번 실행에 CFG.NAVER_HIST_BUDGET_MS 안에서만 받아 다른 수집 시간을 남긴다. 실패해도 나머지 수집은 계속한다.
  */
-function collectNaverDailyHist_(ss, t0, groups, gById) {
+function collectNaverDailyHist_(ss, t0, groups, gById, budgetMs = CFG.NAVER_HIST_BUDGET_MS) {
   try {
     const h0 = Date.now();
     const head = ['date', 'type', 'campaign', 'campaign_tp', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
@@ -314,7 +315,7 @@ function collectNaverDailyHist_(ss, t0, groups, gById) {
       .filter((m) => m < thisMonth && !done.has(m)).sort().reverse();
     const ids = groups.map((g) => String(g.id));
     for (const m of months) {
-      if (Date.now() - h0 > CFG.NAVER_HIST_BUDGET_MS / 2 || Date.now() - t0 > CFG.BUDGET_MS) break; // 한 달을 끝낼 시간이 남았을 때만 시작한다
+      if (Date.now() - h0 > budgetMs / 2 || Date.now() - t0 > CFG.BUDGET_MS) break; // 한 달을 끝낼 시간이 남았을 때만 시작한다
       const last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
       const rows = [];
       for (let d = 1; d <= last; d++) {
@@ -335,7 +336,28 @@ function collectNaverDailyHist_(ss, t0, groups, gById) {
       done.add(m);
       PROPS.setProperty('NAVER_HIST_DONE', JSON.stringify([...done]));
     }
-  } catch (err) { console.warn('일별 과거분 수집 실패: ' + err.message); }
+    return months.filter((m) => !done.has(m)).length;
+  } catch (err) { console.warn('일별 과거분 수집 실패: ' + err.message); return -1; }
+}
+/**
+ * 편집기에서 한 번만 실행: 네이버 일별 과거분을 끝까지 채운다. 6분 제한 안에서 나눠 받고, 남으면 1분 뒤 스스로 다시 시작한다.
+ * 매시간 수집과 겹치는 시간(매시 9~24분)은 쉬었다가 이어 가고, 연속 5번 실패하면 멈춘다.
+ */
+function fillNaverDailyHist() {
+  ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'fillNaverDailyHist').forEach((t) => ScriptApp.deleteTrigger(t));
+  const again = (ms) => ScriptApp.newTrigger('fillNaverDailyHist').timeBased().after(ms).create();
+  const minute = Number(Utilities.formatDate(new Date(), 'Asia/Seoul', 'm'));
+  if (minute >= 9 && minute < 24) { again(15 * 60 * 1000); return; }
+  const t0 = Date.now(), ss = SpreadsheetApp.openById(CFG.SHEET_ID), groups = read_(ss, 'n_idx_groups');
+  if (!groups.length) throw new Error('n_idx_groups 가 비어 있습니다');
+  PROPS.setProperty('NAVER_HIST_FILLING', String(t0));
+  let left = -1;
+  try { left = collectNaverDailyHist_(ss, t0, groups, Object.fromEntries(groups.map((g) => [String(g.id), g])), 8 * 60 * 1000); } finally { saveApiCount_(); }
+  const fails = left < 0 ? Number(PROPS.getProperty('NAVER_HIST_FILL_FAILS') || 0) + 1 : 0;
+  PROPS.setProperty('NAVER_HIST_FILL_FAILS', String(fails));
+  console.log('일별 과거분 남은 달: ' + left + ' (연속 실패 ' + fails + '회)');
+  if (left === 0 || fails >= 5) PROPS.deleteProperty('NAVER_HIST_FILLING');
+  else again(60 * 1000);
 }
 /** 일별 과거분 시트에 있는 달 목록 — 행 수가 바뀔 때만 다시 읽는다 */
 function dailyHistMonths_(ss, name) {

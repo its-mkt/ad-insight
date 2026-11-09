@@ -16,7 +16,7 @@
 const CFG = {
   SHEET_URL: 'https://docs.google.com/spreadsheets/d/1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg/edit',   // its-ad-insight 데이터 시트 주소
   DAILY_DAYS: 62, // 일별 광고비를 모으는 최근 일수 (오늘 포함). 늘리면 시트·응답 크기가 그만큼 커진다
-  DAILY_HIST_MONTHS: 12, // 일별 과거분을 한 번 실행에 채우는 달 수 (g_adgroup_daily_hist, 한 번 받은 달은 다시 받지 않는다)
+  DAILY_HIST_MONTHS: 60, // 일별 과거분을 한 번 실행에 채우는 달 수 (g_adgroup_daily_hist, 한 번 받은 달은 다시 받지 않는다)
   FROM_YEAR: 2023, // 시트를 비우고 다시 쓰므로 고정값으로 둔다. 계산식으로 바꾸면 해가 바뀔 때 과거 달이 지워진다
 };
 
