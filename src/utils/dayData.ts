@@ -1,6 +1,6 @@
 import type { DashboardData, QuoteRawRow, QuoteRow, SpendDailyRow, SpendRow } from '../types/dashboard';
 import { prevM } from './format';
-import { inDayRange, monthsOfRange, previousRange, type DayRange } from './dayRange';
+import { daysOfMonth, inDayRange, lastDayOf, monthsOfRange, previousRange, rangeDays, type DayRange } from './dayRange';
 
 const DAILY_MEDIA = ['Google', 'Naver'];
 type DailyCoverage = Pick<DashboardData, 'spend' | 'spendDaily' | 'dailyRecentFrom' | 'dailyHistMonths' | 'dailyLoadedMonths'>;
@@ -119,5 +119,56 @@ export function applyDayRange(data: DashboardData, range: DayRange | null, opts:
     quotesSites: both(data.quotesSites),
     quotesPhone: both(data.quotesPhone),
     quotesExtra: both(data.quotesExtra),
+  };
+}
+
+/** 진행 중인 달의 비교 기준 */
+export interface SameDateCompare {
+  /** 비교 문구 */
+  cmpLabel: string;
+  /** 비교한 전달 구간의 일수 — 일평균 계산용 */
+  days: number;
+}
+
+/**
+ * 진행 중인 달 보기 — 전달 자리만 "1일~같은 날짜" 값으로 바꿔, 며칠 치 이번 달과 다 끝난 전달을 비교하지 않게 한다.
+ * 광고비는 일별 자료가 수집된 마지막 날까지, 견적은 오늘까지 맞춘다. 전달이 짧으면 그 달 말일까지만 본다.
+ * 일별 자료가 없는 매체(Meta·GFA 등)는 전달 금액을 같은 일수 비율로 줄인 추정값으로 비교한다.
+ * 전달 일별 자료가 갖춰지지 않았으면 null — 월 전체와 비교하고 문구도 '전월' 로 둔다.
+ */
+export function withSameDatePrev(data: DashboardData, today: string): { data: DashboardData; compare: SameDateCompare } | null {
+  const month = today.slice(0, 7);
+  const prevMonth = prevM(month);
+  const rangeUntil = (day: string): DayRange => {
+    const to = `${prevMonth}-${day.slice(8, 10)}`;
+    const last = lastDayOf(prevMonth);
+    return { from: `${prevMonth}-01`, to: to < last ? to : last };
+  };
+  const lastCollected = DAILY_MEDIA.map((m) =>
+    data.spendDaily.reduce((max, r) => (r.media === m && r.date.startsWith(month) && r.date > max ? r.date : max), '')
+  ).filter(Boolean);
+  const spendRange = rangeUntil(lastCollected.length ? lastCollected.sort()[0] : today);
+  if (!rangeCovered(data, spendRange)) return null;
+
+  const quoteRange = rangeUntil(today);
+  const keep = <T extends QuoteRawRow>(rows: T[]): T[] => rows.filter((r) => !r.date?.startsWith(prevMonth) || inDayRange(r.date, quoteRange));
+  const quotesRaw = keep(data.quotesRaw);
+  const days = rangeDays(spendRange);
+  const share = days / daysOfMonth(prevMonth);
+  const estimated = data.spend
+    .filter((r) => r.month === prevMonth && !DAILY_MEDIA.includes(r.media))
+    .map((r) => ({ ...r, cost: Math.round(r.cost * share), imp: Math.round(r.imp * share), clk: Math.round(r.clk * share), conv: r.conv * share }));
+
+  return {
+    data: {
+      ...data,
+      spend: [...data.spend.filter((r) => r.month !== prevMonth), ...spendInRange(data.spendDaily, spendRange, prevMonth), ...estimated],
+      quotes: [...data.quotes.filter((r) => r.month !== prevMonth), ...quoteRowsOf(quotesRaw.filter((r) => r.date?.startsWith(prevMonth)), prevMonth)],
+      quotesRaw,
+      quotesSites: keep(data.quotesSites),
+      quotesPhone: keep(data.quotesPhone),
+      quotesExtra: keep(data.quotesExtra),
+    },
+    compare: { cmpLabel: '전월 동기간', days },
   };
 }

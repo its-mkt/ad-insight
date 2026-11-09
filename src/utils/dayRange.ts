@@ -86,11 +86,13 @@ export interface DayPeriod {
   days: number;
   /** 비교 문구 — '직전 8일' */
   cmpLabel: string;
+  /** 선택한 날짜 범위 */
+  range: DayRange;
 }
 
 export const dayPeriodOf = (r: DayRange): DayPeriod => {
   const short = (day: string) => day.slice(5).replace('-', '.');
   const days = rangeDays(r);
   const label = r.from === r.to ? short(r.to) : r.from.slice(0, 4) === r.to.slice(0, 4) ? `${short(r.from)}~${short(r.to)}` : rangeLabel(r);
-  return { label, days, cmpLabel: `직전 ${days}일` };
+  return { label, days, cmpLabel: `직전 ${days}일`, range: r };
 };

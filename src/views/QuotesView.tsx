@@ -1,5 +1,4 @@
-import React, { useMemo } from 'react';
-import type { DayPeriod } from '../utils/dayRange';
+import React, { useMemo, useState } from 'react';
 import type { DashboardData, QuoteRawRow, SyncStatus } from '../types/dashboard';
 import {
   buildSourceShareData,
@@ -16,8 +15,16 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteStatsOf } from '../hooks/useDashboardData';
+import { inDayRange, type DayPeriod } from '../utils/dayRange';
+import type { SameDateCompare } from '../utils/dayData';
+import { originOf, QuoteListTable } from '../components/quotes/QuoteListTable';
+import { TrendTable } from '../components/quotes/TrendTable';
+import { SourceShareTable } from '../components/quotes/SourceShareTable';
+import { SegmentedControl } from '../components/common/SegmentedControl';
+import { View } from '../components/common/View';
+import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { MonthlyQuotesTable } from '../components/quotes/MonthlyQuotesTable';
@@ -39,41 +46,48 @@ interface QuotesViewProps {
   monthly?: DashboardData;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
+  sameDate?: SameDateCompare;
 }
 
 const QUOTES_SOURCES: SourceLinkItem[] = [
   { label: '아이티켓 고도몰 견적 목록', href: EXTERNAL_LINKS.itketEstimateList },
   { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
   { label: '견적 접수 원본 시트', href: EXTERNAL_LINKS.quotesRawSheet },
-  { label: 'collectQuotes · collectQuoteStatsExtra · 1시간 자동 동기화' },
+  { label: '1시간 자동 동기화' },
 ];
 
-export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
+const ORIGIN_COLORS: Record<string, string> = {
+  itket: '--c-it',
+  zbyhp: '--c-n',
+  cadkorea: '--c-m',
+  전화: '--c-g',
+  톡플러스: '--c-ka',
+};
+
+export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra]);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
+  const [mode, setMode] = useState<'chart' | 'table'>('chart');
   const trendQuotes = trend?.quotes ?? quotes;
   const trendRaw = trend?.quotesRaw ?? quotesRaw;
 
   if (!quotes.length) {
     return (
-      <div className="view on" data-view="quotes" data-title="견적 상세">
+      <View name="quotes" title="견적 상세">
         <ViewHeader
           title="ITKET 견적 상세 현황"
           description="아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이"
           status={status}
         />
         <KpiSection id="kpiQuotes">
-          <div className="kpi">
-            <div className="l">견적 데이터</div>
-            <div className="v">–</div>
-            <div className="d flat">데이터 연결 필요</div>
-          </div>
+          <KpiPlaceholder label="견적 데이터" message="데이터 연결 필요" />
         </KpiSection>
         <Card name="empty" id="quotes-empty">
           <EmptyState message="취합된 실제 견적 데이터가 없습니다. 상단 [연결 설정] 버튼에서 데이터 연결을 완료해 주세요." />
         </Card>
-      </div>
+      </View>
     );
   }
 
@@ -148,29 +162,25 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
         cur={top?.[1] ?? null}
         prev={prevTopCount}
         cmpLabel={prevRows ? cmp : undefined}
-        detail={top ? <KpiDetailItems items={items} /> : null}
+        detail={top ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['최다 접수', '0건']]} />}
       />
     );
   };
 
-  const hasMultiSite = quotesRaw.some((r) => r.site);
   const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => {
-    if (!hasMultiSite || !rows.length) return null;
     const counts: Record<string, number> = {};
     rows.forEach((r) => {
       const k = r.inquiryType ? '전화/톡플러스' : !r.site ? 'itket' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
       counts[k] = (counts[k] || 0) + 1;
     });
-    const parts = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].filter((k) => k === 'cadkorea' || k === 'zbyhp' || counts[k]);
-    if (parts.length <= 1) return null;
-    return <KpiDetailItems items={parts.map((k): [string, number] => [k, counts[k] ?? 0])} />;
+    return <KpiDetailItems items={['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, counts[k] ?? 0])} />;
   };
   const curSiteDetail = siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
   const allSiteDetail = siteBreak(quotesRaw);
 
   const { items: srcItems } = buildSourceShareData(
     quotesRaw,
-    period ? curM : yr,
+    allPeriod || yearTotal ? yr : curM, // 월·일 기간을 고르면 그 달, 연도 합계·전체 기간이면 누적
     quotes,
     allPeriod ? undefined : curM
   );
@@ -188,14 +198,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     .filter((c) => c !== '기타' && c !== topCatKey)
     .slice(0, 2)
     .map((k): [string, number] => [k, sumBy(yrQuotes.filter((r) => cat1Of(r.category) === k), (r) => r.count)]);
-  const catRunnerUps = catRunnerUpItems.length ? <KpiDetailItems items={catRunnerUpItems} /> : null;
+  const catRunnerUps = catRunnerUpItems.length ? <KpiDetailItems items={catRunnerUpItems} /> : <KpiDetailItems items={[['다른 카테고리', '0건']]} />;
 
   // KPI 카드 범위: 월 선택 → 당월, 연도 전체 → 연간 (차트는 항상 yrQuotes 사용)
   const kpiQuotes = yearTotal
     ? quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');
@@ -206,7 +216,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     .filter((c) => c !== '기타' && c !== kpiTopCatKey)
     .slice(0, 2)
     .map((k): [string, number] => [k, sumBy(kpiQuotes.filter((r) => cat1Of(r.category) === k), (r) => r.count)]);
-  const kpiCatRunnerUps = kpiCatRunnerUpItems.length ? <KpiDetailItems items={kpiCatRunnerUpItems} /> : null;
+  const kpiCatRunnerUps = kpiCatRunnerUpItems.length ? <KpiDetailItems items={kpiCatRunnerUpItems} /> : <KpiDetailItems items={[['다른 카테고리', '0건']]} />;
   const pvTopCatCount = !yearTotal && kpiTopCatKey
     ? sumBy(quotes.filter((r) => r.month === pv && cat1Of(r.category) === kpiTopCatKey), (r) => r.count)
     : 0;
@@ -232,13 +242,33 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
   const kpiAdQuotes = yearTotal
     ? sumBy(quotes.filter(inMonths(ytdValidMonths)), (r) => r.count)
     : curM >= starts.cpaFrom ? curAdQuotes : 0;
-  const kpiCpaDetail = kpiCpa ? (
+  const kpiCpaDetail = (
     <>
       <p>광고비 <b>{fmtWon(kpiSpend)}</b></p>
       <i>|</i>
       <p>견적 <b>{fmt(kpiAdQuotes)}건</b></p>
     </>
-  ) : null;
+  );
+
+  // 접수 목록 — 기간 보기에서는 날짜를 옮기지 않은 원본(trendRaw)에서 실제 날짜로 고른다
+  const listRows = trendRaw.filter((r) => {
+    if (period) return inDayRange(r.date, period.range);
+    if (allPeriod) return true;
+    const mo = r.date?.slice(0, 7) ?? '';
+    return yearTotal ? mo.startsWith(yr) && mo <= curM : mo === curM;
+  });
+  const listPeriod = period ? period.label : allPeriod ? '전체 기간' : kpiLabel;
+  // 접수처 비중 — 아래 접수 목록과 같은 기간·같은 행으로 센다. 전화문의 시트 건은 시트의 경로(전화·톡플러스·메일)로 나눈다
+  // 주요 접수처는 건수가 0이어도 남겨 어디가 비었는지 보이게 한다
+  const originKeyOf = (r: QuoteRawRow) => r.inquiryType || originOf(r);
+  const originItems = [...new Set(['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스', ...listRows.map(originKeyOf)])]
+    .map((k) => {
+      const count = listRows.filter((r) => originKeyOf(r) === k).length;
+      return { k, c: ORIGIN_COLORS[k] || '--c-etc', count, v: listRows.length ? Math.round((count / listRows.length) * 1000) / 10 : 0 };
+    })
+    .sort((a, b) => b.count - a.count);
+  const showTrendChart = allPeriod || yearTotal;
+  const trendTitle = allPeriod ? '연도별 견적 접수 수' : '월별 견적 접수 수';
 
   // 추이 차트: 건수 상위 6개 1차 카테고리 + 그 외
   const chartCats = quoteChartCats(yrQuotes);
@@ -255,8 +285,22 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     }))
     .filter((s) => s.v.some((x) => x));
 
+  // 추이 표: 차트와 달리 '그 외'로 묶지 않고 1차 카테고리를 모두 펼친다
+  const trendTableSeries = quoteCat1Order(yrQuotes)
+    .map((k) => ({
+      k,
+      c: '--acc',
+      v: axisKeys.map((key) =>
+        sumBy(
+          yrQuotes.filter((r) => r.month.startsWith(key) && cat1Of(r.category || '기타') === k),
+          (r) => r.count
+        )
+      ),
+    }))
+    .filter((s) => s.v.some((x) => x));
+
   return (
-    <div className="view on" data-view="quotes" data-title="견적 상세">
+    <View name="quotes" title="견적 상세">
       <ViewHeader
         title="ITKET 견적 상세 현황"
         description="아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이"
@@ -264,9 +308,9 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
       />
 
       {allPeriod && (
-        <p className="leg-note quote-src-note">
-          ※ 전체 기간 합산입니다. 견적 데이터는 {dotYm(firstM)}부터 있고, 유입 매체는 2026년 10월부터 추적합니다.
-        </p>
+        <ViewNote>
+          ※ 전체 기간 합산. 견적은 {dotYm(firstM)}부터, 유입 매체는 2026년 10월부터 추적합니다.
+        </ViewNote>
       )}
 
       <KpiSection id="kpiQuotes">
@@ -277,7 +321,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
               label={<>견적당 광고비 (CPA)</>}
               value={allCpa ? `${fmt(allCpa)}원` : '–'}
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
-              detail={allCpa ? <><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotesCount)}건</b></p></> : null}
+              detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotesCount)}건</b></p></>}
             />
             {repCard('전체 최다 접수 담당자', quotesRaw, null, false)}
             <KpiCard
@@ -337,34 +381,63 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
         )}
       </KpiSection>
 
-      <div className="grid grid-2-1">
-        <MultiChart
-          id="chQuote"
-          title={allPeriod ? '연도별 견적 접수 수' : '월별 견적 접수 수'}
-          labels={labels}
-          series={series}
-          unit="건"
+      <div className="mock-bar">
+        <SegmentedControl<'chart' | 'table'>
+          dataKey="mode"
+          options={[
+            { value: 'chart', label: '그래프' },
+            { value: 'table', label: '표' },
+          ]}
+          value={mode}
+          onChange={setMode}
         />
-        <Card name="quotes-src" id="quotes-src" title="유입 매체 비중">
-          <SourceBarChart
-            id="chSrc"
-            items={srcItems}
-            emptyMessage="취합된 실제 유입 매체 데이터가 없습니다."
-          />
-        </Card>
+        <span className="sp" />
       </div>
 
-      <MonthlyQuotesTable
-        quotes={trendQuotes}
-        quotesRaw={trendRaw}
-        yr={yr}
-        curM={curM}
-        months={months}
-        allMonths={allMonths}
-        allPeriod={allPeriod}
-        yearTotal={yearTotal}
-      />
+      {/* 추이는 여러 기간을 비교할 때만 의미가 있어 '전체'(연도 합계·전체 기간)에서만 보여 준다 */}
+      {showTrendChart && (mode === 'chart' ? (
+        <MultiChart id="chQuote" title={trendTitle} labels={labels} series={series} unit="건" />
+      ) : (
+        <TrendTable id="quotes-trend" title={trendTitle} nameLabel="카테고리" labels={labels} series={trendTableSeries} />
+      ))}
+
+      <div className="grid grid-4">
+        <Card name="quotes-src" id="quotes-src" title="유입 매체 비중" subtitle={`(${listPeriod} · ${fmt(sumBy(srcItems, (s) => s.count ?? 0))}건)`}>
+          {mode === 'chart' ? (
+            <SourceBarChart id="chSrc" colorTop={5} items={srcItems} emptyMessage="취합된 실제 유입 매체 데이터가 없습니다." />
+          ) : (
+            <SourceShareTable items={srcItems} emptyMessage="취합된 실제 유입 매체 데이터가 없습니다." />
+          )}
+          <ViewNote>※ 유입 경로가 확인된 건만 집계 (2026.10.12부터 추적)</ViewNote>
+        </Card>
+        <Card name="quotes-origin" id="quotes-origin" title="접수처 비중" subtitle={`(${listPeriod} · ${fmt(listRows.length)}건)`}>
+          {mode === 'chart' ? (
+            <SourceBarChart id="chOrigin" nameLabel="접수처" itemColors colorTop={5} items={listRows.length ? originItems : []} emptyMessage="선택한 기간의 접수 내역이 없습니다." />
+          ) : (
+            <SourceShareTable tableId="tbQuoteOrigin" nameLabel="접수처" items={listRows.length ? originItems : []} emptyMessage="선택한 기간의 접수 내역이 없습니다." />
+          )}
+          <ViewNote>※ 전화·톡플러스·메일은 수기 기록 건만 집계 (2024.07~)</ViewNote>
+        </Card>
+        {(['cat', 'rep'] as const).map((group) => (
+          <MonthlyQuotesTable
+            key={group}
+            group={group}
+            quotes={period ? quotes : trendQuotes}
+            quotesRaw={period ? quotesRaw : trendRaw}
+            yr={yr}
+            curM={curM}
+            months={months}
+            allMonths={allMonths}
+            allPeriod={allPeriod}
+            yearTotal={yearTotal}
+            viewMode={mode}
+            periodLabel={listPeriod}
+            isRange={!!period}
+          />
+        ))}
+      </div>
+      <QuoteListTable rows={listRows} periodLabel={listPeriod} resetKey={`${curM}|${allPeriod}|${yearTotal}|${period?.label ?? ''}`} />
       <SecSrc sources={QUOTES_SOURCES} />
-    </div>
+    </View>
   );
 };

@@ -22,7 +22,7 @@ interface KpiCardProps {
 /** 링크 카드에 마우스를 올리면 보여 줄 "이동할 화면에서 볼 수 있는 내용" — 공용 툴팁(#tip) 설명 */
 const VIEW_TIPS: Partial<Record<ViewId, string>> = {
   ads: '매체별, 광고 형태별 월 광고비 추이와 일평균 광고비, MDF 소진, 집행 상세 표를 볼 수 있습니다.',
-  quotes: '월별 접수 견적을 카테고리, 담당자, 문의 유형, 유입 매체별로 나눠 보고 사이트별 구성을 볼 수 있습니다.',
+  quotes: '월별 접수 견적을 카테고리, 담당자별로 나눠 보고 유입 매체와 접수처 비중을 볼 수 있습니다.',
   'cat-efficiency': '카테고리별 광고비, 클릭, 총 접수 견적, 견적전환율, CPA를 비교해 효율이 좋은 카테고리를 볼 수 있습니다.',
   keywords: '광고그룹별 키워드의 광고비, 클릭, 전환과 운영 중인 소재를 볼 수 있습니다.',
 };
@@ -99,6 +99,19 @@ export const KpiCard: React.FC<KpiCardProps> = ({
     </a>
   );
 };
+
+/** 데이터가 없을 때 KPI 자리에 두는 안내 카드 */
+export const KpiPlaceholder: React.FC<{ label: React.ReactNode; value?: string; message: React.ReactNode }> = ({
+  label,
+  value = '–',
+  message,
+}) => (
+  <div className="kpi">
+    <div className="l">{label}</div>
+    <div className="v">{value}</div>
+    <div className="d flat">{message}</div>
+  </div>
+);
 
 /** KPI 카드 묶음 컨테이너 — className="kpis" 를 단일 출처로 관리 */
 export const KpiSection: React.FC<{ id?: string; children: React.ReactNode }> = ({ id, children }) => (

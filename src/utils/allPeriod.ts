@@ -2,7 +2,7 @@ import type { DashboardData, KeywordRow } from '../types/dashboard';
 import { ym } from './format';
 
 /** 기간 선택의 '전체' 를 쓸 수 있는 화면 — 연도 '전체' 는 전 기간, 월 '전체' 는 선택 연도 합계 */
-export const TOTAL_PERIOD_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes'];
+export const TOTAL_PERIOD_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes', 'admin'];
 
 /** 여러 달의 같은 키워드를 한 줄로 합친다. 실적은 더하고 입찰가·품질지수는 가장 최근 달 값을 쓴다 */
 export function mergeKeywordMonths(rows: KeywordRow[]): KeywordRow[] {

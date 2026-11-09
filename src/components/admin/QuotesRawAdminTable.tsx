@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { EXTERNAL_LINKS } from '../../utils/constants';
-import { fmt, parseCatParts, quoteKey, sourceColorVar, THIS_M, THIS_Y } from '../../utils/format';
-import { ALL_CATEGORIES, CATEGORY_HIERARCHY, QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
+import { fmt, parseCatParts, quoteKey, sourceColorVar } from '../../utils/format';
+import type { DayRange } from '../../utils/dayRange';
+import { CATEGORY_HIERARCHY, QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
 import { SkelRows } from '../common/SkeletonView';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
+import { FilterReset } from '../common/FilterReset';
 import { Tooltip } from '../common/Tooltip';
 import { Download, ExternalLink, Save } from 'lucide-react';
 import { useSort } from '../../hooks/useSort';
@@ -20,6 +22,14 @@ interface QuotesRawAdminTableProps {
   quotes: QuoteRawRow[];
   /** 보고 있는 문의 종류 (어드민 머리말 아래 전환 버튼) */
   channel?: QuoteChannel;
+  /** 상단 기간 바에서 고른 달 (YYYY-MM) */
+  selectedMonth: string;
+  /** 상단 기간 바의 전체 기간 — 날짜로 거르지 않는다 */
+  allPeriod?: boolean;
+  /** 상단 기간 바의 연도 합계 — selectedMonth 의 연도 전체 */
+  yearTotal?: boolean;
+  /** 상단 기간 바의 일·기간 선택 — 있으면 월 선택보다 우선한다 */
+  dayRange?: DayRange | null;
   /** 전화문의 행 — 카테고리는 시트에서 관리해 여기서는 읽기만 한다 */
   phoneQuotes?: QuoteRawRow[];
   /** 실데이터를 받는 중 — 아직 없는 광고 꼬리표는 스켈레톤으로 보여 준다 */
@@ -39,10 +49,11 @@ interface QuotesRawAdminTableProps {
 type SortKey = 'idx' | 'sno' | 'site' | 'date' | 'subject' | 'company' | 'name' | 'email' | 'phone' | 'rep' | 'category' | 'source';
 export type QuoteChannel = 'live' | 'phone';
 
-const MONTH_OPTIONS = [
-  { value: 'ALL', label: '월 전체' },
-  ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1).padStart(2, '0'), label: `${i + 1}월` })),
-];
+/** 2차 필터의 '2차 없음' — 1차로만 분류된 행을 고른다 */
+const NO_CAT2 = '__NONE__';
+
+/** 1차 목록 항목 옆 '· 2' — 분류표에 있는 2차 개수, 2차가 없으면 표시하지 않는다 */
+const cat2CountHint = (count: number): string | undefined => (count ? `· ${count}` : undefined);
 
 /** 아이티켓 원장 행은 site 가 비어 있다 */
 const siteOf = (q: QuoteRawRow): string => q.site || 'itket';
@@ -88,7 +99,7 @@ const CategoryPicker: React.FC<{ value: string; changed: boolean; onChange: (cat
   const node = CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1);
   const cat2List = node?.cat2 ?? [];
   const cat1Options: DropdownOption<string>[] = [
-    ...CATEGORY_HIERARCHY.map((n) => ({ value: n.cat1, label: n.cat1, hint: n.cat2.length ? `· ${n.cat2.length}` : undefined })),
+    ...CATEGORY_HIERARCHY.map((n) => ({ value: n.cat1, label: n.cat1, hint: cat2CountHint(n.cat2.length) })),
     ...(node ? [] : [{ value: cat1, label: `${cat1} (기존)` }]),
   ];
   const cat2Options: DropdownOption<string>[] = [
@@ -123,6 +134,10 @@ const CategoryPicker: React.FC<{ value: string; changed: boolean; onChange: (cat
 export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   quotes: liveQuotes,
   channel = 'live',
+  selectedMonth,
+  allPeriod = false,
+  yearTotal = false,
+  dayRange = null,
   phoneQuotes = [],
   loading = false,
   originals,
@@ -140,31 +155,60 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   const [selectedSite, setSelectedSite] = useState('ALL');
   // 전체 탭은 사이트가 섞이고 sno 도 겹칠 수 있어 사이트 열을 함께 보여 준다
   const showSiteCol = selectedSite === 'ALL' && !isPhone;
-  const [selectedCat, setSelectedCat] = useState('ALL');
+  const [selectedCat1, setSelectedCat1] = useState('ALL');
+  const [selectedCat2, setSelectedCat2] = useState('ALL');
   const [selectedSource, setSelectedSource] = useState('ALL');
-  // 처음에는 이번 달만 보여 준다
-  const [selectedYear, setSelectedYear] = useState(String(THIS_Y));
-  const [selectedMonth, setSelectedMonth] = useState(THIS_M.slice(5, 7));
+  // 담당자 없는 행은 빈 문자열 값(미지정)으로 고른다
+  const [selectedRep, setSelectedRep] = useState('ALL');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date', 'asc');
 
-  const categories = useMemo(() => {
-    // 필터 목록: 실제 견적에 붙은 카테고리만 (분류표 순서, 분류표 밖 값은 뒤에)
-    const used = new Set(quotes.map((q) => q.category).filter(Boolean));
-    const list = [...ALL_CATEGORIES.filter((c) => used.has(c)), ...[...used].filter((c) => !ALL_CATEGORIES.includes(c))];
-    return ['ALL', ...list];
-  }, [quotes]);
+  // 필터 목록: 실제 견적에 붙은 값만 (분류표 순서, 분류표 밖 값은 뒤에). 표에서 분류를 바꿔 값이 사라져도 고른 값은 목록에 남긴다
+  const cat1List = useMemo(() => {
+    const used = new Set(quotes.map((q) => parseCatParts(q.category || '').cat1).filter(Boolean));
+    if (selectedCat1 !== 'ALL') used.add(selectedCat1);
+    const known = CATEGORY_HIERARCHY.map((n) => n.cat1);
+    return ['ALL', ...known.filter((c) => used.has(c)), ...[...used].filter((c) => !known.includes(c))];
+  }, [quotes, selectedCat1]);
+
+  const cat2List = useMemo(() => {
+    if (selectedCat1 === 'ALL') return [];
+    const parts = quotes.map((q) => parseCatParts(q.category || '')).filter((p) => p.cat1 === selectedCat1);
+    const used = new Set(parts.map((p) => p.cat2).filter(Boolean));
+    if (selectedCat2 !== 'ALL' && selectedCat2 !== NO_CAT2) used.add(selectedCat2);
+    const known = CATEGORY_HIERARCHY.find((n) => n.cat1 === selectedCat1)?.cat2 ?? [];
+    const list = [...known.filter((c) => used.has(c)), ...[...used].filter((c) => !known.includes(c))];
+    // 2차가 있는 1차에서만 '2차 없음'이 의미가 있다
+    const hasNone = parts.some((p) => !p.cat2) || selectedCat2 === NO_CAT2;
+    return list.length ? [...list, ...(hasNone ? [NO_CAT2] : [])] : [];
+  }, [quotes, selectedCat1, selectedCat2]);
 
   const sources = useMemo(() => {
     return ['ALL', ...Array.from(new Set(quotes.map((q) => q.source).filter(Boolean)))];
   }, [quotes]);
 
-  const years = useMemo(() => {
-    // 이번 해 견적이 아직 없어도 기본 선택값이 목록에 있도록 함께 넣는다
-    const used = quotes.map((q) => q.date?.slice(0, 4)).filter(Boolean);
-    return ['ALL', ...Array.from(new Set([String(THIS_Y), ...used])).sort().reverse()];
-  }, [quotes]);
+  // 상단 기간 바에서 고른 기간에 드는 날짜인가
+  const inPeriod = useCallback(
+    (date = ''): boolean => {
+      if (dayRange) return date.slice(0, 10) >= dayRange.from && date.slice(0, 10) <= dayRange.to;
+      if (allPeriod) return true;
+      return yearTotal ? date.slice(0, 4) === selectedMonth.slice(0, 4) : date.slice(0, 7) === selectedMonth;
+    },
+    [selectedMonth, allPeriod, yearTotal, dayRange]
+  );
+
+  // 선택한 기간에 견적이 있는 담당자만 목록에 둔다
+  const reps = useMemo(() => {
+    const periodRows = quotes.filter((q) => inPeriod(q.date));
+    const names = new Set(periodRows.map((q) => q.salesRep).filter((r): r is string => !!r));
+    return ['ALL', ...[...names].sort((a, b) => a.localeCompare(b, 'ko')), ...(periodRows.some((q) => !q.salesRep) ? [''] : [])];
+  }, [quotes, inPeriod]);
+
+  // 기간을 바꿔 고른 담당자가 목록에서 빠지면 '담당자 전체'로 푼다
+  useEffect(() => {
+    if (!reps.includes(selectedRep)) setSelectedRep('ALL');
+  }, [reps, selectedRep]);
 
   // 행 식별 키 (id 우선, 없으면 sno, 없으면 index)
   const getRowKey = (q: QuoteRawRow, index: number): string | number => {
@@ -173,10 +217,26 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
 
   // 카테고리·경로 값이 문의 종류마다 달라 옮길 때 두 필터를 풀어 준다
   useEffect(() => {
-    setSelectedCat('ALL');
+    setSelectedCat1('ALL');
+    setSelectedCat2('ALL');
     setSelectedSource('ALL');
+    setSelectedRep('ALL');
     setPage(1);
   }, [channel]);
+
+  // 상단 기간 바에서 기간을 바꾸면 첫 페이지부터 보여 준다
+  useEffect(() => {
+    setPage(1);
+  }, [selectedMonth, allPeriod, yearTotal, dayRange]);
+
+  const resetFilters = () => {
+    setSearch('');
+    setSelectedRep('ALL');
+    setSelectedCat1('ALL');
+    setSelectedCat2('ALL');
+    setSelectedSource('ALL');
+    setPage(1);
+  };
 
   const handleSort = (key: SortKey) => {
     toggleSort(key);
@@ -188,10 +248,14 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
     return quotes
       .map((q, originalIndex) => ({ q, originalIndex }))
       .filter(({ q }) => {
-        if (selectedCat !== 'ALL' && q.category !== selectedCat) return false;
+        if (selectedCat1 !== 'ALL') {
+          const { cat1, cat2 } = parseCatParts(q.category || '');
+          if (cat1 !== selectedCat1) return false;
+          if (selectedCat2 === NO_CAT2 ? cat2 !== '' : selectedCat2 !== 'ALL' && cat2 !== selectedCat2) return false;
+        }
         if (selectedSource !== 'ALL' && q.source !== selectedSource) return false;
-        if (selectedYear !== 'ALL' && q.date?.slice(0, 4) !== selectedYear) return false;
-        if (selectedMonth !== 'ALL' && q.date?.slice(5, 7) !== selectedMonth) return false;
+        if (selectedRep !== 'ALL' && (q.salesRep || '') !== selectedRep) return false;
+        if (!inPeriod(q.date)) return false;
         if (search) {
           const s = search.toLowerCase();
           const match =
@@ -211,7 +275,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
         }
         return true;
       });
-  }, [quotes, selectedCat, selectedSource, selectedYear, selectedMonth, search]);
+  }, [quotes, selectedCat1, selectedCat2, selectedSource, selectedRep, inPeriod, search]);
 
   const siteCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -273,7 +337,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
     const cell = (v?: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const headers = isPhone
       ? ['번호', '접수일시', '메모', '고객사', '고객사담당', '전화번호', '카테고리', '경로', '연결영업대표', '전화수신자']
-      : ['SNO', '제목', '작성자', '회사명', '이메일', '접수날짜', '유입경로', '유입 광고', '표준카테고리', '사이트'];
+      : ['SNO', '제목', '작성자', '회사명', '이메일', '영업담당', '접수날짜', '유입경로', '유입 광고', '표준카테고리', '사이트'];
     const rows = filteredQuotesWithIndex.map(({ q }) => isPhone ? [
       q.sno, q.date, q.subject, q.company, q.name, q.phone, q.category, q.source, q.salesRep, q.receiver,
     ].map(cell) : [
@@ -282,6 +346,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
       `"${(q.name || '').replace(/"/g, '""')}"`,
       `"${(q.company || '').replace(/"/g, '""')}"`,
       `"${q.email || ''}"`,
+      cell(q.salesRep),
       `"${q.date || ''}"`,
       `"${q.source || ''}"`,
       `"${q.sourceDetail.replace(/"/g, '""')}"`,
@@ -376,24 +441,6 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
 
       {/* 필터 바 */}
       <div className="qr-filter">
-        <div className="qr-filter-item">
-          <Dropdown
-            ariaLabel="연도 선택"
-            value={selectedYear}
-            options={years.map((y) => ({ value: y, label: y === 'ALL' ? '연도 전체' : `${y}년` }))}
-            onChange={(v) => { setSelectedYear(v); setPage(1); }}
-          />
-        </div>
-
-        <div className="qr-filter-item">
-          <Dropdown
-            ariaLabel="월 선택"
-            value={selectedMonth}
-            options={MONTH_OPTIONS}
-            onChange={(v) => { setSelectedMonth(v); setPage(1); }}
-          />
-        </div>
-
         <label className="qr-filter-item">
           <TextInput
             aria-label="검색"
@@ -405,15 +452,45 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
 
         <div className="qr-filter-item">
           <Dropdown
-            ariaLabel="카테고리 선택"
-            value={selectedCat}
-            options={categories.map((c) => ({ value: c, label: c === 'ALL' ? '카테고리 전체' : c }))}
-            onChange={(v) => { setSelectedCat(v); setPage(1); }}
+            fixedMenu
+            ariaLabel="담당자 필터"
+            value={selectedRep}
+            options={reps.map((r) => ({ value: r, label: r === 'ALL' ? '담당자 전체' : r || '미지정' }))}
+            onChange={(v) => { setSelectedRep(v); setPage(1); }}
           />
         </div>
 
         <div className="qr-filter-item">
           <Dropdown
+            fixedMenu
+            ariaLabel="1차 카테고리 필터"
+            value={selectedCat1}
+            options={cat1List.map((c) => ({
+              value: c,
+              label: c === 'ALL' ? '1차 카테고리 전체' : c,
+              hint: cat2CountHint(CATEGORY_HIERARCHY.find((n) => n.cat1 === c)?.cat2.length ?? 0),
+            }))}
+            onChange={(v) => { setSelectedCat1(v); setSelectedCat2('ALL'); setPage(1); }}
+          />
+        </div>
+
+        <div className="qr-filter-item">
+          <Dropdown
+            fixedMenu
+            ariaLabel="2차 카테고리 필터"
+            value={selectedCat2}
+            disabled={cat2List.length === 0}
+            options={[
+              { value: 'ALL', label: '2차 카테고리 전체' },
+              ...cat2List.map((c) => ({ value: c, label: c === NO_CAT2 ? '2차 없음' : c })),
+            ]}
+            onChange={(v) => { setSelectedCat2(v); setPage(1); }}
+          />
+        </div>
+
+        <div className="qr-filter-item">
+          <Dropdown
+            fixedMenu
             ariaLabel={isPhone ? '경로 선택' : '유입경로 선택'}
             value={selectedSource}
             options={sources.map((s) => ({ value: s, label: s === 'ALL' ? (isPhone ? '경로 전체' : '유입경로 전체') : s }))}
@@ -421,8 +498,11 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
           />
         </div>
 
+        {(search || selectedRep !== 'ALL' || selectedCat1 !== 'ALL' || selectedSource !== 'ALL') && <FilterReset onClick={resetFilters} />}
+
         <div className="qr-filter-item ml-auto">
           <Dropdown
+            fixedMenu
             ariaLabel="페이지당 표시 개수"
             value={pageSize}
             options={[
@@ -451,6 +531,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
               ) : (
                 <SortableTh sortKey="email" activeKey={sortKey} order={sortOrder} onSort={handleSort} className="col-email">이메일</SortableTh>
               )}
+              {!isPhone && <SortableTh sortKey="rep" activeKey={sortKey} order={sortOrder} onSort={handleSort} className="col-sales-rep">영업담당</SortableTh>}
               <SortableTh sortKey="category" activeKey={sortKey} order={sortOrder} onSort={handleSort} className={isPhone ? 'col-phone-category' : 'col-category'}>{isPhone ? '카테고리' : '표준 카테고리 (수동 지정)'}</SortableTh>
               <SortableTh sortKey="source" activeKey={sortKey} order={sortOrder} onSort={handleSort} className={isPhone ? 'col-phone-source' : 'col-source'}>{isPhone ? '경로' : '유입경로'}</SortableTh>
               {isPhone && <SortableTh sortKey="rep" activeKey={sortKey} order={sortOrder} onSort={handleSort} className="col-rep">연결영업대표 · 수신자</SortableTh>}
@@ -458,10 +539,10 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
           </thead>
           <tbody>
             {pageItems.length === 0 && loading ? (
-              <SkelRows rows={8} widths={[...(showSiteCol ? ['4rem'] : []), '3rem', '5rem', '60%', '50%', '4rem', '70%', '5rem', '5rem', ...(isPhone ? ['5rem'] : [])]} />
+              <SkelRows rows={8} widths={[...(showSiteCol ? ['4rem'] : []), '3rem', '5rem', '60%', '50%', '4rem', '70%', '5rem', '5rem', '5rem']} />
             ) : pageItems.length === 0 ? (
               <tr>
-                <td colSpan={isPhone || showSiteCol ? 9 : 8} className="qr-empty">
+                <td colSpan={showSiteCol ? 10 : 9} className="qr-empty">
                   {isPhone
                     ? phoneQuotes.length === 0
                       ? '전화문의가 아직 수집되지 않았습니다.'
@@ -498,6 +579,13 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
                       </Tooltip>
                     </td>
                     <td className="qr-email" title={(isPhone ? q.phone : q.email) || undefined}>{(isPhone ? q.phone : q.email) || '–'}</td>
+                    {!isPhone && (
+                      <td>
+                        <Tooltip content={q.salesRep}>
+                          <span className="cell-truncate">{q.salesRep || '–'}</span>
+                        </Tooltip>
+                      </td>
+                    )}
                     {isPhone ? (
                       <td>
                         <Tooltip content={q.category}>

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { DayPeriod } from '../utils/dayRange';
 import type {
   AdRow,
   CategoryMap,
@@ -9,6 +8,10 @@ import type {
 import { catSum, catsOf, fmt, fmtWon, mLabel, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
+import type { DayPeriod } from '../utils/dayRange';
+import type { SameDateCompare } from '../utils/dayData';
+import { View } from '../components/common/View';
+import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 import {
@@ -40,6 +43,8 @@ interface KeywordsViewProps {
   yearTotal?: boolean;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
+  sameDate?: SameDateCompare;
 }
 
 const KEYWORDS_SOURCES: SourceLinkItem[] = [
@@ -58,6 +63,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   allPeriod = false,
   yearTotal = false,
   period,
+  sameDate,
 }) => {
   const [media, setMedia] = useState<'all' | 'Google' | 'Naver'>('all');
   const [type, setType] = useState<'SA' | 'DA'>('SA');
@@ -66,7 +72,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
 
   if (!data.keywords.length && !data.spend.length) {
     return (
-      <div className="view on" data-view="keywords" data-title="키워드 · 소재">
+      <View name="keywords" title="키워드 · 소재">
         <ViewHeader
           title="키워드 · 소재 성과"
           description="광고그룹별 검색 키워드 입찰/품질/전환 지표 및 배너·확장 소재 현황"
@@ -76,7 +82,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           <EmptyState message="취합된 키워드 및 소재 데이터가 없습니다. 상단 [연결 설정] 버튼에서 데이터 연결을 완료해 주세요." />
         </Card>
         <SecSrc sources={KEYWORDS_SOURCES} />
-      </div>
+      </View>
     );
   }
 
@@ -117,7 +123,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const pvClk  = pvRows.reduce((s, r) => s + r.clk, 0);
   const pvConv = pvRows.reduce((s, r) => s + r.conv, 0);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');
@@ -134,8 +140,8 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     : null;
   const missing = uncollectedItems(data.spend, allPeriod ? [] : periodMonths, media === 'all' ? undefined : [media]);
   const cpcItems: [string, number | string][] = [];
-  if (naverCpc  > 0) cpcItems.push(['네이버', `${fmt(naverCpc)}원`]);
-  if (googleCpc > 0) cpcItems.push(['구글',   `${fmt(googleCpc)}원`]);
+  if (naverCpc  > 0 || (media !== 'Google' && !missing.some(([k]) => k === '네이버'))) cpcItems.push(['네이버', `${fmt(naverCpc)}원`]);
+  if (googleCpc > 0 || (media !== 'Naver' && !missing.some(([k]) => k === '구글'))) cpcItems.push(['구글',   `${fmt(googleCpc)}원`]);
   if (cpcItems.length) cpcItems.push(...missing);
   const cpcDetail = cpcItems.length > 0 ? <KpiDetailItems items={cpcItems} /> : null;
 
@@ -205,7 +211,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const periodLabel = allPeriod ? '전체 기간' : yearTotal ? yearRangeLabel(mo) : `${mo.slice(0, 4)}년 ${mLabel(mo)}`;
 
   return (
-    <div className="view on" data-view="keywords" data-title="키워드 · 소재">
+    <View name="keywords" title="키워드 · 소재">
       <ViewHeader
         title="키워드 · 소재 성과"
         description="광고그룹별 검색 키워드 입찰/품질/전환 지표 및 배너·확장 소재 현황"
@@ -222,7 +228,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           sub={`클릭 ${fmt(totalClk)} · 전환 ${fmt(totalConv)}`}
           detail={cmpLabel
             ? <KpiDetailItems items={[['클릭', totalClk], ['전환', totalConv]]} />
-            : mediaDetail}
+            : mediaDetail ?? <KpiDetailItems items={[['클릭', totalClk], ['전환', totalConv]]} />}
         />
         <KpiCard
           label="클릭수"
@@ -231,7 +237,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           prev={hasPvData ? pvClk : null}
           cmpLabel={cmpLabel}
           sub={`노출 ${fmt(totalImp)} · CTR ${kpiCtr}`}
-          detail={cmpLabel ? <KpiDetailItems items={[['노출', totalImp], ['CTR', kpiCtr]]} /> : null}
+          detail={<KpiDetailItems items={[['노출', totalImp], ['CTR', kpiCtr]]} />}
         />
         <KpiCard
           label="클릭당 비용 (CPC)"
@@ -240,7 +246,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           prev={hasPvData && pvCpc ? pvCpc : null}
           cmpLabel={cmpLabel}
           sub={`${fmt(totalClk)}클릭 기준`}
-          detail={cpcDetail}
+          detail={cpcDetail ?? <KpiDetailItems items={[['네이버', '0원'], ['구글', '0원']]} />}
         />
         <KpiCard
           label="광고 전환수"
@@ -249,15 +255,15 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           prev={hasPvData ? pvConv : null}
           cmpLabel={cmpLabel}
           sub={kpiAdCpa ? `건당 ${fmt(kpiAdCpa)}원` : '견적 CPA는 카테고리 효율 참고'}
-          detail={cmpLabel && kpiAdCpa ? <KpiDetailItems items={[['건당', `${fmt(kpiAdCpa)}원`]]} /> : null}
+          detail={<KpiDetailItems items={[['건당', `${fmt(kpiAdCpa)}원`]]} />}
         />
       </KpiSection>
 
       {allPeriod && (
-        <p className="leg-note quote-src-note">
-          ※ 전체 기간 합산입니다.
-          {type === 'SA' && kwFirstMonth && ` 키워드별 실적은 ${dotYm(kwFirstMonth)}부터 있어 카테고리 표의 광고비와 기간이 다릅니다.`}
-        </p>
+        <ViewNote>
+          ※ 전체 기간 합산.
+          {type === 'SA' && kwFirstMonth && ` 키워드 실적은 ${dotYm(kwFirstMonth)}부터라 카테고리 표와 기간이 다릅니다.`}
+        </ViewNote>
       )}
 
       <div className="mock-bar">
@@ -286,7 +292,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
             setKwTabIdx(0);
           }}
         />
-        <PeriodNavSlot>
+        <PeriodNavSlot active={!!catFilter.cat1} onReset={() => catState.setCat1('')}>
           <CategoryFilter filter={catFilter} />
         </PeriodNavSlot>
       </div>
@@ -319,6 +325,6 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
         <AdCreativesList groups={adGroups} stats={adStats} loading={isSyncing} periodLabel={periodLabel} media={media} type={type} />
       )}
       <SecSrc sources={KEYWORDS_SOURCES} />
-    </div>
+    </View>
   );
 };

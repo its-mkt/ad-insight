@@ -1,0 +1,211 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import type { QuoteRawRow } from '../../types/dashboard';
+import { fmt, parseCatParts, sourceColorVar } from '../../utils/format';
+import { CATEGORY_HIERARCHY } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
+import { useSort } from '../../hooks/useSort';
+import { Card } from '../common/Card';
+import { Dropdown } from '../common/Dropdown';
+import { FilterReset } from '../common/FilterReset';
+import { EmptyState } from '../common/EmptyState';
+import { Muted } from '../common/Muted';
+import { Pagination } from '../common/Pagination';
+import { SortableTh } from '../common/SortableTh';
+import { TableFootnote } from '../common/TableFootnote';
+import { Th } from '../common/Th';
+
+interface QuoteListTableProps {
+  /** 선택한 기간의 접수 건 (실제 접수 날짜 그대로) */
+  rows: QuoteRawRow[];
+  /** 카드 제목 옆에 붙는 기간 글자 */
+  periodLabel: string;
+  /** 기간이 바뀌면 달라지는 값 — 바뀌면 첫 페이지로 돌아간다 */
+  resetKey: string;
+}
+
+type SortKey = 'date' | 'origin' | 'sno' | 'category' | 'source' | 'rep';
+
+const PAGE_SIZE = 20;
+const ALL = '__all__';
+const NO_REP = '미지정';
+const NO_CAT2 = '2차 없음';
+const ORIGINS = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'];
+
+export const originOf = (r: QuoteRawRow): string =>
+  r.inquiryType ? '전화/톡플러스' : r.site === 'zbyhp' || r.site === 'cadkorea' ? r.site : 'itket';
+const catsOf = (r: QuoteRawRow) => parseCatParts(r.category || '기타');
+const repOf = (r: QuoteRawRow): string => r.salesRep || NO_REP;
+const sourceOf = (r: QuoteRawRow): string => r.source || '미수집';
+
+const SORT_VALUE: Record<SortKey, (r: QuoteRawRow) => string> = {
+  date: (r) => r.date,
+  origin: originOf,
+  sno: (r) => String(r.sno ?? ''),
+  category: (r) => r.category || '기타',
+  source: sourceOf,
+  rep: repOf,
+};
+
+/** 맨 앞에 '전체' 를 붙인 필터 목록 */
+const optionsOf = (values: string[], allLabel: string) => [
+  { value: ALL, label: allLabel },
+  ...[...new Set(values)].map((v) => ({ value: v, label: v })),
+];
+
+/** 어드민 필터와 같은 순서 — 분류표 순서로, 분류표 밖 값은 뒤에 */
+const inHierarchyOrder = (used: string[], known: string[]): string[] => [
+  ...known.filter((c) => used.includes(c)),
+  ...[...new Set(used)].filter((c) => !known.includes(c)),
+];
+
+/**
+ * 견적 접수 목록 (읽기 전용) — 어드민 원본에서 집계에 쓰는 정리된 항목만 보여 준다.
+ * 이 화면은 로그인 없이도 열리므로 이름·회사·이메일·전화번호는 쓰지 않고, 제목은 검색 결과와 같이 로그인했을 때만 보여 준다.
+ */
+export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabel, resetKey }) => {
+  const { isLoggedIn } = useAuth();
+  const [origin, setOrigin] = useState(ALL);
+  const [cat1, setCat1] = useState(ALL);
+  const [cat2, setCat2] = useState(ALL);
+  const [source, setSource] = useState(ALL);
+  const [rep, setRep] = useState(ALL);
+  const [page, setPage] = useState(1);
+  const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date');
+
+  useEffect(() => setPage(1), [resetKey, origin, cat1, cat2, source, rep, sortKey, sortOrder]);
+
+  const resetFilters = () => {
+    setOrigin(ALL);
+    setCat1(ALL);
+    setCat2(ALL);
+    setSource(ALL);
+    setRep(ALL);
+  };
+
+  const filtered = useMemo(() => {
+    const value = SORT_VALUE[sortKey];
+    return rows
+      .filter(
+        (r) =>
+          (origin === ALL || originOf(r) === origin) &&
+          (cat1 === ALL || catsOf(r).cat1 === cat1) &&
+          (cat2 === ALL || (catsOf(r).cat2 || NO_CAT2) === cat2) &&
+          (source === ALL || sourceOf(r) === source) &&
+          (rep === ALL || repOf(r) === rep)
+      )
+      .sort((a, b) => {
+        const diff = value(a).localeCompare(value(b), 'ko', { numeric: true }); // SNO 는 숫자 크기로 정렬
+        return sortOrder === 'asc' ? diff : -diff;
+      });
+  }, [rows, origin, cat1, cat2, source, rep, sortKey, sortOrder]);
+
+  // 어드민 필터와 같은 순서 — 카테고리는 분류표 순서, 담당자는 가나다순에 미지정을 맨 뒤로
+  const cat1Values = inHierarchyOrder(rows.map((r) => catsOf(r).cat1), CATEGORY_HIERARCHY.map((n) => n.cat1));
+  const cat2Parts = cat1 === ALL ? [] : rows.filter((r) => catsOf(r).cat1 === cat1).map((r) => catsOf(r).cat2);
+  const cat2Values = [
+    ...inHierarchyOrder(cat2Parts.filter(Boolean), CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1)?.cat2 ?? []),
+    ...(cat2Parts.some((c) => !c) && cat2Parts.some(Boolean) ? [NO_CAT2] : []),
+  ];
+  // 1차 목록 뒤에 붙는 2차 개수 — 이 기간에 실제로 고를 수 있는 2차만 센다 ('전체'·'2차 없음' 제외). 없으면 표시하지 않는다
+  const cat2CountHint = (c1: string): string | undefined => {
+    const count = new Set(rows.filter((r) => catsOf(r).cat1 === c1).map((r) => catsOf(r).cat2).filter(Boolean)).size;
+    return count ? `· ${count}` : undefined;
+  };
+  const repNames = [...new Set(rows.map(repOf))].filter((v) => v !== NO_REP).sort((a, b) => a.localeCompare(b, 'ko'));
+  const repValues = rows.some((r) => !r.salesRep) ? [...repNames, NO_REP] : repNames;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const pageRows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const th = (key: SortKey, label: string) => (
+    <SortableTh sortKey={key} activeKey={sortKey} order={sortOrder} onSort={toggleSort}>
+      {label}
+    </SortableTh>
+  );
+
+  return (
+    <Card name="quote-list" id="quote-list" title="견적 접수 목록" subtitle={`(${periodLabel} · ${fmt(filtered.length)}건)`}>
+      <div className="ql-filters">
+        <Dropdown
+          fixedMenu
+          ariaLabel="접수처 필터"
+          value={origin}
+          options={[{ value: ALL, label: '접수처 전체' }, ...ORIGINS.map((v) => ({ value: v, label: v }))]}
+          onChange={setOrigin}
+        />
+        <Dropdown fixedMenu ariaLabel="담당자 필터" value={rep} options={optionsOf(repValues, '담당자 전체')} onChange={setRep} />
+        <Dropdown
+          fixedMenu
+          ariaLabel="1차 카테고리 필터"
+          value={cat1}
+          options={optionsOf(cat1Values, '1차 카테고리 전체').map((o) => ({ ...o, hint: cat2CountHint(o.value) }))}
+          onChange={(v) => {
+            setCat1(v);
+            setCat2(ALL);
+          }}
+        />
+        <Dropdown fixedMenu ariaLabel="2차 카테고리 필터" value={cat2} disabled={cat2Values.length === 0} options={optionsOf(cat2Values, '2차 카테고리 전체')} onChange={setCat2} />
+        <Dropdown fixedMenu ariaLabel="유입 경로 필터" value={source} options={optionsOf(rows.map(sourceOf), '유입 경로 전체')} onChange={setSource} />
+        {[origin, rep, cat1, source].some((v) => v !== ALL) && <FilterReset onClick={resetFilters} />}
+      </div>
+      {filtered.length === 0 ? (
+        <EmptyState message="조건에 맞는 견적 접수 내역이 없습니다." />
+      ) : (
+        <>
+          <div className="tw">
+            <table className={`stk${isLoggedIn ? ' with-subject' : ''}`} id="tbQuoteList">
+              {/* 열 폭을 고정한다 — 필터·페이지에 따라 칸 너비가 달라지지 않게 */}
+              <colgroup>
+                <col className="ql-col-origin" />
+                <col className="ql-col-sno" />
+                <col className="ql-col-date" />
+                {isLoggedIn && <col />}
+                <col className="ql-col-rep" />
+                <col className="ql-col-cat" />
+                <col className="ql-col-source" />
+              </colgroup>
+              <thead>
+                <tr>
+                  {th('origin', '접수처')}
+                  {th('sno', 'SNO')}
+                  {th('date', '접수일')}
+                  {isLoggedIn && <Th>제목</Th>}
+                  {th('rep', '담당자')}
+                  {th('category', '표준 카테고리')}
+                  {th('source', '유입 경로')}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((r, i) => {
+                  return (
+                    <tr key={`${r.id ?? r.sno ?? ''}-${r.date}-${i}`}>
+                      <td className="ql-nowrap">{originOf(r)}</td>
+                      <td className="ql-nowrap">{r.sno || '–'}</td>
+                      <td className="ql-nowrap">{r.date.slice(0, 10)}</td>
+                      {isLoggedIn && (
+                        <td className="ql-subject" title={r.subject}>
+                          {r.subject || '–'}
+                        </td>
+                      )}
+                      <td className="ql-nowrap" title={repOf(r)}>{repOf(r)}</td>
+                      <td className="ql-nowrap" title={r.category || '기타'}>{r.category || '기타'}</td>
+                      <td className="ql-nowrap" title={r.sourceDetail ? `${sourceOf(r)} - ${r.sourceDetail}` : undefined}>
+                        {/* 색은 유입경로마다 달라 인라인으로 둔다 */}
+                        <span style={{ color: `var(${sourceColorVar(sourceOf(r))})` }}>{sourceOf(r)}</span>
+                        {r.sourceDetail && <Muted small> {r.sourceDetail}</Muted>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && <Pagination page={current} totalPages={totalPages} onChange={setPage} />}
+        </>
+      )}
+      <TableFootnote
+        basis={`읽기 전용 · 고객 이름·회사·연락처는 표시하지 않습니다${isLoggedIn ? '' : ' · 제목은 로그인 후 볼 수 있습니다'}`}
+      />
+    </Card>
+  );
+};
