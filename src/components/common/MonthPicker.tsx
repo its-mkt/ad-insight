@@ -18,13 +18,15 @@ interface MonthPickerProps {
   yearTotal?: boolean;
   /** 있으면 월 목록 맨 위에 '전체' 를 넣는다. 고른 연도 안의 달(YYYY-MM)을 넘긴다 */
   onSelectYearTotal?: (month: string) => void;
+  /** 다음 달 화살표 뒤에 이어 붙일 조작 (일·기간 선택 달력 등) — 같은 조작부 안에서 한 덩어리로 보인다 */
+  trailing?: React.ReactNode;
 }
 
 const ALL_YEARS = 'ALL';
 const ALL_MONTHS = 0;
 
 /**
- * [‹] [2026년 ⌄ │ 10월 ⌄] [›]  [당월] — 화살표로 한 달씩 옮기고, 가운데 드롭다운으로 연·월을 바로 고르며, 당월 로 최신월에 돌아간다.
+ * [‹] [2026년 ⌄ │ 10월 ⌄] [›]  [trailing] — 화살표로 한 달씩 옮기고, 가운데 드롭다운으로 연·월을 바로 고른다.
  * 연도를 바꾸면 같은 달을 유지하되 범위를 벗어나면 끝 달로 맞춘다.
  */
 export const MonthPicker: React.FC<MonthPickerProps> = ({
@@ -36,6 +38,7 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({
   onSelectAll,
   yearTotal = false,
   onSelectYearTotal,
+  trailing,
 }) => {
   const year = value.slice(0, 4);
   const month = Number(value.slice(5, 7));
@@ -50,7 +53,6 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({
   const stepTitle = (dir: string, blocked: boolean) =>
     allPeriod ? '전체 기간 조회 중' : blocked ? `${dir} ${unit} 데이터 없음` : `${dir} ${unit}`;
   const moveYear = (y: number) => onSelectYearTotal?.(clamp(ym(y, month)));
-  const maxLabel = `${max.slice(0, 4)}년 ${Number(max.slice(5, 7))}월`;
 
   const yearOptions = [
     ...(onSelectAll ? [{ value: ALL_YEARS, label: '전체' }] : []),
@@ -122,19 +124,7 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({
       >
         <ChevronRight strokeWidth={2.25} aria-hidden="true" />
       </button>
-      {/* 당월(데이터가 있는 최신월)로 바로 가기 — 당월에서도 자리를 지켜 폭이 바뀌지 않게 비활성으로만 표시 */}
-      <button
-        type="button"
-        className="mp-today btn-today"
-        id="mp-today"
-        data-btn="today"
-        aria-label={`당월(${maxLabel})로 이동`}
-        title={!allPeriod && !yearTotal && value === max ? `당월(${maxLabel}) 조회 중` : `당월(${maxLabel})로 이동`}
-        disabled={!allPeriod && !yearTotal && value === max}
-        onClick={() => onChange(max)}
-      >
-        당월
-      </button>
+      {trailing}
     </div>
   );
 };

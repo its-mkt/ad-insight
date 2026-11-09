@@ -16,6 +16,20 @@ export interface SpendRow {
   conv: number;
 }
 
+/** 광고그룹 × 일 광고비 — 일·기간 선택이 쓴다. 최근 수십 일만 수집한다 */
+export interface SpendDailyRow {
+  /** YYYY-MM-DD */
+  date: string;
+  media: string;
+  type: string;
+  campaign: string;
+  adgroup: string;
+  cost: number;
+  imp: number;
+  clk: number;
+  conv: number;
+}
+
 export interface ManualRow {
   month: string;
   item: string;
@@ -162,6 +176,8 @@ export interface DashboardData {
     quote?: string;
   };
   spend: SpendRow[];
+  /** 일별 광고비 (최근 수집 구간만) — 없으면 일·기간 선택은 월 단위로 보여 준다 */
+  spendDaily: SpendDailyRow[];
   manual: ManualRow[];
   mapping: MappingRow[];
   quotes: QuoteRow[];
@@ -210,6 +226,8 @@ export interface SourceShareItem {
 
 export interface RawSpendApiRow {
   month?: unknown;
+  /** 일별 시트(g_adgroup_daily·n_adgroup_daily)의 날짜 */
+  date?: unknown;
   type?: string;
   campaign?: unknown;
   ad_group?: unknown;
@@ -337,6 +355,8 @@ export interface RawApiPayload {
   g_adgroup_monthly?: RawSpendApiRow[];
   g_campaign_monthly?: RawSpendApiRow[];
   n_adgroup_monthly?: RawSpendApiRow[];
+  g_adgroup_daily?: RawSpendApiRow[];
+  n_adgroup_daily?: RawSpendApiRow[];
   manual?: RawManualApiRow[];
   mapping?: MappingRow[];
   quotes_monthly?: RawQuoteMonthlyApiRow[];

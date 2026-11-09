@@ -548,17 +548,16 @@ span.seg,
   }
 }
 
-/* ── 기준월 선택 (common/MonthPicker): [‹] [연도 ⌄ │ 월 ⌄] [›]  [당월] ── */
+/* ── 기준월 선택 (common/MonthPicker): [‹] [연도 ⌄ │ 월 ⌄] [›] [달력] ── */
 // 대시보드 전체 숫자를 바꾸는 조작부. 연·월 선택칸은 강조색 테두리로 가장 눈에 띄게,
-// 화살표는 4px 떨어진 보조 버튼, 당월은 기능이 달라 8px 더 떨어뜨린다.
+// 화살표는 4px 떨어진 보조 버튼, 뒤에 이어 붙는 조작(일·기간 달력)은 기능이 달라 8px 떨어뜨린다.
 .month-picker {
   display: inline-flex;
   align-items: stretch;
   gap: 0.25rem;
   height: 2rem;
 
-  .mp-step,
-  .mp-today {
+  .mp-step {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -596,12 +595,9 @@ span.seg,
     }
   }
 
-  .mp-today {
+  // 일·기간 선택 달력 — 기능이 달라 8px 떨어뜨려 이어 붙인다
+  .date-picker {
     margin-left: 0.25rem; // gap 4px + 4px = 8px
-    padding: 0 0.75rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    white-space: nowrap;
   }
 
   // 연·월 선택칸: 바(카드색)와 다른 바탕 + 강조색 테두리 (다크에서 --line2 는 바탕 대비 1.6:1 로 묻힘)
@@ -1714,4 +1710,258 @@ td.future {
 .dd.disabled .dd-trigger {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ── 일·기간 선택 (common/DatePicker): [📅 일·기간] [✕] + 달력 패널 ── */
+// 월 선택(.month-picker)과 같은 높이·각진 모서리·강조색 테두리 규칙. 고른 범위가 있으면 강조색으로 채워 월 단위가 아님을 드러낸다.
+.date-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 2rem;
+
+  .dp-trigger,
+  .dp-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--line2);
+    background: var(--bg);
+    color: var(--ink2);
+    font: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      background: var(--accbg);
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 1px;
+    }
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+      flex-shrink: 0;
+    }
+  }
+
+  .dp-trigger {
+    min-width: 2rem; // 아이콘만 있을 때는 정사각형
+    padding: 0 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .dp-clear {
+    width: 2rem;
+    padding: 0;
+    margin-left: -1px;
+
+    svg {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+  }
+
+  &.open .dp-trigger,
+  &.on .dp-trigger,
+  &.on .dp-clear {
+    border-color: var(--acc);
+    background: var(--accbg);
+    color: var(--acc);
+  }
+
+  .dp-panel {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 30;
+    width: 17.5rem;
+    padding: 0.75rem;
+    background: var(--card);
+    border: 1px solid var(--line2);
+    border-radius: 0;
+    color: var(--ink);
+  }
+
+  .dp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .dp-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .dp-nav,
+  .dp-today-btn,
+  .dp-confirm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line2);
+    background: var(--bg);
+    color: var(--ink2);
+    font: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--accbg);
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 1px;
+    }
+  }
+
+  .dp-nav {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+
+    svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  .dp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    row-gap: 0.25rem;
+  }
+
+  .dp-wd {
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sub);
+  }
+
+  .dp-day {
+    position: relative;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover:not(:disabled):not(.in) {
+      background: var(--bg);
+      border-color: var(--line2);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: -2px;
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    // 요일 색은 증감 색 규칙과 같은 붉은·푸른 계열 토큰
+    &.sun {
+      color: var(--up);
+    }
+
+    &.sat {
+      color: var(--down);
+    }
+
+    // 오늘 — 밑줄 표시 (선택과 겹쳐도 보이게 글자 아래 막대)
+    &.today::after {
+      content: '';
+      position: absolute;
+      left: 30%;
+      right: 30%;
+      bottom: 0.25rem;
+      height: 2px;
+      background: currentColor;
+    }
+
+    // 범위 안 — 옅은 강조 띠
+    &.in {
+      background: var(--accbg);
+      color: var(--accink);
+    }
+
+    // 시작·끝 — 강조색 채움
+    &.start,
+    &.end {
+      background: var(--acc);
+      border-color: var(--acc);
+      color: #fff;
+      font-weight: 700;
+    }
+  }
+
+  .dp-foot {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .dp-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .dp-sum {
+    min-width: 0;
+    font-size: 0.75rem;
+    color: var(--sub);
+  }
+
+  .dp-today-btn,
+  .dp-confirm {
+    flex-shrink: 0;
+    height: 1.75rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  // 확인 — 강조색 채움 (적용하는 단 하나의 버튼)
+  .dp-confirm {
+    border-color: var(--acc);
+    background: var(--acc);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--acc) 85%, #000);
+      border-color: color-mix(in srgb, var(--acc) 85%, #000);
+      color: #fff;
+    }
+  }
 }

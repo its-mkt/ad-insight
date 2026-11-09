@@ -71,6 +71,11 @@ p.small {
     letter-spacing: -0.02em;
     line-height: 1.25;
     margin: 0;
+
+    /* 검색 결과 제목의 검색어 강조 */
+    .h-hl {
+      color: var(--acc);
+    }
   }
 
   p {

@@ -255,6 +255,23 @@
     flex: none;
   }
 
+  // 일·기간을 골랐지만 화면이 월 단위 집계일 때의 안내
+  .period-nav-note {
+    font-size: 0.75rem;
+    color: var(--sub);
+  }
+
+  // 일·기간으로 보는 중에는 월 선택을 옅게 — 월을 고르면 일·기간이 풀린다 (일·기간 달력은 그대로 또렷하게)
+  &.day-mode .month-picker > :not(.date-picker) {
+    opacity: 0.55;
+    transition: opacity 0.15s ease;
+
+    &:hover,
+    &:focus-within {
+      opacity: 1;
+    }
+  }
+
   // 화면별 조회 조건 자리 (PeriodNavSlot) — 바 오른쪽 끝에 둔다
   .period-nav-filters {
     margin-left: auto;

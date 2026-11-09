@@ -2,6 +2,7 @@ import type { AdRow, CategoryMap, DashboardData, KeywordGroup, KeywordRow, Quote
 import { mergeKeywordMonths, periodStartsOf } from './allPeriod';
 import { adStatKey, type AdStat } from './creativeImage';
 import { catsOf, parseCatParts } from './format';
+import { inDayRange, type DayRange } from './dayRange';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
 
@@ -138,13 +139,17 @@ const quoteRowsOf = (data: DashboardData): QuoteRawRow[] => {
 /**
  * 검색어에 맞는 광고·견적을 모아 요약한다. months 가 null 이면 전체 기간이다.
  * 광고비는 일치한 광고그룹과, 그 밖의 광고그룹에서 일치한 키워드만 더해 같은 금액을 두 번 세지 않는다.
- * 카테고리로만 일치한 광고그룹은 분류표의 비율만큼만 더해 카테고리 효율 화면의 금액과 맞춘다.
+  * 카테고리로만 일치한 광고그룹은 분류표의 비율만큼만 더해 카테고리 효율 화면의 금액과 맞춘다.
+ * range 가 있으면 견적은 그 날짜 안의 것만 본다. 광고비(data.spend)가 이미 그 기간의 일별 합계로 바뀌어 있으면(exactSpend) 기간이 맞으므로 CPA 도 계산하고,
+ * 아니면 광고는 월 단위(범위가 걸친 달 전체)라 CPA 를 계산하지 않는다.
  */
 export function searchDashboard(
   data: DashboardData,
   categoryMap: CategoryMap,
   query: string,
-  months: string[] | null
+  months: string[] | null,
+  range: DayRange | null = null,
+  exactSpend = false
 ): SearchResult {
   // 단계 선택 검색이면 글자 검색 대신 이름이 같은 항목만 본다
   const scope = parseScope(query);
@@ -299,6 +304,7 @@ export function searchDashboard(
       if (channel) channelSearch = true;
       return channel;
     })
+    .filter((r) => !range || inDayRange(r.date, range))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const sum = (f: (r: SpendRow) => number) => spendRows.reduce((a, r) => a + f(r), 0);
@@ -320,9 +326,9 @@ export function searchDashboard(
     conv: sum((r) => r.conv),
     keywordOnlyGroups: keywordOnly.size,
     itketQuotes: quotes.filter(isItket).length,
-    cpa: !channelSearch && cpaQuotes > 0 ? cpaCost / cpaQuotes : 0,
+    cpa: !channelSearch && (!range || exactSpend) && cpaQuotes > 0 ? cpaCost / cpaQuotes : 0,
     cpaCost,
     cpaQuotes,
-    cpaHidden: channelSearch,
+    cpaHidden: channelSearch || (!!range && !exactSpend),
   };
 }

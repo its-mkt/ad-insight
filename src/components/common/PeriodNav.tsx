@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MonthPicker } from './MonthPicker';
+import { DatePicker } from './DatePicker';
+import { lastDayOf, toDayKey, type DayRange } from '../../utils/dayRange';
 
 const SLOT_ID = 'periodNavSlot';
 
@@ -31,6 +33,12 @@ interface PeriodNavProps {
   yearTotal?: boolean;
   /** 있으면 월 목록에 '전체' 를 넣는다 (지원하는 화면에서만) */
   onSelectYearTotal?: (month: string) => void;
+  /** 지금 고른 일·기간 (없으면 월 단위) */
+  dayRange?: DayRange | null;
+  /** 있으면 월 선택 옆에 일·기간 선택 달력을 둔다 (일 단위 데이터가 있는 화면에서만). 지우면 null */
+  onSelectDayRange?: (range: DayRange | null) => void;
+  /** 일·기간을 골랐을 때 달력 옆에 붙이는 한 줄 안내 (기준·한계) */
+  dayNote?: string;
 }
 
 export const PeriodNav: React.FC<PeriodNavProps> = ({
@@ -45,8 +53,17 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
   onSelectAll,
   yearTotal,
   onSelectYearTotal,
+  dayRange,
+  onSelectDayRange,
+  dayNote,
 }) => {
   const minYear = [...years].sort()[0] || maxAvailableMonth.slice(0, 4);
+
+  // 달력에서 고를 수 있는 마지막 날 — 데이터가 있는 최신 달의 끝, 아직 안 지난 날은 뺀다
+  const today = toDayKey(new Date());
+  const lastDay = lastDayOf(maxAvailableMonth);
+  const maxDay = today < lastDay ? today : lastDay;
+  const minDay = `${minAvailableMonth || `${minYear}-01`}-01`;
 
   const selectMonth = (m: string) => {
     const y = m.slice(0, 4);
@@ -55,9 +72,9 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
   };
 
   return (
-    <div className="period-nav-bar" id="periodNav">
+    <div className={`period-nav-bar${dayRange ? ' day-mode' : ''}`} id="periodNav">
       <div className="period-nav-left">
-        {/* [‹] [2026년 ⌄] [10월 ⌄] [›] [›|] — 연·월 글자가 기준월임을 드러내므로 따로 아이콘을 두지 않는다 */}
+        {/* [‹] [2026년 ⌄] [10월 ⌄] [›] [📅] — 연·월 글자가 기준월임을 드러내므로 따로 아이콘을 두지 않는다 */}
         <MonthPicker
           value={selectedMonth}
           min={minAvailableMonth || `${minYear}-01`}
@@ -73,7 +90,9 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
               onSelectYearTotal(m);
             })
           }
+          trailing={onSelectDayRange && <DatePicker value={dayRange ?? null} min={minDay} max={maxDay} onChange={onSelectDayRange} />}
         />
+        {dayRange && dayNote && <span className="period-nav-note">{dayNote}</span>}
         <div className="period-nav-filters" id={SLOT_ID} />
       </div>
     </div>

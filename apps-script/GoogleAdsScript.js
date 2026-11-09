@@ -6,6 +6,7 @@
  * 개발자 토큰·관리자(MCC) 계정이 필요 없다. 이 광고 계정의 데이터를 같은 구글 계정의 시트에 쓴다.
  *  - g_campaign_monthly : 캠페인 × 월 비용·노출·클릭·전환 (2023년 1월부터, 실적 최대 MAX 버전)
  *  - g_adgroup_monthly  : 광고그룹 × 월 (카테고리 매칭용, P-Max 처럼 그룹이 없는 캠페인은 제외됨)
+ *  - g_adgroup_daily    : 광고그룹 × 일 (최근 DAILY_DAYS 일, 대시보드의 일·기간 선택용. 그룹이 없는 캠페인은 '(광고그룹 없음)' 행)
  *  - g_keywords         : 사용 중 키워드의 현재 입찰가·품질점수 + 월별 성과 (2023년 1월부터)
  *  - g_ads              : 사용 중 광고 소재 (제목·설명·연결 URL·이미지)
  *  - g_ad_stats         : 소재 × 월 비용·노출·클릭·전환 (2023년 1월부터)
@@ -13,6 +14,7 @@
  */
 const CFG = {
   SHEET_URL: 'https://docs.google.com/spreadsheets/d/1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg/edit',   // its-ad-insight 데이터 시트 주소
+  DAILY_DAYS: 62, // 일별 광고비를 모으는 최근 일수 (오늘 포함). 늘리면 시트·응답 크기가 그만큼 커진다
   FROM_YEAR: 2023, // 시트를 비우고 다시 쓰므로 고정값으로 둔다. 계산식으로 바꾸면 해가 바뀔 때 과거 달이 지워진다
 };
 
@@ -29,6 +31,23 @@ function main() {
     camp.push([r.segments.month.slice(0, 7), type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), ...met_(r)]);
   });
   put_(ss, 'g_campaign_monthly', camp);
+
+  // 일별 — 최근 DAILY_DAYS 일, 광고그룹 × 일. 광고그룹이 없는 캠페인(P-Max 등)은 캠페인 행을 '(광고그룹 없음)' 으로 더해 월 합계와 맞춘다
+  const dFrom = Utilities.formatDate(new Date(Date.now() - (CFG.DAILY_DAYS - 1) * 864e5), tz, 'yyyy-MM-dd');
+  const dRange = `segments.date BETWEEN '${dFrom}' AND '${today}'`;
+  const daily = [['date', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions']];
+  const hasDaily = {};
+  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}
+         FROM ad_group WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
+    hasDaily[r.segments.date + '|' + r.campaign.id] = true;
+    daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), String(r.adGroup.name || '').trim(), String(r.adGroup.id), ...met_(r)]);
+  });
+  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ${M}
+         FROM campaign WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
+    if (hasDaily[r.segments.date + '|' + r.campaign.id]) return;
+    daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), '(광고그룹 없음)', '', ...met_(r)]);
+  });
+  put_(ss, 'g_adgroup_daily', daily);
 
   const grp = [['month', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions']];
   each_(`SELECT segments.month, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}

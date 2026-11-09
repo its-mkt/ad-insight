@@ -2,9 +2,12 @@ import React, { useMemo, useState } from 'react';
 import type { CategoryMap, DashboardData, KeywordRow, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
 import { cat1Of, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
 import { campaignBuckets } from '../utils/keywordGroups';
 import { adStatKey, groupAdsByAdgroup, type AdStat } from '../utils/creativeImage';
+import { View } from '../components/common/View';
+import { ViewNote } from '../components/common/Note';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
@@ -32,6 +35,10 @@ interface SearchViewProps {
   selectedMonth: string;
   allPeriod?: boolean;
   yearTotal?: boolean;
+  /** 일·기간 선택 — 있으면 견적은 그 날짜 그대로, 광고는 걸친 달 전체로 본다 */
+  dayRange?: DayRange | null;
+  /** 일·기간의 광고비가 일별 자료로 정확히 모인 상태 (아니면 걸친 달 전체) */
+  dayCovered?: boolean;
   isLoggedIn: boolean;
   onLogin: () => void;
   onSelectAllPeriod: () => void;
@@ -97,30 +104,35 @@ export const SearchView: React.FC<SearchViewProps> = ({
   selectedMonth,
   allPeriod = false,
   yearTotal = false,
+  dayRange = null,
+  dayCovered = false,
   isLoggedIn,
   onLogin,
   onSelectAllPeriod,
 }) => {
   const months = useMemo(
-    () => (allPeriod ? null : yearTotal ? monthsUpTo(selectedMonth) : [selectedMonth]),
-    [allPeriod, yearTotal, selectedMonth]
+    () => (dayRange ? monthsOfRange(dayRange) : allPeriod ? null : yearTotal ? monthsUpTo(selectedMonth) : [selectedMonth]),
+    [dayRange, allPeriod, yearTotal, selectedMonth]
   );
   const result = useMemo(
-    () => (query ? searchDashboard(data, categoryMap, query, months) : null),
-    [data, categoryMap, query, months]
+    () => (query ? searchDashboard(data, categoryMap, query, months, dayRange, dayCovered) : null),
+    [data, categoryMap, query, months, dayRange, dayCovered]
   );
   // 추이 차트는 한 달을 골라도 그 해 1월~기준월 흐름을 보여 준다
-  const chartMonths = useMemo(() => (allPeriod ? null : monthsUpTo(selectedMonth)), [allPeriod, selectedMonth]);
+  const chartMonths = useMemo(
+    () => (allPeriod ? null : monthsUpTo(dayRange ? monthOfDay(dayRange.to) : selectedMonth)),
+    [allPeriod, dayRange, selectedMonth]
+  );
   const chartResult = useMemo(
     () => (query && !allPeriod && !yearTotal ? searchDashboard(data, categoryMap, query, chartMonths) : result),
     [data, categoryMap, query, allPeriod, yearTotal, chartMonths, result]
   );
   // 비교 기간: 한 달이면 전월, 연도 합계면 전년 동기, 전체 기간은 비교 없음 (종합 요약 KPI 와 같은 기준)
   const prevResult = useMemo(() => {
-    if (!query || allPeriod) return null;
+    if (!query || allPeriod || dayRange) return null;
     const prevMonths = yearTotal ? sameMonthsLastYear(months || []) : [prevM(selectedMonth)];
     return searchDashboard(data, categoryMap, query, prevMonths);
-  }, [data, categoryMap, query, allPeriod, yearTotal, months, selectedMonth]);
+  }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
 
@@ -146,7 +158,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
     return out;
   }, [result]);
 
-  const periodLabel = allPeriod
+  const periodLabel = dayRange
+    ? rangeLabel(dayRange)
+    : allPeriod
     ? '전체 기간'
     : yearTotal
       ? yearRangeLabel(selectedMonth)
@@ -154,12 +168,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
   if (!query || !result) {
     return (
-      <div className="view on" data-view="search" data-title={TITLE}>
+      <View name="search" title={TITLE}>
         <ViewHeader title={TITLE} description={DESCRIPTION} status={status} />
         <Card name="empty" id="search-empty">
           <EmptyState message="검색어를 입력해 주세요." subMessage={SEARCH_HINT} />
         </Card>
-      </div>
+      </View>
     );
   }
 
@@ -173,8 +187,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
   if (!total) {
     return (
-      <div className="view on" data-view="search" data-title={TITLE}>
-        <ViewHeader title={`"${query}" ${TITLE}`} description={DESCRIPTION} status={status} />
+      <View name="search" title={TITLE}>
+        <ViewHeader title={`"${query}" ${TITLE}`} highlight={query} description={DESCRIPTION} status={status} />
         <Card name="empty" id="search-empty">
           <EmptyState message={`${periodLabel}에 "${query}"와 일치하는 결과가 없습니다.`} subMessage={SEARCH_HINT} />
           {!allPeriod && (
@@ -185,7 +199,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             </div>
           )}
         </Card>
-      </div>
+      </View>
     );
   }
 
@@ -247,7 +261,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
   const cpaFrom = periodStartsOf(data).cpaFrom;
   // 카드 제목용 짧은 기간 (예: 11월, 전체 기간)
-  const kpiPeriod = allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
+  const kpiPeriod = dayRange || allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
   const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : '전월') : undefined;
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
   // 광고비 카드 하단: 매체별 금액
@@ -265,7 +279,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     .filter((k) => siteCount[k])
     .map((k): [string, number] => [k, siteCount[k]]);
   // 견적 카드의 추정 CPA 기준 — 매체·유입 경로 검색은 추적 기간이 달라 계산하지 않는다
-  const cpaLabel = result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : `${dotYm(cpaFrom)} 이후 기준`;
+  const cpaLabel = dayRange && !dayCovered ? '일별 광고비 수집 전 기간은 계산하지 않음' : result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : `${dotYm(cpaFrom)} 이후 기준`;
 
   // 견적 구성 — 제목·고객 정보 없이 건수만이라 로그아웃 상태에서도 보여 준다
   const catKeyOf = (r: QuoteRawRow) => (listCatFilter && !isCatMatch(r) ? CAT_OTHER : cat1Of(r.category || '기타'));
@@ -304,17 +318,25 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const monthlyTotal = axis.map((key) => sumBy(chartQuotes.filter((r) => r.month.startsWith(key)), (r) => r.count));
 
   return (
-    <div className="view on" data-view="search" data-title={TITLE}>
-      <ViewHeader title={`"${query}" ${TITLE}`} description={DESCRIPTION} status={status} />
+    <View name="search" title={TITLE}>
+      <ViewHeader title={`"${query}" ${TITLE}`} highlight={query} description={DESCRIPTION} status={status} />
+
+      {dayRange && (
+        <ViewNote>
+          {dayCovered
+            ? '※ 일·기간 선택은 광고비·노출·클릭·전환과 견적을 선택한 날짜 그대로 집계합니다(키워드·소재 성과는 월 단위라 해당 달 전체). 전월 비교는 하지 않습니다.'
+            : `※ 이 기간은 일별 광고비 수집 전이라 견적만 선택한 날짜 그대로 집계하고, 광고 지표는 기간이 걸친 달(${monthsOfRange(dayRange).map(mLabel).join('·')}) 전체로 표시하며 비교·CPA는 계산하지 않습니다.`}
+        </ViewNote>
+      )}
 
       {sourceScope ? (
-        <p className="leg-note quote-src-note">
-          ※ {periodLabel} 기준입니다. 견적의 유입 매체가 "{sourceScope}"인 건만 모았습니다(유입 매체는 2026년 10월부터 추적). 유입 매체는 광고비와 직접 연결된 값이 아니라서 이 검색에서는 광고비·견적당 광고비(CPA)를 보여 주지 않습니다.
-        </p>
+        <ViewNote>
+          ※ {periodLabel} 기준. 유입 매체가 "{sourceScope}"인 견적만 집계합니다(매체 추적은 2026년 10월부터). 매체는 광고비와 직접 연결되지 않아 광고비·CPA는 표시하지 않습니다.
+        </ViewNote>
       ) : (
-      <p className="leg-note quote-src-note">
-          ※ {periodLabel} 기준입니다. 광고비는 이름·카테고리·매체가 일치한 광고그룹과 일치한 키워드의 합계이고, 견적은 제목·카테고리·유입 매체 일치 건입니다(유입 매체는 2026년 10월부터 추적). 서로 직접 연결된 값이 아니어서 견적당 광고비(CPA)는 추정치입니다({cpaLabel}). 전환당 비용은 같은 광고 실적의 광고비 ÷ 광고전환이라 정확한 값입니다.
-      </p>
+      <ViewNote>
+          ※ {periodLabel} 기준. 광고비는 이름·카테고리·매체가 일치한 광고그룹·키워드 합계, 견적은 제목·카테고리·유입 매체 일치 건입니다(매체 추적은 2026년 10월부터). 둘은 직접 연결되지 않아 CPA는 추정치({cpaLabel})이고, 전환당 비용은 같은 광고 실적 기준이라 정확합니다.
+      </ViewNote>
       )}
 
       {sourceScope ? (
@@ -387,7 +409,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           cur={result.cpa || null}
           prev={prevResult?.cpa || null}
           cmpLabel={cmpLabel}
-          sub={result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : cpaLabel}
+          sub={cpaLabel}
           detail={
             result.cpa ? (
               <>
@@ -396,7 +418,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 <p>견적 <b>{fmt(result.cpaQuotes)}건</b></p>
               </>
             ) : (
-              <span>{result.cpaHidden ? '추적 기간이 달라 계산하지 않음' : cpaLabel}</span>
+              <span>{dayRange && !dayCovered ? cpaLabel : result.cpaHidden ? '추적 기간이 달라 계산하지 않음' : cpaLabel}</span>
             )
           }
         />
@@ -530,8 +552,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
             <ShowMoreButton noun="키워드" total={counts.keywords} expanded={showAll} onToggle={() => setShowAll((v) => !v)} />
             <TableFootnote
               unit="원·회"
-              basis={`산출 근거: ${periodLabel} 실적 합계 · 입찰가·품질지수는 가장 최근 달 값 · CTR = 클릭 ÷ 노출`}
-              sources={['Google Ads · 네이버 검색광고 API 자동 수집']}
+              basis={`산출 근거: ${periodLabel} 실적 합계 · 입찰가·품질지수는 최근 달 값 · CTR = 클릭 ÷ 노출`}
+              sources={['Google Ads · 네이버 검색광고 API']}
             />
           </>
         )}
@@ -658,12 +680,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
             )}
             <TableFootnote
               unit="건"
-              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 · 유입 매체는 2026년 10월부터 추적"
-              sources={['견적 접수 원본 시트 · collectQuotes 자동 동기화']}
+              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 (매체 추적은 2026년 10월부터)"
             />
           </>
         )}
       </Card>
-    </div>
+    </View>
   );
 };

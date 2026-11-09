@@ -5,7 +5,7 @@
  *  - setup        : 처음 한 번. 관리용 시트(mapping·manual)와 웹앱 비밀키를 만들고, 1시간마다 syncAll 을 예약한다.
  *  - syncAll      : 1시간마다. 네이버는 구조+키워드 성과(collectNaver) 하루 1번 + 광고그룹 광고비(collectNaverStats) 매 실행으로 나눠 UrlFetch 한도를 지킨다.
  *  - collectNaver : 네이버 캠페인·광고그룹·키워드·소재 목록 → n_idx_groups · n_idx_keywords · n_ads, 이어서 성과까지
- *  - collectNaverStats : 색인의 ID 로 /stats 만 → n_adgroup_monthly (당월·전월은 매번, 과거 월은 비어 있는 달만). n_keywords 는 비어 있는 과거 달만 채운다. 소재 × 월 성과(n_ad_stats)는 하루 1번
+ *  - collectNaverStats : 색인의 ID 로 /stats 만 → n_adgroup_daily(최근 DAILY_DAYS 일, 오늘·어제는 매번) · n_adgroup_monthly (당월·전월은 매번, 과거 월은 비어 있는 달만). n_keywords 는 비어 있는 과거 달만 채운다. 소재 × 월 성과(n_ad_stats)는 하루 1번
  *  - doGet        : ?key=비밀키 로 부르면 시트 전체를 JSON 으로 내려준다 (대시보드가 읽음). 키가 틀리면 아무것도 주지 않는다.
  * 네이버 키는 코드에 쓰지 않는다 — 프로젝트 설정 → 스크립트 속성에 NAVER_API_KEY · NAVER_SECRET · NAVER_CUSTOMER_ID 로 넣는다.
  * Google Ads 데이터(g_*)는 Google Ads 스크립트(GoogleAdsScript.js)가 같은 시트에 쓴다.
@@ -18,13 +18,15 @@ const CFG = {
   AD_CHUNK: 30,                              // 소재 /stats 는 ID 가 길어 주소 길이 한도(약 2KB) 안에 들게 줄인다
   BUDGET_MS: 4.5 * 60 * 1000,                // 한 번 실행에 쓸 최대 시간(6분 제한 대비)
   KW_STATS_RESERVE_MS: 70 * 1000,            // 광고그룹 순회를 일찍 끝내 키워드 성과(/stats) 조회 시간을 남긴다
+  DAILY_DAYS: 62,                            // 일별 광고비를 모으는 최근 일수 (오늘 포함, 대시보드의 일·기간 선택용)
+  DAILY_BACKFILL_DAYS: 7,                    // 일별 수집 한 번에 새로 채우는 지난 날 수 (오늘·어제는 매번 다시 받는다)
   BACKFILL_MONTHS: 5,                        // 성과 수집 한 번에 채우는 지난 달 수 (한 번에 몰려 한도를 넘지 않게)
   // UrlFetch 하루 2만 회는 이 구글 계정의 모든 스크립트(견적문의·상담접수 연동 등)가 함께 쓴다.
   // 네이버 API 는 하루 이 횟수까지만 부르고 멈춰, 고장으로 폭주해도 나머지 스크립트 몫을 남긴다. 스크립트 속성 NAVER_DAILY_CAP 로 바꿀 수 있다.
   NAVER_DAILY_CAP: 6000,
   RUN_LIMIT_MS: 5 * 60 * 1000,               // syncAll 전체가 이 시간을 넘기면 남은 수집은 다음 실행으로 (6분 강제 종료 방지)
-  SHEETS: ['g_campaign_monthly', 'g_adgroup_monthly', 'g_keywords', 'g_ads', 'g_ad_stats', 'g_meta',
-    'n_adgroup_monthly', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'q_meta', 'mapping', 'manual', 'manual_categories'],
+  SHEETS: ['g_campaign_monthly', 'g_adgroup_monthly', 'g_adgroup_daily', 'g_keywords', 'g_ads', 'g_ad_stats', 'g_meta',
+    'n_adgroup_monthly', 'n_adgroup_daily', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'q_meta', 'mapping', 'manual', 'manual_categories'],
   // 대시보드 주소와 키는 공개 번들에 들어 있다. 고객 정보는 관리자 로그인이 확인될 때만 내려준다 (doGet)
   SUPABASE_URL: 'https://tqxljgmygvanysqnhiar.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable__Oq9NpOHnxEqRSZ02qJDaw_n-FIAGC2',
@@ -216,6 +218,8 @@ function collectNaverStats_(ss, t0, withKeywords) {
   const keep = old.filter((r) => r.type !== 'SA' || !done.includes(r.month)).map((r) => head.map((h) => r[h]));
   put_(ss, 'n_adgroup_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 
+  collectNaverDaily_(ss, t0, groups, gById);
+
   // 키워드 × 월 (당월은 1일~어제). 월 열이 없는 예전 행은 버린다.
   const kws = read_(ss, 'n_idx_keywords');
   const kHead = ['month', 'type', 'campaign', 'ad_group', 'keyword', 'match', 'bid', 'quality', 'cost', 'impressions', 'clicks', 'conversions', 'ad_relevance', 'expected_click'];
@@ -256,6 +260,37 @@ function collectNaverStats_(ss, t0, withKeywords) {
   put_(ss, 'n_meta', [['key', 'value'], ['updated', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm')], ['customer_id', PROPS.getProperty('NAVER_CUSTOMER_ID')],
     ['structure', PROPS.getProperty('NAVER_STRUCT_AT') || ''], ['api_calls', apiCalls_]]);
   syncMapping_(ss);
+}
+/**
+ * 광고그룹 × 일 (최근 CFG.DAILY_DAYS 일) → n_adgroup_daily. 일·기간 선택이 쓴다.
+ * 오늘·어제는 매 실행마다 다시 받고(집계가 늦게 바뀐다), 그 이전은 받은 적 없는 날을 한 번에 CFG.DAILY_BACKFILL_DAYS 일씩만 채운다.
+ * 광고비가 없던 날은 행이 없으므로, 받은 날은 스크립트 속성 NAVER_DAILY_HAVE 에 적어 다시 묻지 않는다.
+ * 호출 수: (광고그룹 수 ÷ CFG.CHUNK) × 받는 날 수 — 평소 2일 치, 처음 채울 때는 실행마다 9일 치.
+ */
+function collectNaverDaily_(ss, t0, groups, gById) {
+  const kst = (ms) => Utilities.formatDate(new Date(ms), 'Asia/Seoul', 'yyyy-MM-dd');
+  const now = Date.now();
+  const days = Array.from({ length: CFG.DAILY_DAYS }, (_, i) => kst(now - i * 864e5)); // 최신 → 과거
+  const oldest = days[days.length - 1];
+  const head = ['date', 'type', 'campaign', 'campaign_tp', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
+  const old = read_(ss, 'n_adgroup_daily');
+  const have = new Set(JSON.parse(PROPS.getProperty('NAVER_DAILY_HAVE') || '[]'));
+  old.forEach((r) => have.add(r.date));
+  const fresh = days.slice(0, 2);
+  const todo = fresh.concat(days.filter((d) => !have.has(d) && !fresh.includes(d)).slice(0, CFG.DAILY_BACKFILL_DAYS));
+  const rows = [], done = [];
+  for (const d of todo) {
+    if (Date.now() - t0 > CFG.BUDGET_MS) break; // 남은 날은 다음 실행에서
+    stats_(groups.map((g) => String(g.id)), d, d).forEach((s) => {
+      const g = gById[s.id];
+      if (g && (s.salesAmt || s.impCnt)) rows.push([d, 'SA', g.campaign, g.ctype, g.name, String(g.id), s.salesAmt || 0, s.impCnt || 0, s.clkCnt || 0, s.ccnt || 0]);
+    });
+    done.push(d);
+  }
+  const keep = old.filter((r) => r.date >= oldest && !done.includes(r.date)).map((r) => head.map((h) => r[h]));
+  put_(ss, 'n_adgroup_daily', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
+  done.forEach((d) => have.add(d));
+  PROPS.setProperty('NAVER_DAILY_HAVE', JSON.stringify([...have].filter((d) => d >= oldest).sort()));
 }
 /** 편집기에서 직접 실행: 소재 성과(n_ad_stats)를 지금 바로 채운다 (하루 1번 제한과 무관) */
 function collectNaverAdStats() {
@@ -1496,4 +1531,3 @@ function debugNaverAdExtensions() {
   console.log('확장소재 종류별 개수: ' + JSON.stringify(byType));
   saveApiCount_();
 }
-
