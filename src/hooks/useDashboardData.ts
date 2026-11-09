@@ -14,6 +14,7 @@ import type {
   RawMetaApiRow,
   RawSpendApiRow,
   SpendRow,
+  SpendDailyRow,
   QuoteRawRow,
   QuoteManualMark,
   SyncStatus,
@@ -56,6 +57,7 @@ function emptyData(): DashboardData {
     updated: '',
     sources: { google: '', naver: '' },
     spend: [],
+    spendDaily: [],
     manual: [],
     mapping: [],
     quotes: [],
@@ -169,6 +171,16 @@ export function fromApi(j: RawApiPayload): DashboardData {
   });
 
   (j.n_adgroup_monthly || []).forEach((r) => spend.push(toSpendRow('Naver', r)));
+
+  // 일별 광고비 — 시트에 없으면(수집 전·웹앱 미갱신) 빈 목록이고, 일·기간 선택은 월 단위로 보여 준다
+  const toDailyRow = (media: string, r: RawSpendApiRow): SpendDailyRow => {
+    const { month: _month, ...rest } = toSpendRow(media, r);
+    return { ...rest, date: String(r.date ?? '').trim().slice(0, 10) };
+  };
+  const spendDaily: SpendDailyRow[] = [
+    ...(j.g_adgroup_daily || []).map((r) => toDailyRow('Google', r)),
+    ...(j.n_adgroup_daily || []).map((r) => toDailyRow('Naver', r)),
+  ].filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date));
 
   const manual: ManualRow[] = (j.manual || [])
     .map((r) => ({
@@ -300,6 +312,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
     updated: fmtUpdatedTimestamp(rawUpdated),
     sources: { google: upd(j.g_meta), naver: upd(j.n_meta), quote: upd(j.q_meta) },
     spend,
+    spendDaily,
     manual,
     mapping: j.mapping || [],
     quotes: (j.quotes_monthly || []).map((r) => {
@@ -442,6 +455,7 @@ export function useDashboardData() {
       const localRes = await fetch('data/latest.json');
       if (!localRes.ok) return;
       const localJ = (await localRes.json()) as RawApiPayload;
+      if (liveLoaded.current) return;
       setData((prevData) => {
         if (prevData.spend.length > 0 && prevData.quotesRaw.length > 0) return prevData;
         writeCachedPayload(localJ);
@@ -484,17 +498,17 @@ export function useDashboardData() {
   }, [tryLoadStaticFallback]);
 
   useEffect(() => {
-    // 지난번 받은 데이터로 먼저 그리고(없으면 배포에 묶인 스냅숏), 실데이터를 받아 바꿔 끼운다
+    // 실데이터 요청(수 초~수십 초)을 가장 먼저 띄워 두고, 그동안 지난번 받은 데이터(없으면 배포에 묶인 스냅숏)로 먼저 그린다.
+    // 예전에는 캐시·스냅숏을 다 받은 뒤에야 요청을 시작해 그만큼 늦게 도착했다
+    load();
     readCachedPayload().then(async (cached) => {
+      if (liveLoaded.current) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
       if (isUsableCache(cached)) {
-        if (!liveLoaded.current) {
-          setData(fromApi(cached));
-          setStatus('live');
-        }
+        setData(fromApi(cached));
+        setStatus('live');
       } else {
         await tryLoadStaticFallback();
       }
-      load();
     });
 
     const timer = setInterval(load, 15 * 60 * 1000);
