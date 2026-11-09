@@ -267,7 +267,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   // 광고비 카드 하단: 매체별 금액
   const mediaCost = (['Naver', 'Google', 'Meta'] as const)
     .map((m): [string, number] => [m === 'Naver' ? '네이버' : m === 'Google' ? '구글' : '메타', sumBy(result.spendRows.filter((r) => r.media === m), (r) => r.cost)])
-    .filter(([, v]) => v > 0)
+    .filter(([k, v]) => v > 0 || k !== '메타') // 집행이 없어도 구글·네이버는 0 으로 보여 준다
     .map(([k, v]): [string, string] => [k, fmtWon(v)]);
   // 견적 카드 하단: 접수처별 건수
   const siteCount: Record<string, number> = {};
@@ -275,9 +275,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     const k = r.inquiryType ? '전화/톡플러스' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
     siteCount[k] = (siteCount[k] || 0) + 1;
   });
-  const siteItems = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스']
-    .filter((k) => siteCount[k])
-    .map((k): [string, number] => [k, siteCount[k]]);
+  const siteItems = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, siteCount[k] ?? 0]);
+  const siteDetail = <KpiDetailItems items={siteItems} />;
   // 견적 카드의 추정 CPA 기준 — 매체·유입 경로 검색은 추적 기간이 달라 계산하지 않는다
   const cpaLabel = dayRange && !dayCovered ? '일별 광고비 수집 전 기간은 계산하지 않음' : result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : `${dotYm(cpaFrom)} 이후 기준`;
 
@@ -312,8 +311,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const topDetail = (top: [string, number] | undefined, rows: [string, number][]) => {
     const items: [string, string][] = rows.filter((r) => r !== top).slice(0, 2).map(([k, n]) => [k, `${fmt(n)}건`]);
     // 비교 줄이 건수 줄 자리를 쓰므로, 비교가 있으면 건수·비중을 보조 줄 맨 앞으로 옮긴다
-    if (cmpLabel && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
-    return items.length ? <KpiDetailItems items={items} /> : null;
+    if ((cmpLabel || !items.length) && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
+    return items.length ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['건수', '0건']]} />;
   };
   const monthlyTotal = axis.map((key) => sumBy(chartQuotes.filter((r) => r.month.startsWith(key)), (r) => r.count));
 
@@ -348,7 +347,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             prev={prevResult?.quotes.length}
             cmpLabel={cmpLabel}
             sub={`${sourceScope} 유입`}
-            detail={siteItems.length > 1 ? <KpiDetailItems items={siteItems} /> : null}
+            detail={siteDetail}
           />
           <KpiCard
             label={`${kpiPeriod} 유입 점유율`}
@@ -401,7 +400,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           prev={prevResult?.quotes.length}
           cmpLabel={cmpLabel}
           sub={`전체 ${fmt(result.quotes.length)}건`}
-          detail={siteItems.length > 1 ? <KpiDetailItems items={siteItems} /> : null}
+          detail={siteDetail}
         />
         <KpiCard
           label={`${kpiPeriod} 견적당 광고비 (CPA)`}

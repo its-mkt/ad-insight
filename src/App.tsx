@@ -23,8 +23,8 @@ import { AdminView } from './views/AdminView';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import { dayPeriodOf, type DayRange } from './utils/dayRange';
-import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
+import { dayPeriodOf, toDayKey, type DayRange } from './utils/dayRange';
+import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withSameDatePrev } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
 
 /** 주소의 해시 → 화면과 검색어 (#keywords, #search?q=HPE) */
@@ -151,9 +151,18 @@ export const App: React.FC = () => {
     };
   }, [searchDay, fullData]);
   const dayCovered = !!searchDay && rangeCovered(fullData, searchDay);
+  // 진행 중인 달을 월로 볼 때는 전달을 같은 날짜까지만 비교한다 (월별 추이는 monthly 원본으로 그린다)
+  const sameDatePrev = useMemo(
+    () =>
+      !searchDay && !allPeriod && !yearTotal && viewMonth === THIS_M && !['admin', 'data', 'search'].includes(currentView)
+        ? withSameDatePrev(fullData, toDayKey(new Date()))
+        : null,
+    [fullData, searchDay, allPeriod, yearTotal, viewMonth, currentView]
+  );
+  const sameDate = sameDatePrev?.compare;
   const viewData = useMemo(
-    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : data),
-    [data, fullData, searchDay, currentView]
+    () => sameDatePrev?.data ?? (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : data),
+    [data, fullData, searchDay, currentView, sameDatePrev]
   );
   const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
   const searchMonth = searchPeriod.month || maxAvailableMonth;
@@ -332,6 +341,23 @@ export const App: React.FC = () => {
               minAvailableMonth={minAvailableMonth}
               maxAvailableMonth={maxAvailableMonth}
               onSelectYear={setSelectedYear}
+              periodChanged={
+                !!searchDay ||
+                (isSearchView
+                  ? searchPeriod.mode !== 'month' || (!!searchPeriod.month && searchPeriod.month !== maxAvailableMonth)
+                  : allPeriod || yearTotal || selectedMonth !== THIS_M)
+              }
+              onResetPeriod={() => {
+                setSearchDay(null);
+                if (isSearchView) {
+                  setSearchPeriod({ mode: 'month', month: '' });
+                  return;
+                }
+                setAllPeriodOn(false);
+                setYearTotalOn(false);
+                setSelectedYear(String(THIS_Y));
+                setSelectedMonth(THIS_M);
+              }}
               onSelectMonth={(m) => {
                 if (isSearchView) {
                   setSearchDay(null);
@@ -361,7 +387,7 @@ export const App: React.FC = () => {
               yearTotal={isSearchView ? searchPeriod.mode === 'year' : yearTotal}
               dayRange={searchDay}
               dayNote={
-                searchDay && !isSearchView
+                searchDay && !isSearchView && currentView !== 'admin'
                   ? dayCovered
                     ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
                     : dailyLoading
@@ -409,7 +435,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'overview' && (
-                <OverviewView monthly={period ? data : undefined} period={period}
+                <OverviewView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -420,7 +446,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'ads' && (
-                <AdsView monthly={period ? data : undefined} period={period}
+                <AdsView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -429,7 +455,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'cat-efficiency' && (
-                <CatEfficiencyView period={period}
+                <CatEfficiencyView period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -439,7 +465,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'keywords' && (
-                <KeywordsView period={period}
+                <KeywordsView period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -450,7 +476,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'quotes' && (
-                <QuotesView monthly={period ? data : undefined} period={period}
+                <QuotesView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}
@@ -484,7 +510,7 @@ export const App: React.FC = () => {
               {/* 로그인 세션을 확인하는 동안은 표 자리표시, 로그인한 경우에만 어드민 화면 */}
               {currentView === 'admin' && authLoading && <SkeletonView title={VIEW_TITLES.admin} variant="table" />}
               {currentView === 'admin' && isLoggedIn && (
-                <AdminView data={data} isSyncing={isSyncing || status === 'init'} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
+                <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
             </main>
           </div>

@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useState } from 'react';
-import type { DayPeriod } from '../utils/dayRange';
 import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SpendRow, SyncStatus } from '../types/dashboard';
 import {
   buildCategoryBarItems,
@@ -19,8 +18,14 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteStatsOf } from '../hooks/useDashboardData';
+import { CompareLegend } from '../components/common/Legend';
+import type { DayPeriod } from '../utils/dayRange';
+import type { SameDateCompare } from '../utils/dayData';
+import { View } from '../components/common/View';
+import { PendingTag } from '../components/common/Muted';
+import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { colTip } from '../utils/columnTips';
 import { MultiChart } from '../components/charts/MultiChart';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
@@ -45,6 +50,8 @@ interface OverviewViewProps {
   monthly?: DashboardData;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
+  sameDate?: SameDateCompare;
 }
 
 const OVERVIEW_SOURCES: SourceLinkItem[] = [
@@ -64,6 +71,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSearchName,
   monthly,
   period,
+  sameDate,
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
   const stats = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra]);
@@ -75,21 +83,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   if (!hasSpend && !hasQuotes) {
     return (
-      <div className="view on" data-view="overview" data-title="종합 요약">
+      <View name="overview" title="종합 요약">
         <ViewHeader
           title="종합 요약"
           description="광고비 집행 현황과 견적 유입 성과를 한눈에 파악하는 통합 대시보드"
           status={status}
         />
         <KpiSection id="kpiOverview">
-          <div className="kpi">
-            <div className="l">데이터 상태</div>
-            <div className="v">연결 대기</div>
-            <div className="d flat">상단 [연결 설정]을 완료해 주세요</div>
-          </div>
+          <KpiPlaceholder label="데이터 상태" value="연결 대기" message="상단 [연결 설정]을 완료해 주세요" />
         </KpiSection>
         <SecSrc sources={OVERVIEW_SOURCES} />
-      </div>
+      </View>
     );
   }
 
@@ -106,8 +110,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     THIS_M;
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const pvCaption = period ? period.cmpLabel : mLabel(pv);
-  const cmp = period ? period.cmpLabel : '전월';
+  const pvCaption = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : mLabel(pv);
+  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
   const months = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
@@ -119,7 +123,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const lastSpendMonth = (media: string) =>
     data.spend.reduce((last, r) => (r.media === media && r.month > last ? r.month : last), '');
   const spendMediaDetail = (rows: SpendRow[]) => {
-    if (!rows.length) return null;
+    if (!rows.length) return <KpiDetailItems items={[['네이버', '0원'], ['구글', '0원']]} />;
     const newest = rows.reduce((last, r) => (r.month > last ? r.month : last), '');
     const amountOf = (media: string): string => {
       const list = rows.filter((r) => r.media === media);
@@ -181,17 +185,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const ytdAdQuotes = sumBy(stats.quotes.filter(inMonths(ytdValidMonths)), (r) => r.count);
 
   // 사이트별 견적 건수 breakdown — quotesExtra(어드민)가 있을 때만 의미 있다
-  const hasMultiSite = stats.quotesRaw.some((r) => r.site);
   const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => {
-    if (!hasMultiSite || !rows.length) return null;
     const counts: Record<string, number> = {};
     rows.forEach((r) => {
       const k = r.inquiryType ? '전화/톡플러스' : !r.site ? 'itket' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
       counts[k] = (counts[k] || 0) + 1;
     });
-    const parts = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].filter((k) => k === 'cadkorea' || k === 'zbyhp' || counts[k]);
-    if (parts.length <= 1) return null;
-    return <KpiDetailItems items={parts.map((k): [string, number] => [k, counts[k] ?? 0])} />;
+    return <KpiDetailItems items={['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, counts[k] ?? 0])} />;
   };
   const curSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
   const ytdSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 4) === yr));
@@ -247,7 +247,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         ['구글', convCur.google],
       ]}
     />
-  ) : null;
+  ) : (
+    <KpiDetailItems items={[['전환당 비용', '0원'], ['네이버', convCur.naver], ['구글', convCur.google]]} />
+  );
   const convCard = (label: string, cmpLabel?: string) => (
     <KpiCard
       to="keywords"
@@ -294,7 +296,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const srcItems = srcPrev ? withSourceCompare(srcCur.items, srcPrev.items) : srcCur.items;
 
   return (
-    <div className="view on" data-view="overview" data-title="종합 요약">
+    <View name="overview" title="종합 요약">
       <ViewHeader
         title="종합 요약"
         description="광고비 집행 현황과 견적 유입 성과를 한눈에 파악하는 통합 대시보드"
@@ -302,11 +304,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       />
 
       {allPeriod && (
-        <p className="leg-note quote-src-note">
-          ※ 전체 기간 합산입니다. 데이터 시작 시기가 달라 견적은 {dotYm(quotesFrom)}, 구글 광고비는 {dotYm(starts.google)}, 네이버 광고비는 {dotYm(starts.naver)}
-          {starts.meta && `, 메타 광고비는 ${dotYm(starts.meta)}`}부터이고,
-          CPA는 모두 있는 {dotYm(starts.cpaFrom)} 이후만 계산합니다.
-        </p>
+        <ViewNote>
+          ※ 전체 기간 합산. 집계 시작: 견적 {dotYm(quotesFrom)}, 구글 {dotYm(starts.google)}, 네이버 {dotYm(starts.naver)}
+          {starts.meta && `, 메타 ${dotYm(starts.meta)}`}. CPA는 {dotYm(starts.cpaFrom)} 이후만 계산합니다.
+        </ViewNote>
       )}
 
       <KpiSection id="kpiOverview">
@@ -327,7 +328,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               }
               value={`${fmt(allCpa)}원`}
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
-              detail={allCpa ? <><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotes)}건</b></p></> : null}
+              detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotes)}건</b></p></>}
             />
             {convCard('전체 광고 전환수')}
           </>
@@ -338,10 +339,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <>
                   {yearLabel} 총 광고비
                   {curM === THIS_M && !period && (
-                    <>
-                      {' '}
-                      <small className="muted">(진행 중)</small>
-                    </>
+                    <PendingTag />
                   )}
                 </>
               }
@@ -369,7 +367,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               cur={ytdCpa || null}
               prev={lastYrMonths[0] >= starts.cpaFrom ? cpaIn(lastYrMonths) : null}
               cmpLabel="전년 동기"
-              detail={ytdCpa ? <><p>광고비 <b>{fmtWon(ytdCpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(ytdAdQuotes)}건</b></p></> : null}
+              detail={<><p>광고비 <b>{fmtWon(ytdCpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(ytdAdQuotes)}건</b></p></>}
             />
             {convCard(`${yearLabel} 광고 전환수`, '전년 동기')}
           </>
@@ -380,10 +378,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <>
               {curCaption} 총 광고비
               {curM === THIS_M && !period && (
-                <>
-                  {' '}
-                  <small className="muted">(진행 중)</small>
-                </>
+                <PendingTag />
               )}
             </>
           }
@@ -411,7 +406,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           cur={curCpa}
           prev={pvCpa}
           cmpLabel={cmp}
-          detail={curCpa > 0 ? <><p>광고비 <b>{fmtWon(curSpendTot)}</b></p><i>|</i><p>견적 <b>{fmt(curAdQuotes)}건</b></p></> : null}
+          detail={<><p>광고비 <b>{fmtWon(curSpendTot)}</b></p><i>|</i><p>견적 <b>{fmt(curAdQuotes)}건</b></p></>}
         />
         {convCard(`${curCaption} 광고 전환수`, cmp)}
           </>
@@ -449,23 +444,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             curLabel={yearTotal ? yearLabel : undefined}
             totalCur={sumBy(fullList, (c) => c.cur)}
             totalPrev={sumBy(fullList, (c) => c.prev)}
-            prevLabel={yearTotal ? '전년 동기' : undefined}
+            prevLabel={yearTotal ? '전년 동기' : period || sameDate ? cmp : undefined}
             emptyMessage="취합된 카테고리 데이터가 없습니다."
             onSelect={onSearchName && ((k) => onSearchName(formatCategoryScope(k)))}
           />
-          <div className="leg" id="lgOverviewCat">
-            <span>
-              <i className="cur" />
-              {allPeriod ? '전체 기간' : `${yearTotal ? yearLabel : period ? period.label : '기준월'} (굵은 막대)`}
-            </span>
-            {!allPeriod && (
-              <span>
-                <i className="prev" />
-                {yearTotal ? '전년 동기' : cmp}
-              </span>
-            )}
-            <span className="leg-note">단위: 만원</span>
-          </div>
+          <CompareLegend
+            id="lgOverviewCat"
+            unit="만원"
+            curLabel={allPeriod ? '전체 기간' : `${yearTotal ? yearLabel : period ? period.label : '기준월'} (굵은 막대)`}
+            prevLabel={allPeriod ? undefined : yearTotal ? '전년 동기' : cmp}
+          />
           <ShowMoreButton
             total={fullList.length}
             expanded={visibleCount >= fullList.length}
@@ -486,20 +474,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             onSelect={onSearchName && ((k) => onSearchName(formatSourceScope(k)))}
           />
           {srcCompareLabel && (
-            <div className="leg src-bar-leg">
-              <span>
-                <i className="cur" />
-                {yearTotal ? yearLabel : curCaption} (굵은 막대)
-              </span>
-              <span>
-                <i className="prev" />
-                {yearTotal ? '전년 동기' : pvCaption} (얇은 막대)
-              </span>
-            </div>
+            <CompareLegend
+              className="src-bar-leg"
+              curLabel={`${yearTotal ? yearLabel : curCaption} (굵은 막대)`}
+              prevLabel={`${yearTotal ? '전년 동기' : pvCaption} (얇은 막대)`}
+            />
           )}
         </Card>
       </div>
       <SecSrc sources={OVERVIEW_SOURCES} />
-    </div>
+    </View>
   );
 };

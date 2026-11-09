@@ -56,7 +56,12 @@ export function Dropdown<T extends string | number>({
 
   // 화면 기준 위치 — 그리기 전에 재서 아래에 안 들어가면 공간이 더 넓은 쪽으로 펼친다
   useLayoutEffect(() => {
-    if (!open || !fixedMenu || !triggerRef.current || !listRef.current) return;
+    if (!fixedMenu) return;
+    if (!open) {
+      setMenuStyle(undefined);
+      return;
+    }
+    if (!triggerRef.current || !listRef.current) return;
     const GAP = 4;
     const MARGIN = 8;
     const t = triggerRef.current.getBoundingClientRect();
@@ -77,8 +82,11 @@ export function Dropdown<T extends string | number>({
   // 화면 기준으로 띄운 목록은 트리거를 따라가지 않으므로 바깥이 스크롤되면 닫는다
   useEffect(() => {
     if (!open || !fixedMenu) return;
+    const startTop = triggerRef.current?.getBoundingClientRect().top ?? 0;
     const onScroll = (e: Event) => {
-      if (!listRef.current?.contains(e.target as Node)) setOpen(false);
+      if (listRef.current?.contains(e.target as Node)) return;
+      // 스크롤 이벤트만으로 닫지 않는다 — 트리거가 실제로 움직였을 때만 (열면서 생기는 이벤트에 바로 닫히지 않게)
+      if (Math.abs((triggerRef.current?.getBoundingClientRect().top ?? startTop) - startTop) > 1) setOpen(false);
     };
     const onResize = () => setOpen(false);
     window.addEventListener('scroll', onScroll, true);
@@ -163,7 +171,7 @@ export function Dropdown<T extends string | number>({
           id={listId}
           ref={listRef}
           tabIndex={-1}
-          style={fixedMenu ? menuStyle : undefined}
+          style={fixedMenu ? menuStyle ?? { position: 'fixed', visibility: 'hidden', minWidth: 0 } : undefined}
           aria-label={ariaLabel}
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           onKeyDown={onListKey}

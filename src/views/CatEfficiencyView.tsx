@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import type { DayPeriod } from '../utils/dayRange';
 import type { CategoryMap, DashboardData, SyncStatus } from '../types/dashboard';
 import {
   buildCategoryBarItems,
@@ -15,8 +14,13 @@ import {
   THIS_M,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
+import { CompareLegend } from '../components/common/Legend';
+import type { DayPeriod } from '../utils/dayRange';
+import type { SameDateCompare } from '../utils/dayData';
+import { View } from '../components/common/View';
+import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import {
   CategoryFilter,
@@ -45,6 +49,8 @@ interface CatEfficiencyViewProps {
   yearTotal?: boolean;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
+  sameDate?: SameDateCompare;
 }
 
 const CAT_EFF_SOURCES: SourceLinkItem[] = [
@@ -62,6 +68,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   allPeriod = false,
   yearTotal = false,
   period,
+  sameDate,
 }) => {
   const catState = useCategoryFilterState();
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
@@ -69,23 +76,19 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
 
   if (!data.spend.length) {
     return (
-      <div className="view on" data-view="cat-efficiency" data-title="카테고리 효율">
+      <View name="cat-efficiency" title="카테고리 효율">
         <ViewHeader
           title="카테고리 효율 분석"
           description="카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 아이티켓·zbyhp·cadkorea·전화문의 합산)"
           status={status}
         />
         <KpiSection id="kpiCatEff">
-          <div className="kpi">
-            <div className="l">카테고리 데이터</div>
-            <div className="v">–</div>
-            <div className="d flat">데이터 연결 필요</div>
-          </div>
+          <KpiPlaceholder label="카테고리 데이터" message="데이터 연결 필요" />
         </KpiSection>
         <Card name="empty" id="cat-empty">
           <EmptyState message="취합된 데이터가 없습니다." />
         </Card>
-      </div>
+      </View>
     );
   }
 
@@ -108,7 +111,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const curMonths = allPeriod ? efficiencyMonths : yearTotal ? monthsUpTo(curM) : [curM];
   const prevMonths = allPeriod ? [] : yearTotal ? sameMonthsLastYear(curMonths) : [pv];
   const periodLabel = allPeriod ? `${dotYm(cpaFrom)} 이후` : yearTotal ? yearRangeLabel(curM) : period ? period.label : mLabel(curM);
-  const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : mLabel(pv);
+  const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : mLabel(pv);
 
   const rowsCur = data.spend.filter(inMonths(curMonths));
   const rowsPrev = data.spend.filter(inMonths(prevMonths));
@@ -194,7 +197,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const avgCpa = totQuotes > 0 ? totSpend / totQuotes : 0;
 
   // KPI 비교 기준: 월 선택은 전월, 연도 전체는 전년 동기. 전체 기간은 비교하지 않는다
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
   const prevInputs = prevMonths.map((mo) => ({
     rows: quoteRows.filter((r) => r.month === mo),
     spend: catSum(categoryMap, data.spend.filter((r) => r.month === mo), (r) => r.cost),
@@ -229,27 +232,27 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const totConv = isFiltered ? sumBy(catKeys, (k) => catConv[k] || 0) : sumBy(rowsCur, (r) => r.conv);
 
   return (
-    <div className="view on" data-view="cat-efficiency" data-title="카테고리 효율">
+    <View name="cat-efficiency" title="카테고리 효율">
       <ViewHeader
         title="카테고리 효율 분석"
         description="카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 아이티켓·zbyhp·cadkorea·전화문의 합산)"
         status={status}
       />
 
-      <PeriodNavSlot>
+      <PeriodNavSlot active={!!catFilter.cat1} onReset={() => catState.setCat1('')}>
         <CategoryFilter filter={catFilter} />
       </PeriodNavSlot>
 
       {allPeriod && (
-        <p className="leg-note quote-src-note">
-          ※ 전체 기간은 광고비와 견적이 모두 있는 {dotYm(cpaFrom)} 이후만 합산합니다. 그래서 광고비 합계가 종합 요약의 전체 누적 광고비보다 적습니다.
-        </p>
+        <ViewNote>
+          ※ 전체 기간은 광고비·견적이 모두 있는 {dotYm(cpaFrom)} 이후만 합산해, 종합 요약의 누적 광고비보다 적습니다.
+        </ViewNote>
       )}
 
       {yearTotal && curMonths[0] < cpaFrom && (
-        <p className="leg-note quote-src-note">
-          ※ {dotYm(cpaFrom)} 이전은 광고비와 견적 데이터가 모두 갖춰지지 않아 CPA가 실제와 다를 수 있습니다.
-        </p>
+        <ViewNote>
+          ※ {dotYm(cpaFrom)} 이전은 광고비·견적이 모두 갖춰지지 않아 CPA가 실제와 다를 수 있습니다.
+        </ViewNote>
       )}
 
       <KpiSection id="kpiCatEff">
@@ -260,7 +263,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           prev={topSpendCat?.prevCost}
           cmpLabel={cmpLabel}
           sub={noCompareSub}
-          detail={topSpendCat ? <KpiDetailItems items={[['광고비', fmtWon(topSpendCat.cost)], ['비중', sharePct(topSpendCat.cost, totSpend)]]} /> : null}
+          detail={topSpendCat ? <KpiDetailItems items={[['광고비', fmtWon(topSpendCat.cost)], ['비중', sharePct(topSpendCat.cost, totSpend)]]} /> : <KpiDetailItems items={[['광고비', '0원'], ['비중', '0%']]} />}
         />
         <KpiCard
           label="최다 견적 카테고리"
@@ -269,7 +272,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           prev={topQuoteCat ? qPrevOf(topQuoteCat.k) : null}
           cmpLabel={cmpLabel}
           sub={noCompareSub}
-          detail={topQuoteCat ? <KpiDetailItems items={[['견적', `${fmt(topQuoteCat.quotes)}건`], ['비중', sharePct(topQuoteCat.quotes, totQuotes)]]} /> : null}
+          detail={topQuoteCat ? <KpiDetailItems items={[['견적', `${fmt(topQuoteCat.quotes)}건`], ['비중', sharePct(topQuoteCat.quotes, totQuotes)]]} /> : <KpiDetailItems items={[['견적', '0건'], ['비중', '0%']]} />}
         />
         <KpiCard
           label="최고 효율 (최저 CPA)"
@@ -278,7 +281,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           prev={bestPrevCpa}
           cmpLabel={cmpLabel}
           sub={noCompareSub}
-          detail={bestCpaCat ? <KpiDetailItems items={[['건당', `${fmt(bestCpaCat.cpa)}원`], ['견적', `${fmt(bestCpaCat.quotes)}건`]]} /> : null}
+          detail={bestCpaCat ? <KpiDetailItems items={[['건당', `${fmt(bestCpaCat.cpa)}원`], ['견적', `${fmt(bestCpaCat.quotes)}건`]]} /> : <KpiDetailItems items={[['건당', '0원'], ['견적', '0건']]} />}
         />
         <KpiCard
           label={`${periodLabel} 전체 평균 CPA`}
@@ -306,21 +309,13 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
             curLabel={yearTotal ? periodLabel : undefined}
             totalCur={sumBy(fullList, (c) => c.cur)}
             totalPrev={sumBy(fullList, (c) => c.prev)}
-            prevLabel={yearTotal ? prevLabel : undefined}
+            prevLabel={yearTotal || period || sameDate ? prevLabel : undefined}
           />
-          <div className="leg">
-            <span>
-              <i className="cur" />
-              {allPeriod || yearTotal || period ? periodLabel : '기준월'}
-            </span>
-            {!allPeriod && (
-              <span>
-                <i className="prev" />
-                {yearTotal || period ? prevLabel : '전월'}
-              </span>
-            )}
-            <span className="leg-note">단위: 만원</span>
-          </div>
+          <CompareLegend
+            unit="만원"
+            curLabel={allPeriod || yearTotal || period ? periodLabel : '기준월'}
+            prevLabel={allPeriod ? undefined : yearTotal || period || sameDate ? prevLabel : '전월'}
+          />
           <ShowMoreButton
             total={fullList.length}
             expanded={visibleCount >= fullList.length}
@@ -340,6 +335,6 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
         avgCpa={avgCpa}
       />
       <SecSrc sources={CAT_EFF_SOURCES} />
-    </div>
+    </View>
   );
 };

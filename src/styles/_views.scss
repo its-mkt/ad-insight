@@ -309,8 +309,7 @@ p.small {
   }
 }
 
-#tbQuotesCat,
-#tbQuotesSrcMonth,
+.quotes-group-table,
 #tbSpendDetail {
   table-layout: fixed;
   width: 100%;
@@ -2321,4 +2320,61 @@ tr.kw-more-row td {
   background: transparent;
   color: var(--sub);
   cursor: pointer;
+}
+
+// 견적 상세 — 읽기 전용 접수 목록
+.card-quote-list {
+  .ql-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  // 공용 .pagination 은 inline-flex 라 왼쪽에 붙으므로, 한 줄을 다 쓰게 해 가운데로 모은다
+  .pagination {
+    display: flex;
+    margin-top: 0.75rem;
+  }
+
+  #tbQuoteList {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 56rem;
+
+    &.with-subject {
+      min-width: 76rem;
+
+      .ql-col-source {
+        width: 18rem;
+      }
+    }
+  }
+
+  .ql-col-origin {
+    width: 7.5rem;
+  }
+
+  .ql-col-sno {
+    width: 5rem;
+  }
+
+  .ql-col-date {
+    width: 7rem;
+  }
+
+  .ql-col-rep {
+    width: 7.5rem;
+  }
+
+  .ql-col-cat {
+    width: 15rem;
+  }
+
+  .ql-nowrap,
+  .ql-subject {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
