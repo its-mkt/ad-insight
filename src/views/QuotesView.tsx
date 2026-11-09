@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import type { DayPeriod } from '../utils/dayRange';
 import type { DashboardData, QuoteRawRow, SyncStatus } from '../types/dashboard';
 import {
   buildSourceShareData,
@@ -34,6 +35,10 @@ interface QuotesViewProps {
   allPeriod?: boolean;
   /** 월 선택이 '전체' — selectedMonth 는 그 연도의 마지막 달이다 */
   yearTotal?: boolean;
+  /** 일·기간 보기에서도 월별 추이 차트·표는 이 원본 월 데이터로 그린다 */
+  monthly?: DashboardData;
+  /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
+  period?: DayPeriod;
 }
 
 const QUOTES_SOURCES: SourceLinkItem[] = [
@@ -43,9 +48,12 @@ const QUOTES_SOURCES: SourceLinkItem[] = [
   { label: 'collectQuotes · collectQuoteStatsExtra · 1시간 자동 동기화' },
 ];
 
-export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false }) => {
+export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra]);
+  const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
+  const trendQuotes = trend?.quotes ?? quotes;
+  const trendRaw = trend?.quotesRaw ?? quotesRaw;
 
   if (!quotes.length) {
     return (
@@ -139,7 +147,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
         value={top?.[0] || '–'}
         cur={top?.[1] ?? null}
         prev={prevTopCount}
-        cmpLabel={prevRows ? '전월' : undefined}
+        cmpLabel={prevRows ? cmp : undefined}
         detail={top ? <KpiDetailItems items={items} /> : null}
       />
     );
@@ -162,14 +170,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
 
   const { items: srcItems } = buildSourceShareData(
     quotesRaw,
-    yr,
+    period ? curM : yr,
     quotes,
     allPeriod ? undefined : curM
   );
 
   // 카테고리는 분류표 1차 기준 (2차는 1차에 합산). 최다 카테고리는 '기타'를 빼고 고른다
   // 선택한 달까지만 본다 — 비중의 분모인 누적 견적(1~선택 월)과 기간을 맞춘다
-  const yrQuotes = quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM);
+  const yrQuotes = trendQuotes.filter((r) => r.month.startsWith(yr) && r.month <= curM);
   const topCatKey = quoteCat1Order(yrQuotes).find((c) => c !== '기타');
   const topCat = topCatKey
     ? { k: topCatKey, c: sumBy(yrQuotes.filter((r) => cat1Of(r.category) === topCatKey), (r) => r.count) }
@@ -186,7 +194,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
   const kpiQuotes = yearTotal
     ? quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM)
     : quotes.filter((r) => r.month === curM);
-  const kpiLabel = yearTotal ? `${yr}년` : mLabel(curM);
+  const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
+  const cmp = period ? period.cmpLabel : '전월';
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');
@@ -203,7 +212,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     : 0;
   const catDelta = !yearTotal && kpiTopCat ? kpiTopCat.c - pvTopCatCount : null;
   const catDeltaNode = catDelta !== null && catDelta !== 0
-    ? <span style={{ color: catDelta > 0 ? 'var(--up)' : 'var(--down)' }}>{' · '}{catDelta > 0 ? '▲' : '▼'} {fmt(Math.abs(catDelta))}건 전월</span>
+    ? <span style={{ color: catDelta > 0 ? 'var(--up)' : 'var(--down)' }}>{' · '}{catDelta > 0 ? '▲' : '▼'} {fmt(Math.abs(catDelta))}건 {cmp}</span>
     : null;
 
   // KPI CPA: 월 선택 → 당월 / 전월 비교, 연도 전체 → 연간 / 전년 동기 비교
@@ -215,7 +224,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
   const pvCpa = pv >= starts.cpaFrom && pvAdQuotes > 0 ? pvSpendTot / pvAdQuotes : 0;
   const kpiCpa = yearTotal ? ytdCpa : curCpa;
   const kpiPrevCpa = yearTotal ? (lastYrMonths[0] >= starts.cpaFrom ? lastYrCpa : null) : (pvCpa || null);
-  const kpiCpaCompLabel = yearTotal ? '전년 동기' : '전월';
+  const kpiCpaCompLabel = yearTotal ? '전년 동기' : cmp;
   const ytdValidMonths = cpaMonths.filter((mo) => mo >= starts.cpaFrom);
   const kpiSpend = yearTotal
     ? sumBy(data.spend.filter(inMonths(ytdValidMonths)), (r) => r.cost)
@@ -282,11 +291,11 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
           <>
         {!yearTotal && (
           <KpiCard
-            label={`${mLabel(curM)} 총 견적`}
+            label={`${kpiLabel} 총 견적`}
             value={`${fmt(curTot)}건`}
             cur={curTot}
             prev={pvTot}
-            cmpLabel="전월"
+            cmpLabel={cmp}
             detail={curSiteDetail}
           />
         )}
@@ -346,8 +355,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
       </div>
 
       <MonthlyQuotesTable
-        quotes={quotes}
-        quotesRaw={quotesRaw}
+        quotes={trendQuotes}
+        quotesRaw={trendRaw}
         yr={yr}
         curM={curM}
         months={months}

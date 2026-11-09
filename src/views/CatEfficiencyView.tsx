@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import type { DayPeriod } from '../utils/dayRange';
 import type { CategoryMap, DashboardData, SyncStatus } from '../types/dashboard';
 import {
   buildCategoryBarItems,
@@ -42,6 +43,8 @@ interface CatEfficiencyViewProps {
   allPeriod?: boolean;
   /** 월 선택이 '전체' — selectedMonth 는 그 연도의 마지막 달이다 */
   yearTotal?: boolean;
+  /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
+  period?: DayPeriod;
 }
 
 const CAT_EFF_SOURCES: SourceLinkItem[] = [
@@ -58,6 +61,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   selectedMonth,
   allPeriod = false,
   yearTotal = false,
+  period,
 }) => {
   const catState = useCategoryFilterState();
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
@@ -103,8 +107,8 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
     .sort();
   const curMonths = allPeriod ? efficiencyMonths : yearTotal ? monthsUpTo(curM) : [curM];
   const prevMonths = allPeriod ? [] : yearTotal ? sameMonthsLastYear(curMonths) : [pv];
-  const periodLabel = allPeriod ? `${dotYm(cpaFrom)} 이후` : yearTotal ? yearRangeLabel(curM) : mLabel(curM);
-  const prevLabel = yearTotal ? '전년 동기' : mLabel(pv);
+  const periodLabel = allPeriod ? `${dotYm(cpaFrom)} 이후` : yearTotal ? yearRangeLabel(curM) : period ? period.label : mLabel(curM);
+  const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : mLabel(pv);
 
   const rowsCur = data.spend.filter(inMonths(curMonths));
   const rowsPrev = data.spend.filter(inMonths(prevMonths));
@@ -190,7 +194,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const avgCpa = totQuotes > 0 ? totSpend / totQuotes : 0;
 
   // KPI 비교 기준: 월 선택은 전월, 연도 전체는 전년 동기. 전체 기간은 비교하지 않는다
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
   const prevInputs = prevMonths.map((mo) => ({
     rows: quoteRows.filter((r) => r.month === mo),
     spend: catSum(categoryMap, data.spend.filter((r) => r.month === mo), (r) => r.cost),
@@ -307,12 +311,12 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           <div className="leg">
             <span>
               <i className="cur" />
-              {allPeriod || yearTotal ? periodLabel : '기준월'}
+              {allPeriod || yearTotal || period ? periodLabel : '기준월'}
             </span>
             {!allPeriod && (
               <span>
                 <i className="prev" />
-                {yearTotal ? prevLabel : '전월'}
+                {yearTotal || period ? prevLabel : '전월'}
               </span>
             )}
             <span className="leg-note">단위: 만원</span>

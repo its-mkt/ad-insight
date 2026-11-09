@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { DayPeriod } from '../utils/dayRange';
 import type {
   AdRow,
   CategoryMap,
@@ -37,6 +38,8 @@ interface KeywordsViewProps {
   allPeriod?: boolean;
   /** 월 선택이 '전체' — selectedMonth 는 그 연도의 마지막 달이다 */
   yearTotal?: boolean;
+  /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
+  period?: DayPeriod;
 }
 
 const KEYWORDS_SOURCES: SourceLinkItem[] = [
@@ -54,6 +57,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   selectedMonth,
   allPeriod = false,
   yearTotal = false,
+  period,
 }) => {
   const [media, setMedia] = useState<'all' | 'Google' | 'Naver'>('all');
   const [type, setType] = useState<'SA' | 'DA'>('SA');
@@ -113,7 +117,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const pvClk  = pvRows.reduce((s, r) => s + r.clk, 0);
   const pvConv = pvRows.reduce((s, r) => s + r.conv, 0);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');
