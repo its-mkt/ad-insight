@@ -102,6 +102,8 @@ function syncAllBody_(t0) {
     if (Date.now() - t0 > CFG.RUN_LIMIT_MS) { console.warn('- ' + label + ': 실행 시간 ' + Math.round(CFG.RUN_LIMIT_MS / 60000) + '분을 넘겨 다음 실행으로 미룸'); continue; }
     try { fn(); console.log('✓ ' + label + ' 동기화 완료'); } catch (e) { fail_(name, e); }
   }
+  // 일별 과거분은 시트를 많이 건드리므로 견적 등 다른 수집이 모두 끝난 뒤에 받는다
+  if (pendingNaverHist_) collectNaverDailyHist_(SpreadsheetApp.openById(CFG.SHEET_ID), t0, pendingNaverHist_.groups, pendingNaverHist_.gById);
   console.log('=== [its-ad-insight] 전체 매체 통합 동기화 완료 (' + Math.round((Date.now() - t0) / 1000) + '초 소요) ===');
 }
 
@@ -262,7 +264,7 @@ function collectNaverStats_(ss, t0, withKeywords) {
   put_(ss, 'n_meta', [['key', 'value'], ['updated', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm')], ['customer_id', PROPS.getProperty('NAVER_CUSTOMER_ID')],
     ['structure', PROPS.getProperty('NAVER_STRUCT_AT') || ''], ['api_calls', apiCalls_]]);
   syncMapping_(ss);
-  collectNaverDailyHist_(ss, t0, groups, gById);
+  pendingNaverHist_ = { groups, gById };
 }
 /**
  * 광고그룹 × 일 (최근 CFG.DAILY_DAYS 일) → n_adgroup_daily. 일·기간 선택이 쓴다.
@@ -295,6 +297,7 @@ function collectNaverDaily_(ss, t0, groups, gById) {
   done.forEach((d) => have.add(d));
   PROPS.setProperty('NAVER_DAILY_HAVE', JSON.stringify([...have].filter((d) => d >= oldest).sort()));
 }
+let pendingNaverHist_ = null; // 이번 실행의 네이버 수집에서 읽은 광고그룹 목록 — syncAll 끝에서 과거분 수집에 쓴다
 /**
  * 지난달까지의 광고그룹 × 일을 달 단위로 n_adgroup_daily_hist 에 쌓는다 (한 번 받은 달은 다시 받지 않는다).
  * 최신 달부터, 한 번 실행에 CFG.NAVER_HIST_BUDGET_MS 안에서만 받아 다른 수집 시간을 남긴다. 실패해도 나머지 수집은 계속한다.
@@ -322,7 +325,10 @@ function collectNaverDailyHist_(ss, t0, groups, gById) {
         });
       }
       if (rows.length) {
-        const at = sh.getLastRow() + 1;
+        // 저장이 타임아웃되어도 실제로는 써졌을 수 있으니, 같은 달이 있으면 그 자리에 다시 쓴다
+        const lastRow = sh.getLastRow();
+        const first = lastRow > 1 ? sh.getRange(2, 1, lastRow - 1, 1).getDisplayValues().findIndex((r) => String(r[0]).startsWith(m)) : -1;
+        const at = first >= 0 ? first + 2 : lastRow + 1;
         sh.getRange(at, 1, rows.length, 1).setNumberFormat('@');
         sh.getRange(at, 1, rows.length, head.length).setValues(rows);
       }
