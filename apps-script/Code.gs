@@ -21,6 +21,8 @@ const CFG = {
   DAILY_DAYS: 62,                            // 일별 광고비를 모으는 최근 일수 (오늘 포함, 대시보드의 일·기간 선택용)
   DAILY_BACKFILL_DAYS: 31,                   // 일별 수집 한 번에 새로 채우는 지난 날 수 (오늘·어제는 매번 다시 받는다)
   DAILY_HIST: { google: 'g_adgroup_daily_hist', naver: 'n_adgroup_daily_hist' }, // 최근 구간보다 오래된 일별 광고비 (달 단위로 쌓는다, 고른 달만 내려준다)
+  NAVER_HIST_API_RESERVE: 2000,              // 일별 과거분 수집이 남겨 둘 네이버 API 호출 수 (이날 남은 매시간 수집 몫)
+  NAVER_HIST_FILL_DAILY_MS: 30 * 60 * 1000,  // 전용 채우기가 하루에 쓸 최대 실행 시간 (트리거 하루 90분 한도를 syncAll 과 나눠 쓴다)
   NAVER_HIST_BUDGET_MS: 90 * 1000,           // 일별 과거분 수집에 한 번 실행당 쓸 최대 시간 (다른 수집 시간을 남긴다)
   BACKFILL_MONTHS: 5,                        // 성과 수집 한 번에 채우는 지난 달 수 (한 번에 몰려 한도를 넘지 않게)
   // UrlFetch 하루 2만 회는 이 구글 계정의 모든 스크립트(견적문의·상담접수 연동 등)가 함께 쓴다.
@@ -317,8 +319,10 @@ function collectNaverDailyHist_(ss, t0, groups, gById, budgetMs = CFG.NAVER_HIST
     for (const m of months) {
       if (Date.now() - h0 > budgetMs / 2 || Date.now() - t0 > CFG.BUDGET_MS) break; // 한 달을 끝낼 시간이 남았을 때만 시작한다
       const last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+      if (apiLeft_() < last * Math.ceil(ids.length / CFG.CHUNK) + CFG.NAVER_HIST_API_RESERVE) { console.warn('일별 과거분: 오늘 네이버 API 여유가 적어 멈춥니다 (남은 호출 ' + apiLeft_() + '회)'); return -2; }
       const rows = [];
       for (let d = 1; d <= last; d++) {
+        if (Date.now() - t0 > CFG.RUN_LIMIT_MS) return months.filter((x) => !done.has(x)).length; // 6분 강제 종료 전에 멈춘다 (이 달은 다음에 처음부터 받는다)
         const day = m + '-' + String(d).padStart(2, '0');
         stats_(ids, day, day).forEach((s) => {
           const g = gById[s.id];
@@ -341,22 +345,30 @@ function collectNaverDailyHist_(ss, t0, groups, gById, budgetMs = CFG.NAVER_HIST
 }
 /**
  * 편집기에서 한 번만 실행: 네이버 일별 과거분을 끝까지 채운다. 6분 제한 안에서 나눠 받고, 남으면 1분 뒤 스스로 다시 시작한다.
- * 매시간 수집과 겹치는 시간(매시 9~24분)은 쉬었다가 이어 가고, 연속 5번 실패하면 멈춘다.
+ * 매시간 수집과 겹치는 시간(매시 9~24분)은 쉬었다가 이어 가고, 연속 5번 실패하거나 하루 실행 시간·API 여유를 넘기면 멈춘다 (남은 달은 매시간 수집이 이어 받는다).
  */
 function fillNaverDailyHist() {
   ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'fillNaverDailyHist').forEach((t) => ScriptApp.deleteTrigger(t));
   const again = (ms) => ScriptApp.newTrigger('fillNaverDailyHist').timeBased().after(ms).create();
   const minute = Number(Utilities.formatDate(new Date(), 'Asia/Seoul', 'm'));
   if (minute >= 9 && minute < 24) { again(15 * 60 * 1000); return; }
+  const dayKey = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const spent = JSON.parse(PROPS.getProperty('NAVER_HIST_FILL_SPENT') || '{}'), usedMs = spent.day === dayKey ? spent.ms : 0;
+  if (usedMs >= CFG.NAVER_HIST_FILL_DAILY_MS) {
+    console.warn('일별 과거분: 오늘 쓸 실행 시간을 다 써서 멈춥니다 (남은 달은 매시간 수집이 이어 받습니다)');
+    PROPS.deleteProperty('NAVER_HIST_FILLING');
+    return;
+  }
   const t0 = Date.now(), ss = SpreadsheetApp.openById(CFG.SHEET_ID), groups = read_(ss, 'n_idx_groups');
   if (!groups.length) throw new Error('n_idx_groups 가 비어 있습니다');
   PROPS.setProperty('NAVER_HIST_FILLING', String(t0));
   let left = -1;
   try { left = collectNaverDailyHist_(ss, t0, groups, Object.fromEntries(groups.map((g) => [String(g.id), g])), 8 * 60 * 1000); } finally { saveApiCount_(); }
-  const fails = left < 0 ? Number(PROPS.getProperty('NAVER_HIST_FILL_FAILS') || 0) + 1 : 0;
+  PROPS.setProperty('NAVER_HIST_FILL_SPENT', JSON.stringify({ day: dayKey, ms: usedMs + Date.now() - t0 }));
+  const fails = left === -1 ? Number(PROPS.getProperty('NAVER_HIST_FILL_FAILS') || 0) + 1 : 0;
   PROPS.setProperty('NAVER_HIST_FILL_FAILS', String(fails));
   console.log('일별 과거분 남은 달: ' + left + ' (연속 실패 ' + fails + '회)');
-  if (left === 0 || fails >= 5) PROPS.deleteProperty('NAVER_HIST_FILLING');
+  if (left === 0 || left === -2 || fails >= 5) PROPS.deleteProperty('NAVER_HIST_FILLING');
   else again(60 * 1000);
 }
 /** 일별 과거분 시트에 있는 달 목록 — 행 수가 바뀔 때만 다시 읽는다 */
