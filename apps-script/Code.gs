@@ -20,6 +20,8 @@ const CFG = {
   KW_STATS_RESERVE_MS: 70 * 1000,            // 광고그룹 순회를 일찍 끝내 키워드 성과(/stats) 조회 시간을 남긴다
   DAILY_DAYS: 62,                            // 일별 광고비를 모으는 최근 일수 (오늘 포함, 대시보드의 일·기간 선택용)
   DAILY_BACKFILL_DAYS: 31,                   // 일별 수집 한 번에 새로 채우는 지난 날 수 (오늘·어제는 매번 다시 받는다)
+  DAILY_HIST: { google: 'g_adgroup_daily_hist', naver: 'n_adgroup_daily_hist' }, // 최근 구간보다 오래된 일별 광고비 (달 단위로 쌓는다, 고른 달만 내려준다)
+  NAVER_HIST_BUDGET_MS: 90 * 1000,           // 일별 과거분 수집에 한 번 실행당 쓸 최대 시간 (다른 수집 시간을 남긴다)
   BACKFILL_MONTHS: 5,                        // 성과 수집 한 번에 채우는 지난 달 수 (한 번에 몰려 한도를 넘지 않게)
   // UrlFetch 하루 2만 회는 이 구글 계정의 모든 스크립트(견적문의·상담접수 연동 등)가 함께 쓴다.
   // 네이버 API 는 하루 이 횟수까지만 부르고 멈춰, 고장으로 폭주해도 나머지 스크립트 몫을 남긴다. 스크립트 속성 NAVER_DAILY_CAP 로 바꿀 수 있다.
@@ -260,6 +262,7 @@ function collectNaverStats_(ss, t0, withKeywords) {
   put_(ss, 'n_meta', [['key', 'value'], ['updated', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm')], ['customer_id', PROPS.getProperty('NAVER_CUSTOMER_ID')],
     ['structure', PROPS.getProperty('NAVER_STRUCT_AT') || ''], ['api_calls', apiCalls_]]);
   syncMapping_(ss);
+  collectNaverDailyHist_(ss, t0, groups, gById);
 }
 /**
  * 광고그룹 × 일 (최근 CFG.DAILY_DAYS 일) → n_adgroup_daily. 일·기간 선택이 쓴다.
@@ -291,6 +294,89 @@ function collectNaverDaily_(ss, t0, groups, gById) {
   put_(ss, 'n_adgroup_daily', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
   done.forEach((d) => have.add(d));
   PROPS.setProperty('NAVER_DAILY_HAVE', JSON.stringify([...have].filter((d) => d >= oldest).sort()));
+}
+/**
+ * 지난달까지의 광고그룹 × 일을 달 단위로 n_adgroup_daily_hist 에 쌓는다 (한 번 받은 달은 다시 받지 않는다).
+ * 최신 달부터, 한 번 실행에 CFG.NAVER_HIST_BUDGET_MS 안에서만 받아 다른 수집 시간을 남긴다. 실패해도 나머지 수집은 계속한다.
+ */
+function collectNaverDailyHist_(ss, t0, groups, gById) {
+  try {
+    const h0 = Date.now();
+    const head = ['date', 'type', 'campaign', 'campaign_tp', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
+    const sh = ss.getSheetByName(CFG.DAILY_HIST.naver) || ss.insertSheet(CFG.DAILY_HIST.naver);
+    if (sh.getLastRow() < 1) sh.getRange(1, 1, 1, head.length).setValues([head]);
+    const done = new Set(JSON.parse(PROPS.getProperty('NAVER_HIST_DONE') || '[]'));
+    const thisMonth = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM');
+    const months = [...new Set(read_(ss, 'n_adgroup_monthly').filter((r) => r.type === 'SA').map((r) => String(r.month).slice(0, 7)))]
+      .filter((m) => m < thisMonth && !done.has(m)).sort().reverse();
+    const ids = groups.map((g) => String(g.id));
+    for (const m of months) {
+      if (Date.now() - h0 > CFG.NAVER_HIST_BUDGET_MS / 2 || Date.now() - t0 > CFG.BUDGET_MS) break; // 한 달을 끝낼 시간이 남았을 때만 시작한다
+      const last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+      const rows = [];
+      for (let d = 1; d <= last; d++) {
+        const day = m + '-' + String(d).padStart(2, '0');
+        stats_(ids, day, day).forEach((s) => {
+          const g = gById[s.id];
+          if (g && (s.salesAmt || s.impCnt)) rows.push([day, 'SA', g.campaign, g.ctype, g.name, String(g.id), s.salesAmt || 0, s.impCnt || 0, s.clkCnt || 0, s.ccnt || 0]);
+        });
+      }
+      if (rows.length) {
+        const at = sh.getLastRow() + 1;
+        sh.getRange(at, 1, rows.length, 1).setNumberFormat('@');
+        sh.getRange(at, 1, rows.length, head.length).setValues(rows);
+      }
+      done.add(m);
+      PROPS.setProperty('NAVER_HIST_DONE', JSON.stringify([...done]));
+    }
+  } catch (err) { console.warn('일별 과거분 수집 실패: ' + err.message); }
+}
+/** 일별 과거분 시트에 있는 달 목록 — 행 수가 바뀔 때만 다시 읽는다 */
+function dailyHistMonths_(ss, name) {
+  const sh = ss.getSheetByName(name), last = sh ? sh.getLastRow() : 0;
+  if (last < 2) return [];
+  const cache = CacheService.getScriptCache(), key = 'hist-months:' + name + ':' + last;
+  try { const c = cache.get(key); if (c) return JSON.parse(c); } catch (_) {}
+  const months = [...new Set(sh.getRange(2, 1, last - 1, 1).getDisplayValues().map((r) => String(r[0]).slice(0, 7)))].filter(Boolean).sort();
+  try { cache.put(key, JSON.stringify(months), 21600); } catch (_) {}
+  return months;
+}
+/** 일별 과거분을 달별로 압축 캐시해 고른 달만 돌려준다. 행 수가 바뀌면 키가 바뀌어 저절로 새로 읽는다 */
+function histRows_(ss, name, months) {
+  const sh = ss.getSheetByName(name), last = sh ? sh.getLastRow() : 0;
+  if (last < 2) return [];
+  const cache = CacheService.getScriptCache(), base = 'hist:' + name + ':' + last + ':';
+  const cached = (m) => {
+    try {
+      const n = Number(cache.get(base + m + ':n'));
+      if (!n) return null;
+      const keys = Array.from({ length: n }, (_, i) => base + m + ':' + i), got = cache.getAll(keys);
+      if (keys.some((k) => got[k] == null)) return null;
+      const b64 = keys.map((k) => got[k]).join('');
+      return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip')).getDataAsString());
+    } catch (_) { return null; }
+  };
+  const hit = months.map(cached);
+  if (hit.every(Boolean)) return [].concat(...hit);
+  const byMonth = {};
+  read_(ss, name).forEach((r) => { const m = String(r.date).slice(0, 7); (byMonth[m] = byMonth[m] || []).push(r); });
+  Object.keys(byMonth).forEach((m) => {
+    try {
+      const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(byMonth[m]), 'application/json')).getBytes());
+      const CHUNK = 90000, n = Math.max(1, Math.ceil(b64.length / CHUNK)), put = {};
+      for (let i = 0; i < n; i++) put[base + m + ':' + i] = b64.slice(i * CHUNK, (i + 1) * CHUNK);
+      put[base + m + ':n'] = String(n);
+      cache.putAll(put, 21600);
+    } catch (_) {}
+  });
+  return [].concat(...months.map((m) => byMonth[m] || []));
+}
+/** ?daily=YYYY-MM,YYYY-MM — 고른 달의 일별 과거분만 내려준다 (광고비 집계라 고객 정보는 없다) */
+function dailyHistResponse_(ss, param, out) {
+  const months = String(param).split(',').filter((m) => /^[0-9]{4}-[0-9]{2}$/.test(m)).slice(0, 48);
+  out.months = months;
+  Object.values(CFG.DAILY_HIST).forEach((name) => { out[name] = histRows_(ss, name, months); });
+  return out;
 }
 /** 편집기에서 직접 실행: 소재 성과(n_ad_stats)를 지금 바로 채운다 (하루 1번 제한과 무관) */
 function collectNaverAdStats() {
@@ -1038,7 +1124,9 @@ function doGet(e) {
   const token = PROPS.getProperty('API_TOKEN');
   if (!token || !e || !e.parameter || e.parameter.key !== token) return json_({ error: 'unauthorized' });
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
+  if (e.parameter.daily) return json_(dailyHistResponse_(ss, e.parameter.daily, out));
   const isAdmin = isAdminToken_(ss, e.parameter.access_token);
+  out.daily_hist_months = { Google: dailyHistMonths_(ss, CFG.DAILY_HIST.google), Naver: dailyHistMonths_(ss, CFG.DAILY_HIST.naver) };
   CFG.SHEETS.forEach((n) => { if (isAdmin || !CFG.ADMIN_ONLY_SHEETS.includes(n)) out[n] = read_(ss, n); });
   if (!isAdmin) {
     // 공개 화면은 고객 이름·회사·이메일과 저장한 관리자 계정을 쓰지 않는다

@@ -2,24 +2,42 @@ import type { DashboardData, QuoteRawRow, QuoteRow, SpendDailyRow, SpendRow } fr
 import { prevM } from './format';
 import { inDayRange, monthsOfRange, previousRange, type DayRange } from './dayRange';
 
-/**
- * 일별 광고비가 모인 구간의 첫 날 — 매체마다 모은 구간이 다를 수 있어(네이버는 처음에 며칠씩 채운다) 가장 늦은 시작일을 쓴다.
- * 일별 데이터가 없으면 null.
- */
-export function dailyCoverageFrom(data: Pick<DashboardData, 'spendDaily'>): string | null {
-  const firstOf = new Map<string, string>();
-  data.spendDaily.forEach((r) => {
-    const cur = firstOf.get(r.media);
-    if (!cur || r.date < cur) firstOf.set(r.media, r.date);
+const DAILY_MEDIA = ['Google', 'Naver'];
+type DailyCoverage = Pick<DashboardData, 'spend' | 'spendDaily' | 'dailyRecentFrom' | 'dailyHistMonths' | 'dailyLoadedMonths'>;
+
+/** 그 달에 월 광고비가 있는 매체 — 집행이 없던 매체는 일별 자료를 요구하지 않는다 */
+const mediaOfMonth = (data: DailyCoverage, month: string): string[] =>
+  DAILY_MEDIA.filter((m) => data.spend.some((r) => r.media === m && r.month === month));
+
+/** 일·기간 전체의 광고비가 일별 자료로 갖춰졌는지 — 아니면 월 단위로 보여 준다 */
+export function rangeCovered(data: DailyCoverage, range: DayRange): boolean {
+  if (!data.spendDaily.length) return false;
+  return monthsOfRange(range).every((month) => {
+    const start = month === range.from.slice(0, 7) ? range.from : `${month}-01`;
+    return mediaOfMonth(data, month).every(
+      (m) => start >= (data.dailyRecentFrom[m] ?? '9999') || (data.dailyLoadedMonths.includes(month) && (data.dailyHistMonths[m] || []).includes(month))
+    );
   });
-  if (!firstOf.size) return null;
-  return [...firstOf.values()].sort().pop() as string;
 }
 
-/** 일·기간 전체가 일별 광고비 구간 안에 드는지 — 아니면 월 단위로 보여 준다 */
-export function rangeCovered(data: Pick<DashboardData, 'spendDaily'>, range: DayRange): boolean {
-  const from = dailyCoverageFrom(data);
-  return !!from && range.from >= from;
+/** 이 기간과 직전 같은 일수를 계산하려면 더 받아야 하는 달 */
+export function dailyMonthsToLoad(data: DailyCoverage, range: DayRange): string[] {
+  const months = new Set([...monthsOfRange(range), ...monthsOfRange(previousRange(range))]);
+  return [...months].filter(
+    (month) =>
+      !data.dailyLoadedMonths.includes(month) &&
+      DAILY_MEDIA.some((m) => `${month}-01` < (data.dailyRecentFrom[m] ?? '9999') && (data.dailyHistMonths[m] || []).includes(month))
+  );
+}
+
+/** 받아 온 일별 과거분을 합친다 — 최근 구간과 겹치는 날은 더 새로 수집한 최근 구간을 쓴다 */
+export function withDailyHist(data: DashboardData, rows: SpendDailyRow[], months: string[]): DashboardData {
+  if (!months.length) return data;
+  return {
+    ...data,
+    spendDaily: [...data.spendDaily, ...rows.filter((r) => r.date < (data.dailyRecentFrom[r.media] ?? '9999'))],
+    dailyLoadedMonths: months,
+  };
 }
 
 /** 범위 안 일별 광고비를 광고그룹별로 합쳐, 종료일이 속한 달(month)의 월 행으로 만든다 */
