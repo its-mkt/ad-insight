@@ -23,7 +23,7 @@ import { AdminView } from './views/AdminView';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import type { DayRange } from './utils/dayRange';
+import { dayPeriodOf, type DayRange } from './utils/dayRange';
 import { applyDayRange, rangeCovered } from './utils/dayData';
 
 /** 주소의 해시 → 화면과 검색어 (#keywords, #search?q=HPE) */
@@ -128,6 +128,7 @@ export const App: React.FC = () => {
     () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(data, searchDay, { quotes: currentView !== 'search' }) : data),
     [data, searchDay, currentView]
   );
+  const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
   const searchMonth = searchPeriod.month || maxAvailableMonth;
 
   useEffect(() => {
@@ -335,7 +336,7 @@ export const App: React.FC = () => {
               dayNote={
                 searchDay && !isSearchView
                   ? dayCovered
-                    ? '광고비는 선택한 기간 기준입니다 (키워드·소재 성과는 월 단위)'
+                    ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
                     : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
@@ -379,7 +380,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'overview' && (
-                <OverviewView
+                <OverviewView monthly={period ? data : undefined} period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -390,7 +391,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'ads' && (
-                <AdsView
+                <AdsView monthly={period ? data : undefined} period={period}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -399,7 +400,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'cat-efficiency' && (
-                <CatEfficiencyView
+                <CatEfficiencyView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -409,7 +410,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'keywords' && (
-                <KeywordsView
+                <KeywordsView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -420,7 +421,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && currentView === 'quotes' && (
-                <QuotesView
+                <QuotesView monthly={period ? data : undefined} period={period}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}

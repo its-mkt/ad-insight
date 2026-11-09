@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { DashboardData, SyncStatus } from '../types/dashboard';
+import type { DayPeriod } from '../utils/dayRange';
+import type { DashboardData, SpendRow, SyncStatus } from '../types/dashboard';
 import {
   fmt,
   fmtWon,
@@ -30,6 +31,10 @@ interface AdsViewProps {
   allPeriod?: boolean;
   /** 월 선택이 '전체' — selectedMonth 는 그 연도의 마지막 달이다 */
   yearTotal?: boolean;
+  /** 일·기간 보기에서도 월별 추이 차트·표는 이 원본 월 데이터로 그린다 */
+  monthly?: DashboardData;
+  /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
+  period?: DayPeriod;
 }
 
 const ADS_SOURCES: SourceLinkItem[] = [
@@ -41,12 +46,13 @@ const ADS_SOURCES: SourceLinkItem[] = [
   { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
 ];
 
-export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false }) => {
+export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
     (a, b) => b - a
   );
   const availableYears = years.length ? years : [THIS_Y];
   const [mode, setMode] = useState<'chart' | 'table'>('chart');
+  const trendSpend = (monthly ?? data).spend;
 
   const targetYear = selectedMonth ? Number(selectedMonth.slice(0, 4)) : availableYears[0];
   const Y = availableYears.includes(targetYear) ? targetYear : availableYears[0];
@@ -83,6 +89,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   const at = (key: string) => data.spend.filter((r) => r.month.startsWith(key));
   const colLabel = (key: string) => (allPeriod ? `${key}년` : mLabel(key));
   const tot = (mo: string) => sumBy(at(mo), (r) => r.cost);
+  const trendAt = (key: string) => trendSpend.filter((r) => r.month.startsWith(key));
+  const trendTot = (mo: string) => sumBy(trendAt(mo), (r) => r.cost);
   const man = (mo: string, item: string) =>
     sumBy(
       data.manual.filter((r) => r.month === mo && r.item === item),
@@ -95,7 +103,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
 
   const storeCost = byMonthOrYear((mo: string) => {
     const apiStore = sumBy(
-      data.spend.filter(
+      trendSpend.filter(
         (r) => r.month === mo && (r.campaign.includes('스마트스토어') || r.campaign.includes('스토어'))
       ),
       (r) => r.cost
@@ -103,20 +111,25 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
     return apiStore || man(mo, 'STORE');
   });
 
-  const mdfCost = byMonthOrYear((mo: string) => {
-    const manMdf = man(mo, 'MDF');
+  // 수동 입력 MDF 는 달 전체 금액이라 일·기간 보기에서는 쓰지 않는다
+  const mdfOf = (spend: SpendRow[], useManual: boolean) => byMonthOrYear((mo: string) => {
+    const manMdf = useManual ? man(mo, 'MDF') : 0;
     const apiMdf = sumBy(
-      data.spend.filter((r) => r.month === mo && r.campaign.includes('MDF')),
+      spend.filter((r) => r.month === mo && r.campaign.includes('MDF')),
       (r) => r.cost
     );
     return manMdf || apiMdf;
   });
+  const mdfCost = mdfOf(data.spend, !period);
+  const trendMdf = mdfOf(trendSpend, true);
 
   const curM =
     selectedMonth && selectedMonth.startsWith(String(Y))
       ? selectedMonth
       : monthsOfY[monthsOfY.length - 1];
   const pv = prevM(curM);
+  const curCaption = period ? period.label : mLabel(curM);
+  const cmp = period ? period.cmpLabel : '전월';
   const cpa = (mo: string) => {
     const c = sumBy(at(mo), (r) => r.conv);
     return c ? tot(mo) / c : 0;
@@ -124,12 +137,12 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
 
   const series = SERIES_DEFS.map((s) => ({
     ...s,
-    raw: months.map((mo) => sumBy(at(mo).filter(s.f), (r) => r.cost)),
+    raw: months.map((mo) => sumBy(trendAt(mo).filter(s.f), (r) => r.cost)),
   }))
     .filter((s) => s.raw.some((v) => v))
     .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
 
-  const lastY = (mo: string) => tot(ym(Y - 1, +mo.slice(5)));
+  const lastY = (mo: string) => trendTot(ym(Y - 1, +mo.slice(5)));
 
   // 연도 합계: 1월~마지막 달을 전년 같은 달들과 비교한다
   const yearMonths = monthsUpTo(curM);
@@ -152,7 +165,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 일평균: 진행 중인 달은 오늘까지의 날짜 수로 나눠, 다 끝난 전월과 같은 기준으로 비교한다
   const daysInMonth = (mo: string) => new Date(+mo.slice(0, 4), +mo.slice(5), 0).getDate();
   const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysInMonth(mo));
-  const dailySpend = (mo: string) => tot(mo) / elapsedDays(mo);
+  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : elapsedDays(mo));
   const missing = uncollectedMedia(data.spend, [curM]).map((m): [string, string] => [m, '미수집']);
 
   return (
@@ -205,7 +218,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               label={
                 <>
                   {yearLabel} 광고비
-                  {curM === THIS_M && (
+                  {curM === THIS_M && !period && (
                     <>
                       {' '}
                       <small className="muted">(진행 중)</small>
@@ -243,8 +256,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         <KpiCard
           label={
             <>
-              {mLabel(curM)} 광고비
-              {curM === THIS_M && (
+              {curCaption} 광고비
+              {curM === THIS_M && !period && (
                 <>
                   {' '}
                   <small className="muted">(진행 중)</small>
@@ -255,7 +268,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           value={`${fmt(tot(curM))}원`}
           cur={tot(curM)}
           prev={tot(pv)}
-          cmpLabel="전월"
+          cmpLabel={cmp}
           detail={(() => {
             const items: [string, number | string][] = [];
             if (curGoogleCost > 0) items.push(['Google', curGoogleCost]);
@@ -268,8 +281,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         <KpiCard
           label={
             <>
-              {mLabel(curM)} 일평균 광고비
-              {curM === THIS_M && (
+              {curCaption} 일평균 광고비
+              {curM === THIS_M && !period && (
                 <>
                   {' '}
                   <small className="muted">(진행 중)</small>
@@ -280,34 +293,34 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           value={`${fmt(dailySpend(curM))}원`}
           cur={dailySpend(curM)}
           prev={dailySpend(pv)}
-          cmpLabel="전월"
+          cmpLabel={cmp}
           detail={
             <KpiDetailItems
               items={[
-                ...(curM === THIS_M
+                ...(curM === THIS_M && !period
                   ? ([
                       ['월말 예상', fmtWon(dailySpend(curM) * daysInMonth(curM))],
                       ['경과', `${elapsedDays(curM)}/${daysInMonth(curM)}일`],
                     ] as [string, string][])
-                  : ([['기간', `${daysInMonth(curM)}일`]] as [string, string][])),
+                  : ([['기간', `${period ? period.days : daysInMonth(curM)}일`]] as [string, string][])),
               ]}
             />
           }
         />
         <KpiCard
-          label={`${mLabel(curM)} MDF 소진`}
+          label={`${curCaption} MDF 소진`}
           value={`${fmt(mdfCost(curM))}원`}
           cur={mdfCost(curM)}
           prev={mdfCost(pv)}
-          cmpLabel="전월"
+          cmpLabel={cmp}
           detail={mdfRatioPct ? <p>광고비 대비 <b>{mdfRatioPct}%</b></p> : undefined}
         />
         <KpiCard
-          label={`${mLabel(curM)} 전환 1건당 광고비`}
+          label={`${curCaption} 전환 1건당 광고비`}
           value={`${fmt(cpa(curM))}원`}
           cur={cpa(curM)}
           prev={cpa(pv)}
-          cmpLabel="전월"
+          cmpLabel={cmp}
           detail={<KpiDetailItems items={[['전환수', curConv]]} />}
         />
           </>
@@ -329,9 +342,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         allMonths12={allMonths12}
         months={months}
         isFuture={isFuture}
-        at={at}
-        tot={tot}
-        mdfCost={mdfCost}
+        at={trendAt}
+        tot={trendTot}
+        mdfCost={trendMdf}
         storeCost={storeCost}
         lastY={lastY}
         allPeriod={allPeriod}

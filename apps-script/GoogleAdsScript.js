@@ -38,12 +38,12 @@ function main() {
   const daily = [['date', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions']];
   const hasDaily = {};
   each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}
-         FROM ad_group WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
+         FROM ad_group WHERE ${dRange} AND metrics.impressions > 0`, (r) => {
     hasDaily[r.segments.date + '|' + r.campaign.id] = true;
     daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), String(r.adGroup.name || '').trim(), String(r.adGroup.id), ...met_(r)]);
   });
   each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ${M}
-         FROM campaign WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
+         FROM campaign WHERE ${dRange} AND metrics.impressions > 0`, (r) => {
     if (hasDaily[r.segments.date + '|' + r.campaign.id]) return;
     daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), '(광고그룹 없음)', '', ...met_(r)]);
   });

@@ -68,3 +68,29 @@ export const rangeLabel = (r: DayRange): string => {
 /** 일수 (양 끝 포함) */
 export const rangeDays = (r: DayRange): number =>
   Math.round((fromDayKey(r.to).getTime() - fromDayKey(r.from).getTime()) / 86400000) + 1;
+
+/** 바로 앞의 같은 일수 구간 — 8일을 고르면 그 직전 8일 (일·기간 보기의 비교 기준) */
+export const previousRange = (r: DayRange): DayRange => {
+  const to = fromDayKey(r.from);
+  to.setDate(to.getDate() - 1);
+  const from = new Date(to);
+  from.setDate(from.getDate() - (rangeDays(r) - 1));
+  return { from: toDayKey(from), to: toDayKey(to) };
+};
+
+/** 일·기간 보기에서 화면 문구와 계산에 쓰는 값 */
+export interface DayPeriod {
+  /** 카드 제목에 붙는 기간 — '11.01~11.08', 하루면 '11.03' */
+  label: string;
+  /** 선택한 일수 */
+  days: number;
+  /** 비교 문구 — '직전 8일' */
+  cmpLabel: string;
+}
+
+export const dayPeriodOf = (r: DayRange): DayPeriod => {
+  const short = (day: string) => day.slice(5).replace('-', '.');
+  const days = rangeDays(r);
+  const label = r.from === r.to ? short(r.to) : r.from.slice(0, 4) === r.to.slice(0, 4) ? `${short(r.from)}~${short(r.to)}` : rangeLabel(r);
+  return { label, days, cmpLabel: `직전 ${days}일` };
+};
