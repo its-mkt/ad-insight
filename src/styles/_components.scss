@@ -53,6 +53,23 @@
     font-variant-numeric: tabular-nums;
     margin: 0.25rem 0;
     overflow-wrap: anywhere; // 카테고리·매체 이름이 길어도 카드 밖으로 넘치지 않게
+
+    // 큰 값 뒤에 덧붙인 보조 값(견적 카드의 "/판매 건수" 등)은 작고 흐리게
+    small.muted {
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+  }
+
+  // 하단 보조 줄 안의 건수 증감 글자 — .d 를 쓰면 카드 배경까지 물들어 글자 색만 바꾼다
+  .s-delta {
+    &.up {
+      color: var(--up);
+    }
+    &.down {
+      color: var(--down);
+    }
   }
 
   // 하단 보조 줄은 증감(.d)과 같은 크기·굵기로 맞춘다
@@ -380,9 +397,15 @@ span.seg,
     cursor: pointer;
     transition: all 0.15s ease;
 
-    &:hover:not(.on) {
+    &:hover:not(.on):not(:disabled) {
       color: var(--ink);
       background: var(--bg);
+    }
+
+    // 준비 중 등으로 고를 수 없는 항목
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
 
     &.on {
@@ -529,7 +552,7 @@ span.seg,
 
   // 라벨 뒤 보조 표시 (하위 카테고리 개수 등)
   .dd-opt-hint {
-    margin-left: 0.5rem;
+    margin-left: 0.25rem;
     color: var(--sub);
     font-weight: 400;
   }
@@ -688,6 +711,15 @@ span.seg,
 // 왼쪽 2/3 · 오른쪽 1/3. 오른쪽 막대가 사라지지 않게 최소 너비를 둔다 (더 좁으면 _views.scss 의 .grid 규칙대로 한 줄로 쌓인다)
 .grid-2-1 {
   grid-template-columns: minmax(0, 2fr) minmax(24rem, 1fr);
+}
+
+// 4열 고정 (좁으면 2열). 표가 넓어도 칸 비율이 바뀌지 않게 하고, 넘치는 표는 카드 안에서 스크롤한다
+.grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  @media (max-width: 1400px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 table {
@@ -902,8 +934,11 @@ th.n.sortable {
         margin-left: auto;
       }
 
+      // 높이는 옆 드롭다운(.dd-trigger)과 같게 둔다
       .input {
-        min-width: 16rem;
+        min-width: 14rem;
+        height: 2rem;
+        padding: 0 0.75rem;
       }
     }
 
@@ -932,7 +967,7 @@ th.n.sortable {
 
       // 열 너비 (table-layout: fixed 기준)
       .col-sno {
-        width: 4.5rem;
+        width: 4rem;
       }
 
       .col-site {
@@ -948,7 +983,7 @@ th.n.sortable {
       }
 
       .col-company {
-        width: 8rem;
+        width: 6rem;
       }
 
       .col-name {
@@ -957,6 +992,10 @@ th.n.sortable {
 
       .col-email {
         width: 10rem;
+      }
+
+      .col-sales-rep {
+        width: 6rem;
       }
 
       .col-category {
@@ -1325,6 +1364,7 @@ table.kv th {
       font-size: 0.75rem;
       font-weight: 400;
       color: var(--line2);
+      white-space: pre-line; // 설명 안의 줄바꿈(\n)을 살린다
     }
   }
 }
@@ -1799,8 +1839,16 @@ td.future {
   }
 
   .dp-title {
+    display: inline-flex;
+    gap: 0.25rem;
     font-size: 0.875rem;
     font-weight: 700;
+
+    .dd-trigger {
+      height: 1.75rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
   }
 
   .dp-nav,
@@ -1964,4 +2012,15 @@ td.future {
       color: #fff;
     }
   }
+}
+
+// 필터 줄의 초기화 버튼 — 옆 드롭다운과 높이를 맞춘다
+.btn.ic.filter-reset {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  justify-content: center;
+  border: 1px solid var(--line2);
+  background: var(--card);
 }

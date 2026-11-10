@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { ViewId } from './types/dashboard';
+import type { SiteId, ViewId } from './types/dashboard';
 import { VALID_VIEWS, VIEW_TITLES } from './utils/constants';
+import { parseRoute, routePath } from './utils/route';
+
+/** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
+const APP_TITLE = '아이티스 광고 인사이트';
 import { THIS_M, THIS_Y } from './utils/format';
-import { useDashboardData } from './hooks/useDashboardData';
+import { fetchDailyHist, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
@@ -17,22 +21,17 @@ import { AdsView } from './views/AdsView';
 import { CatEfficiencyView } from './views/CatEfficiencyView';
 import { KeywordsView } from './views/KeywordsView';
 import { QuotesView } from './views/QuotesView';
+import { PurchasesView } from './views/PurchasesView';
+import { OncoreView } from './views/OncoreView';
 import { SearchView } from './views/SearchView';
 import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import type { DayRange } from './utils/dayRange';
-import { applyDayRange, rangeCovered } from './utils/dayData';
-
-/** 주소의 해시 → 화면과 검색어 (#keywords, #search?q=HPE) */
-function parseHash(): { view: ViewId; query: string } {
-  const [name, params = ''] = window.location.hash.slice(1).split('?');
-  const view = name as ViewId;
-  if (!VALID_VIEWS.includes(view)) return { view: 'overview', query: '' };
-  return { view, query: view === 'search' ? (new URLSearchParams(params).get('q') || '').trim() : '' };
-}
+import { dayPeriodOf, toDayKey, type DayRange } from './utils/dayRange';
+import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withSameDatePrev } from './utils/dayData';
+import type { SpendDailyRow } from './types/dashboard';
 
 function getInitialDark(): boolean {
   try {
@@ -52,8 +51,8 @@ function getInitialDark(): boolean {
 
 export const App: React.FC = () => {
   const { data, categoryMap, status, isSyncing, load, updateQuotesRaw, updateQuotesSites } = useDashboardData();
-  const [currentView, setCurrentView] = useState<ViewId>(() => parseHash().view);
-  const [searchQuery, setSearchQuery] = useState(() => parseHash().query);
+  const [currentView, setCurrentView] = useState<ViewId>(() => parseRoute().view);
+  const [searchQuery, setSearchQuery] = useState(() => parseRoute().query);
   const [searchTab, setSearchTab] = useState<SearchTab | undefined>();
   const [searchOpen, setSearchOpen] = useState(false);
   const { isLoggedIn, loading: authLoading } = useAuth();
@@ -66,6 +65,22 @@ export const App: React.FC = () => {
   const queryIsFavorite = favorites.some((q) => sameSearch(q, searchQuery));
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [isDark, setIsDark] = useState<boolean>(getInitialDark);
+  // 사이드바에서 고른 사이트 — 주소 경로 앞부분(/itket·/oncore/…)이 기준이라 링크를 공유해도 같은 사이트로 열린다
+  const [site, setSite] = useState<SiteId>(() => parseRoute().site);
+  // 처음 열 때 사이트가 없는 주소('/', 예전 '#quotes'·'#itket/quotes')는 같은 화면의 경로 주소로 바꿔 둔다
+  useEffect(() => {
+    const { site: s, view, query } = parseRoute();
+    const path = routePath(s, view, query);
+    if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
+  }, []);
+  // 사이트를 바꿔도 보던 화면은 그대로 두고 주소 앞부분만 바꾼다 (뒤로 가기로 돌아갈 수 있게 기록을 남긴다)
+  const changeSite = (next: SiteId) => {
+    if (next === site) return;
+    setSite(next);
+    window.history.pushState(null, '', routePath(next, currentView, searchQuery));
+  };
+  // 온코어는 데이터 연결 전이라 아이티켓 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민은 사이트와 상관없다)
+  const oncorePending = site === 'oncore' && currentView !== 'data' && currentView !== 'admin';
 
   // 캐시가 없어 보여 줄 데이터가 하나도 없는 첫 동기화 동안만 스켈레톤 (캐시가 있으면 이전 데이터를 그대로 보여 준다)
   const hasData = data.spend.length > 0 || data.quotes.length > 0;
@@ -123,11 +138,47 @@ export const App: React.FC = () => {
   // 검색 결과의 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
   const [searchDay, setSearchDay] = useState<DayRange | null>(null);
   // 일·기간 — 일별 광고비 구간 안이면 그 기간의 광고비·견적으로 다시 모은 자료를 화면에 준다 (구간 밖이면 월 단위)
-  const dayCovered = !!searchDay && rangeCovered(data, searchDay);
-  const viewData = useMemo(
-    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(data, searchDay, { quotes: currentView !== 'search' }) : data),
-    [data, searchDay, currentView]
+  // 최근 구간보다 앞선 날짜를 고르면 그 달의 일별 광고비를 추가로 받아 합친다
+  const [dailyHist, setDailyHist] = useState<{ rows: SpendDailyRow[]; months: string[] }>({ rows: [], months: [] });
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const dailyFailed = useRef(new Set<string>());
+  const fullData = useMemo(() => withDailyHist(data, dailyHist.rows, dailyHist.months), [data, dailyHist]);
+  useEffect(() => {
+    const need = searchDay ? dailyMonthsToLoad(fullData, searchDay).filter((m) => !dailyFailed.current.has(m)).slice(0, 48) : [];
+    if (!need.length) {
+      setDailyLoading(false);
+      return;
+    }
+    let alive = true;
+    setDailyLoading(true);
+    fetchDailyHist(need)
+      .then((rows) => {
+        if (alive) setDailyHist((p) => ({ rows: [...p.rows, ...rows], months: [...p.months, ...need] }));
+      })
+      .catch((err) => {
+        console.warn('일별 과거분 불러오기 실패', err);
+        need.forEach((m) => dailyFailed.current.add(m));
+        if (alive) setDailyLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [searchDay, fullData]);
+  const dayCovered = !!searchDay && rangeCovered(fullData, searchDay);
+  // 진행 중인 달을 월로 볼 때는 전달을 같은 날짜까지만 비교한다 (월별 추이는 monthly 원본으로 그린다)
+  const sameDatePrev = useMemo(
+    () =>
+      !searchDay && !allPeriod && !yearTotal && viewMonth === THIS_M && !['admin', 'data', 'search'].includes(currentView)
+        ? withSameDatePrev(fullData, toDayKey(new Date()))
+        : null,
+    [fullData, searchDay, allPeriod, yearTotal, viewMonth, currentView]
   );
+  const sameDate = sameDatePrev?.compare;
+  const viewData = useMemo(
+    () => sameDatePrev?.data ?? (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : data),
+    [data, fullData, searchDay, currentView, sameDatePrev]
+  );
+  const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
   const searchMonth = searchPeriod.month || maxAvailableMonth;
 
   useEffect(() => {
@@ -147,12 +198,8 @@ export const App: React.FC = () => {
     const target = VALID_VIEWS.includes(view) ? view : 'overview';
     setCurrentView(target);
     closeDrawer();
-    document.title = `${VIEW_TITLES[target]} · 아이티캣 광고 인사이트`;
-    window.history.replaceState(
-      null,
-      '',
-      target === 'overview' ? window.location.pathname + window.location.search : `#${target}`
-    );
+    document.title = `${VIEW_TITLES[target]} · ${APP_TITLE}`;
+    window.history.replaceState(null, '', routePath(site, target));
     window.scrollTo({ top: 0 });
   };
 
@@ -169,7 +216,7 @@ export const App: React.FC = () => {
     setSearchDay(null);
     setCurrentView('search');
     closeDrawer();
-    window.history.pushState(null, '', `#search?q=${encodeURIComponent(query)}`);
+    window.history.pushState(null, '', routePath(site, 'search', query));
     window.scrollTo({ top: 0 });
   };
 
@@ -183,7 +230,7 @@ export const App: React.FC = () => {
     });
 
   useEffect(() => {
-    document.title = `${currentView === 'search' && searchQuery ? `"${searchQuery}" ` : ''}${VIEW_TITLES[currentView]} · 아이티캣 광고 인사이트`;
+    document.title = `${currentView === 'search' && searchQuery ? `"${searchQuery}" ` : ''}${VIEW_TITLES[currentView]} · ${APP_TITLE}`;
   }, [currentView, searchQuery]);
 
   // 설정·연동(데이터 연결·어드민 관리)은 로그인한 관리자만. 로그아웃하면 종합 요약으로, 로그인 없이 주소(#data·#admin)로 들어오면 종합 요약 + 로그인 모달
@@ -199,8 +246,13 @@ export const App: React.FC = () => {
   }, [authLoading, isLoggedIn, currentView]);
 
   useEffect(() => {
-    const onHashChange = () => {
-      const { view, query } = parseHash();
+    // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
+    const onRouteChange = () => {
+      const { site: nextSite, view, query } = parseRoute();
+      // 예전 해시 주소('#quotes')를 직접 입력해도 경로 주소로 맞춘다
+      const path = routePath(nextSite, view, query);
+      if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
+      setSite(nextSite);
       setCurrentView(view);
       if (view === 'search') {
         setSearchQuery(query);
@@ -226,13 +278,15 @@ export const App: React.FC = () => {
       }
     };
 
-    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate', onRouteChange);
+    window.addEventListener('hashchange', onRouteChange);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', onResize);
     mq.addEventListener('change', onSystemThemeChange);
 
     return () => {
-      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('popstate', onRouteChange);
+      window.removeEventListener('hashchange', onRouteChange);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', onResize);
       mq.removeEventListener('change', onSystemThemeChange);
@@ -264,10 +318,13 @@ export const App: React.FC = () => {
           drawerOpen={drawerOpen}
           status={status}
           updated={data.updated}
+          sources={data.sources}
           isSyncing={isSyncing}
           onNavigate={handleNavigate}
           onCloseDrawer={closeDrawer}
           onReload={load}
+          site={site}
+          onSiteChange={changeSite}
         />
         <div className="wrap">
           <Header
@@ -296,7 +353,7 @@ export const App: React.FC = () => {
             onLogin={() => setLoginOpen(true)}
             onSearch={() => setSearchOpen(true)}
           />
-          {currentView !== 'data' && (
+          {currentView !== 'data' && !oncorePending && (
             <PeriodNav
               years={availableYears}
               selectedYear={selectedYear}
@@ -304,6 +361,23 @@ export const App: React.FC = () => {
               minAvailableMonth={minAvailableMonth}
               maxAvailableMonth={maxAvailableMonth}
               onSelectYear={setSelectedYear}
+              periodChanged={
+                !!searchDay ||
+                (isSearchView
+                  ? searchPeriod.mode !== 'month' || (!!searchPeriod.month && searchPeriod.month !== maxAvailableMonth)
+                  : allPeriod || yearTotal || selectedMonth !== THIS_M)
+              }
+              onResetPeriod={() => {
+                setSearchDay(null);
+                if (isSearchView) {
+                  setSearchPeriod({ mode: 'month', month: '' });
+                  return;
+                }
+                setAllPeriodOn(false);
+                setYearTotalOn(false);
+                setSelectedYear(String(THIS_Y));
+                setSelectedMonth(THIS_M);
+              }}
               onSelectMonth={(m) => {
                 if (isSearchView) {
                   setSearchDay(null);
@@ -333,10 +407,14 @@ export const App: React.FC = () => {
               yearTotal={isSearchView ? searchPeriod.mode === 'year' : yearTotal}
               dayRange={searchDay}
               dayNote={
-                searchDay && !isSearchView
+                searchDay && currentView === 'purchases'
+                  ? `구매 상세는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
+                  : searchDay && !isSearchView && currentView !== 'admin'
                   ? dayCovered
-                    ? '광고비는 선택한 기간 기준입니다 (키워드·소재 성과는 월 단위)'
-                    : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
+                    ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
+                    : dailyLoading
+                      ? '일별 데이터를 불러오는 중입니다…'
+                      : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
               onSelectDayRange={(r) => {
@@ -372,14 +450,15 @@ export const App: React.FC = () => {
           )}
           <div className="cont">
             <main id="main">
-              {isLoading && (
+              {oncorePending && <OncoreView status={status} />}
+              {isLoading && !oncorePending && (
                 <SkeletonView
                   title={VIEW_TITLES[currentView]}
                   variant={currentView === 'keywords' ? 'table' : 'dashboard'}
                 />
               )}
-              {!isLoading && currentView === 'overview' && (
-                <OverviewView
+              {!isLoading && !oncorePending && currentView === 'overview' && (
+                <OverviewView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -389,8 +468,8 @@ export const App: React.FC = () => {
                   onSearchName={searchFromName}
                 />
               )}
-              {!isLoading && currentView === 'ads' && (
-                <AdsView
+              {!isLoading && !oncorePending && currentView === 'ads' && (
+                <AdsView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -398,8 +477,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && currentView === 'cat-efficiency' && (
-                <CatEfficiencyView
+              {!isLoading && !oncorePending && currentView === 'cat-efficiency' && (
+                <CatEfficiencyView period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -408,8 +487,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && currentView === 'keywords' && (
-                <KeywordsView
+              {!isLoading && !oncorePending && currentView === 'keywords' && (
+                <KeywordsView period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -419,8 +498,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && currentView === 'quotes' && (
-                <QuotesView
+              {!isLoading && !oncorePending && currentView === 'quotes' && (
+                <QuotesView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}
@@ -429,7 +508,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && currentView === 'search' && (
+              {!isLoading && !oncorePending && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
+              {!isLoading && !oncorePending && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}
                   data={viewData}
@@ -454,7 +534,7 @@ export const App: React.FC = () => {
               {/* 로그인 세션을 확인하는 동안은 표 자리표시, 로그인한 경우에만 어드민 화면 */}
               {currentView === 'admin' && authLoading && <SkeletonView title={VIEW_TITLES.admin} variant="table" />}
               {currentView === 'admin' && isLoggedIn && (
-                <AdminView data={data} isSyncing={isSyncing || status === 'init'} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
+                <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
             </main>
           </div>

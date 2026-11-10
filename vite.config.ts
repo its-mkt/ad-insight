@@ -26,7 +26,8 @@ function releaseInfo(): { tag: string; commit: string } {
 const release = releaseInfo();
 
 export default defineConfig(({ command }) => ({
-  base: './',
+  // 화면 주소가 /itket/quotes 처럼 깊어져도 파일을 루트 기준으로 찾게 한다 (배포 주소가 도메인 루트)
+  base: '/',
   // 로컬 개발 서버에서는 배포본과 헷갈리지 않게 -dev 를 붙인다
   define: {
     __APP_RELEASE__: JSON.stringify(command === 'serve' ? `${release.tag}-dev` : release.tag),
@@ -77,6 +78,9 @@ export default defineConfig(({ command }) => ({
           fs.mkdirSync(destDir, { recursive: true });
           fs.copyFileSync(src, path.join(destDir, 'latest.json'));
         }
+        // GitHub Pages 는 /itket/quotes 같은 경로에 파일이 없으면 404.html 을 준다 — 같은 앱을 띄워 주소로 화면을 고른다
+        const indexHtml = path.resolve(__dirname, 'dist/index.html');
+        if (fs.existsSync(indexHtml)) fs.copyFileSync(indexHtml, path.resolve(__dirname, 'dist/404.html'));
       },
     },
   ],

@@ -7,6 +7,7 @@
  *  - g_campaign_monthly : 캠페인 × 월 비용·노출·클릭·전환 (2023년 1월부터, 실적 최대 MAX 버전)
  *  - g_adgroup_monthly  : 광고그룹 × 월 (카테고리 매칭용, P-Max 처럼 그룹이 없는 캠페인은 제외됨)
  *  - g_adgroup_daily    : 광고그룹 × 일 (최근 DAILY_DAYS 일, 대시보드의 일·기간 선택용. 그룹이 없는 캠페인은 '(광고그룹 없음)' 행)
+ *  - g_adgroup_daily_hist : 지난달까지의 광고그룹 × 일을 달 단위로 쌓는다 (최근 구간보다 앞선 날짜를 고를 때 쓴다)
  *  - g_keywords         : 사용 중 키워드의 현재 입찰가·품질점수 + 월별 성과 (2023년 1월부터)
  *  - g_ads              : 사용 중 광고 소재 (제목·설명·연결 URL·이미지)
  *  - g_ad_stats         : 소재 × 월 비용·노출·클릭·전환 (2023년 1월부터)
@@ -15,6 +16,7 @@
 const CFG = {
   SHEET_URL: 'https://docs.google.com/spreadsheets/d/1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg/edit',   // its-ad-insight 데이터 시트 주소
   DAILY_DAYS: 62, // 일별 광고비를 모으는 최근 일수 (오늘 포함). 늘리면 시트·응답 크기가 그만큼 커진다
+  DAILY_HIST_MONTHS: 60, // 일별 과거분을 한 번 실행에 채우는 달 수 (g_adgroup_daily_hist, 한 번 받은 달은 다시 받지 않는다)
   FROM_YEAR: 2023, // 시트를 비우고 다시 쓰므로 고정값으로 둔다. 계산식으로 바꾸면 해가 바뀔 때 과거 달이 지워진다
 };
 
@@ -35,19 +37,7 @@ function main() {
   // 일별 — 최근 DAILY_DAYS 일, 광고그룹 × 일. 광고그룹이 없는 캠페인(P-Max 등)은 캠페인 행을 '(광고그룹 없음)' 으로 더해 월 합계와 맞춘다
   const dFrom = Utilities.formatDate(new Date(Date.now() - (CFG.DAILY_DAYS - 1) * 864e5), tz, 'yyyy-MM-dd');
   const dRange = `segments.date BETWEEN '${dFrom}' AND '${today}'`;
-  const daily = [['date', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions']];
-  const hasDaily = {};
-  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}
-         FROM ad_group WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
-    hasDaily[r.segments.date + '|' + r.campaign.id] = true;
-    daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), String(r.adGroup.name || '').trim(), String(r.adGroup.id), ...met_(r)]);
-  });
-  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ${M}
-         FROM campaign WHERE ${dRange} AND metrics.cost_micros > 0`, (r) => {
-    if (hasDaily[r.segments.date + '|' + r.campaign.id]) return;
-    daily.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), '(광고그룹 없음)', '', ...met_(r)]);
-  });
-  put_(ss, 'g_adgroup_daily', daily);
+  put_(ss, 'g_adgroup_daily', [DAILY_HEAD].concat(dailyRows_(dRange, M)));
 
   const grp = [['month', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions']];
   each_(`SELECT segments.month, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}
@@ -75,38 +65,44 @@ function main() {
     if (f && f.url) img[r.asset.resourceName] = f.url;
   });
 
-  // 검색광고(SA) 이미지 확장소재 매핑: 광고그룹·캠페인 단위 AD_IMAGE 에셋
+  // 검색광고(SA) 이미지 확장소재 매핑: 광고그룹·캠페인·계정 단위 AD_IMAGE 에셋 (Google 과 같이 좁은 단위가 우선)
   // 한 광고그룹·캠페인에 이미지가 여러 장 걸릴 수 있어 목록으로 모은다
-  const grpImg = {}, campImg = {};
+  const grpImg = {}, campImg = {}, acctImg = [];
   const addImg = (map, id, res) => {
     if (img[res]) (map[id] = map[id] || []).push(img[res]);
   };
   try {
-    each_(`SELECT ad_group.id, asset.resource_name FROM ad_group_asset WHERE asset_field_type = 'AD_IMAGE' AND status = 'ENABLED'`, (r) => {
+    each_(`SELECT ad_group.id, asset.resource_name FROM ad_group_asset WHERE ad_group_asset.field_type = 'AD_IMAGE' AND ad_group_asset.status = 'ENABLED'`, (r) => {
       addImg(grpImg, String(r.adGroup.id), r.asset.resourceName);
     });
-  } catch (_) {}
+  } catch (e) { console.log(`광고그룹 이미지 조회 실패: ${e && e.message}`); }
   try {
-    each_(`SELECT campaign.id, asset.resource_name FROM campaign_asset WHERE asset_field_type = 'AD_IMAGE' AND status = 'ENABLED'`, (r) => {
+    each_(`SELECT campaign.id, asset.resource_name FROM campaign_asset WHERE campaign_asset.field_type = 'AD_IMAGE' AND campaign_asset.status = 'ENABLED'`, (r) => {
       addImg(campImg, String(r.campaign.id), r.asset.resourceName);
     });
-  } catch (_) {}
+  } catch (e) { console.log(`캠페인 이미지 조회 실패: ${e && e.message}`); }
+  try {
+    each_(`SELECT asset.resource_name FROM customer_asset WHERE customer_asset.field_type = 'AD_IMAGE' AND customer_asset.status = 'ENABLED'`, (r) => {
+      if (img[r.asset.resourceName]) acctImg.push(img[r.asset.resourceName]);
+    });
+  } catch (e) { console.log(`계정 이미지 조회 실패: ${e && e.message}`); }
+  console.log(`이미지 확장소재: 광고그룹 ${Object.keys(grpImg).length}개, 캠페인 ${Object.keys(campImg).length}개, 계정 ${acctImg.length}장`);
 
-  // image: 대표 이미지 1장 (이전 화면 호환) · images: 모든 이미지를 줄바꿈으로 이은 목록 (최대 10장)
+  // image: 대표 이미지 1장 (이전 화면 호환) · images: 모든 이미지를 줄바꿈으로 이은 목록 (최대 30장, 반응형 디스플레이의 가로형·정사각형 합계)
   // title: 대표 제목 (이전 화면 호환) · titles·descs: 반응형 광고의 제목·설명 전체를 줄바꿈으로 이은 목록
   const ads = [['type', 'campaign', 'ad_group', 'ad_id', 'ad_type', 'title', 'url', 'image', 'images', 'titles', 'descs']];
   const texts = (list) => [...new Set((list || []).map((t) => String((t && t.text) || '').trim()).filter(Boolean))];
   each_(`SELECT campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.ad.name,
                 ad_group_ad.ad.final_urls, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions,
                 ad_group_ad.ad.responsive_display_ad.headlines, ad_group_ad.ad.responsive_display_ad.long_headline, ad_group_ad.ad.responsive_display_ad.descriptions,
-                ad_group_ad.ad.responsive_display_ad.marketing_images, ad_group_ad.ad.image_ad.image_url
+                ad_group_ad.ad.responsive_display_ad.marketing_images, ad_group_ad.ad.responsive_display_ad.square_marketing_images, ad_group_ad.ad.image_ad.image_url
          FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED'`, (r) => {
     const a = r.adGroupAd.ad, rsa = a.responsiveSearchAd || {}, rda = a.responsiveDisplayAd || {};
     const titles = texts([].concat(rsa.headlines || [], rda.headlines || [], rda.longHeadline ? [rda.longHeadline] : [])).slice(0, 15);
     const descs = texts([].concat(rsa.descriptions || [], rda.descriptions || [])).slice(0, 5);
-    const mi = rda.marketingImages || [];
+    const mi = [].concat(rda.marketingImages || [], rda.squareMarketingImages || []);
     const own = (a.imageAd && a.imageAd.imageUrl ? [a.imageAd.imageUrl] : []).concat(mi.map((m) => img[m.asset]).filter(Boolean));
-    const list = [...new Set([own, grpImg[String(r.adGroup.id)], campImg[String(r.campaign.id)]].find((l) => l && l.length) || [])].slice(0, 10);
+    const list = [...new Set([own, grpImg[String(r.adGroup.id)], campImg[String(r.campaign.id)], acctImg].find((l) => l && l.length) || [])].slice(0, 30);
     ads.push([type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.adGroup.name || '').trim(), String(a.id), a.type,
       String(titles[0] || a.name || '').trim(), (a.finalUrls || [])[0] || '', list[0] || '', list.join('\n'), titles.join('\n'), descs.join('\n')]);
   });
@@ -124,6 +120,45 @@ function main() {
 
   put_(ss, 'g_meta', [['key', 'value'], ['updated', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm')],
     ['account', AdsApp.currentAccount().getName()], ['customer_id', AdsApp.currentAccount().getCustomerId()]]);
+
+  try { collectDailyHist_(ss, tz, M, camp); } catch (e) { console.log(`일별 과거분 수집 실패: ${e && e.message}`); }
+}
+
+const DAILY_HEAD = ['date', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
+/** 광고그룹 × 일 행. 광고그룹이 없는 캠페인(P-Max 등)은 캠페인 행을 '(광고그룹 없음)' 으로 더해 월 합계와 맞춘다 */
+function dailyRows_(dRange, M) {
+  const rows = [], hasDaily = {};
+  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ${M}
+         FROM ad_group WHERE ${dRange} AND metrics.impressions > 0`, (r) => {
+    hasDaily[r.segments.date + '|' + r.campaign.id] = true;
+    rows.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), String(r.adGroup.name || '').trim(), String(r.adGroup.id), ...met_(r)]);
+  });
+  each_(`SELECT segments.date, campaign.id, campaign.name, campaign.advertising_channel_type, ${M}
+         FROM campaign WHERE ${dRange} AND metrics.impressions > 0`, (r) => {
+    if (hasDaily[r.segments.date + '|' + r.campaign.id]) return;
+    rows.push([r.segments.date, type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.campaign.id), '(광고그룹 없음)', '', ...met_(r)]);
+  });
+  return rows.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+}
+/** 지난달까지의 일별 광고비를 달 단위로 g_adgroup_daily_hist 에 쌓는다. 최신 달부터 실행당 CFG.DAILY_HIST_MONTHS 달, 시트에 있는 달은 건너뛴다 */
+function collectDailyHist_(ss, tz, M, camp) {
+  const name = 'g_adgroup_daily_hist';
+  const sh = retry_(() => ss.getSheetByName(name) || ss.insertSheet(name));
+  if (sh.getLastRow() < 1) retry_(() => sh.getRange(1, 1, 1, DAILY_HEAD.length).setValues([DAILY_HEAD]));
+  const last = sh.getLastRow();
+  const have = new Set(last > 1 ? sh.getRange(2, 1, last - 1, 1).getDisplayValues().map((r) => String(r[0]).slice(0, 7)) : []);
+  const thisMonth = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  [...new Set(camp.slice(1).map((r) => r[0]))].filter((m) => m < thisMonth && !have.has(m)).sort().reverse().slice(0, CFG.DAILY_HIST_MONTHS).forEach((m) => {
+    const end = String(new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate()).padStart(2, '0');
+    const rows = dailyRows_(`segments.date BETWEEN '${m}-01' AND '${m}-${end}'`, M);
+    if (!rows.length) return;
+    const at = sh.getLastRow() + 1; // 재시도해도 같은 자리에 쓰도록 먼저 정한다
+    retry_(() => {
+      sh.getRange(at, 1, rows.length, 1).setNumberFormat('@');
+      sh.getRange(at, 1, rows.length, DAILY_HEAD.length).setValues(rows);
+      SpreadsheetApp.flush();
+    });
+  });
 }
 
 /** 검색 캠페인은 SA, 나머지(디스플레이·P-Max·디맨드젠·동영상)는 DA 로 본다. */

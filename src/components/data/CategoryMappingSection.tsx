@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import type { DataAuditReport } from '../../utils/dataAudit';
-import { fmt, sumBy } from '../../utils/format';
+import { sumBy } from '../../utils/format';
 import { TableFootnote } from '../common/TableFootnote';
 import { StatusBadge } from '../common/StatusBadge';
 import { Card } from '../common/Card';
+import { Chip } from '../common/Chip';
+import { NumTd, TotalRow } from '../common/TableRows';
 import { LIST_LIMIT, ShowMoreButton } from '../common/MoreButton';
 import { SkelBar, SkelRows } from '../common/SkeletonView';
 
@@ -22,7 +24,7 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
   const restCount = ranked.length - flowCats.length;
   return (
     <>
-      <Card name="flow" id="cat-flow" title={<>카테고리 매칭<span className="muted">({audit.curMonth} 기준 실시간 매핑 현황)</span></>}>
+      <Card name="flow" id="cat-flow" title="카테고리 매칭" subtitle={`(${audit.curMonth} 기준 실시간 매핑 현황)`}>
       <p className="lead-t">
         매체마다 다른 캠페인·광고그룹 이름과 견적 제목을 직접 잇지 않고, <b>분류표(1차 카테고리)</b>를 가운데 두고
         양쪽을 연결한다. 정확한 매핑표에 없으면 이름·제목으로 찾는다.
@@ -30,10 +32,10 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
         <div className="flow">
           <div className="col">
             <div className="col-h">매체 광고그룹 (예)</div>
-            <div className="chip n">N · (⭐)HPE_MDF › 주요키워드</div>
-            <div className="chip n">N · 스마트스토어 쇼핑검 › 엘리트북</div>
-            <div className="chip g">G · GDN_자사몰_최신 › GDN_GPU</div>
-            <div className="chip n">N · 스토리지 › 시놀로지_NAS</div>
+            <Chip tone="n">N · (⭐)HPE_MDF › 주요키워드</Chip>
+            <Chip tone="n">N · 스마트스토어 쇼핑검 › 엘리트북</Chip>
+            <Chip tone="g">G · GDN_자사몰_최신 › GDN_GPU</Chip>
+            <Chip tone="n">N · 스토리지 › 시놀로지_NAS</Chip>
           </div>
           <div className="mid">N : M</div>
           <div className="col">
@@ -41,24 +43,24 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
             {loading
               ? Array.from({ length: 6 }, (_, i) => <SkelBar key={i} h="2rem" />)
               : flowCats.map((c) => (
-                  <div key={c} className="chip s">
+                  <Chip key={c} tone="s">
                     {c}
-                  </div>
+                  </Chip>
                 ))}
-            {!loading && restCount > 0 && <div className="chip s muted">외 {restCount}개 · 기타</div>}
+            {!loading && restCount > 0 && <Chip tone="s" muted>외 {restCount}개 · 기타</Chip>}
           </div>
           <div className="mid">N : M</div>
           <div className="col">
             <div className="col-h">견적 (예)</div>
-            <div className="chip it">제목 · HP Z6 G5 견적서 요청</div>
-            <div className="chip it">제목 · Synology DS1825+ 견적</div>
-            <div className="chip it">제목 · APC Smart-UPS SMT1000IC</div>
-            <div className="chip it">제목 없음 · 유입 광고 ROSEHA</div>
+            <Chip tone="it">제목 · HP Z6 G5 견적서 요청</Chip>
+            <Chip tone="it">제목 · Synology DS1825+ 견적</Chip>
+            <Chip tone="it">제목 · APC Smart-UPS SMT1000IC</Chip>
+            <Chip tone="it">제목 없음 · 유입 광고 ROSEHA</Chip>
           </div>
         </div>
       </Card>
 
-      <Card name="mapping" id="cat-mapping" title={<>표준 카테고리별 매칭 현황<span className="muted">({audit.curMonth} 기준)</span></>}>
+      <Card name="mapping" id="cat-mapping" title="표준 카테고리별 매칭 현황" subtitle={`(${audit.curMonth} 기준)`}>
       <div className="tw">
         <table className="stk data-tbl data-tbl-map" id="tbCatMappingStatus">
           <colgroup>
@@ -84,9 +86,9 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
                 <td>
                   <b>{item.category}</b>
                 </td>
-                <td className="n">{fmt(item.adgroupCount)}개</td>
-                <td className="n">{fmt(item.curMonthSpend)}원</td>
-                <td className="n">{fmt(item.curMonthQuotes)}건</td>
+                <NumTd value={item.adgroupCount} unit="개" />
+                <NumTd value={item.curMonthSpend} unit="원" />
+                <NumTd value={item.curMonthQuotes} unit="건" />
                 <td className="c">
                   {item.category === '기타' ? (
                     <StatusBadge size="sm" level="warn">미분류</StatusBadge>
@@ -97,30 +99,23 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
               </tr>
             ))}
             {!loading && (
-            <tr className="grp">
-              <td>합계</td>
-              <td className="n">
-                <b>{fmt(sumBy(audit.categoryBreakdown, (i) => i.adgroupCount))}개</b>
-              </td>
-              <td className="n">
-                <b>{fmt(sumBy(audit.categoryBreakdown, (i) => i.curMonthSpend))}원</b>
-              </td>
-              <td className="n">
-                <b>{fmt(sumBy(audit.categoryBreakdown, (i) => i.curMonthQuotes))}건</b>
-              </td>
+            <TotalRow>
+              <NumTd value={sumBy(audit.categoryBreakdown, (i) => i.adgroupCount)} unit="개" bold />
+              <NumTd value={sumBy(audit.categoryBreakdown, (i) => i.curMonthSpend)} unit="원" bold />
+              <NumTd value={sumBy(audit.categoryBreakdown, (i) => i.curMonthQuotes)} unit="건" bold />
               <td className="c">
                 <StatusBadge size="sm" level="ok">100% 일치</StatusBadge>
               </td>
-            </tr>
+            </TotalRow>
             )}
           </tbody>
         </table>
         {!loading && <ShowMoreButton total={audit.categoryBreakdown.length} expanded={showAll} onToggle={() => setShowAll((v) => !v)} />}
         <TableFootnote
-          basis="산출 근거: 광고그룹·견적을 분류표 1차로 집계 (2차 합산) · 기타 = 이름·제목으로 분류 불가"
+          basis="산출 근거: 광고그룹·견적을 분류표 1차로 집계 (2차 합산) · 기타 = 분류 불가"
           sources={[
-            '광고: 캠페인·광고그룹 매핑표 → 이름 규칙 (format.ts · categoryText.ts)',
-            '견적: 제목 → 유입 광고 꼬리표 규칙 (categoryText.ts · Code.gs)',
+            '광고: 캠페인·광고그룹 매핑표 → 이름 규칙',
+            '견적: 제목 → 유입 광고 꼬리표 규칙',
           ]}
         />
       </div>

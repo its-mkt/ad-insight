@@ -1,6 +1,7 @@
 import React from 'react';
 import type { CategoryBarItem } from '../../types/dashboard';
 import { fmt } from '../../utils/format';
+import { BarDelta } from '../common/BarDelta';
 
 import { EmptyState } from '../common/EmptyState';
 
@@ -58,7 +59,6 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
   return (
     <div id={id} className="src-bars-wrap cat-bars cmp">
       <div className="src-bar-row src-bar-head" aria-hidden="true">
-        <span className="src-bar-rank">#</span>
         <span className="cat-name">카테고리</span>
         <div className="src-bar-bars">소진액</div>
         <div className="src-bar-val">
@@ -74,7 +74,6 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
         const d = c.prev ? Math.round(((c.cur - c.prev) / c.prev) * 1000) / 10 : null;
         return (
           <div key={c.k} className="src-bar-row has-prev">
-            <span className="src-bar-rank">{idx + 1}</span>
             {onSelect ? (
               <button
                 type="button"
@@ -122,9 +121,7 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
               {hidePrev && <span className="amt">{fmt(c.cur)}만</span>}
               {hidePrev && hasShare && <span className="pct">{fmtPct(curShare)}</span>}
               {!hidePrev && (
-                <span className={`delta${d == null || d === 0 ? '' : d > 0 ? ' up' : ' down'}`}>
-                  {d == null || d === 0 ? '–' : `${d > 0 ? '▲' : '▼'}${Math.abs(d)}%`}
-                </span>
+                <BarDelta d={d} />
               )}
               {hasQ && <span className="qn">{c.q != null && c.q > 0 ? `${c.q}건` : '–'}</span>}
             </div>

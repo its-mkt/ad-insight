@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import type { CatEfficiencyItem } from './types';
 import { fmt, sumBy } from '../../utils/format';
-import { EXTERNAL_LINKS } from '../../utils/constants';
 import { TableFootnote } from '../common/TableFootnote';
-import { ChevronRight } from 'lucide-react';
 import { useSort } from '../../hooks/useSort';
 import { SortableTh } from '../common/SortableTh';
 import { Card } from '../common/Card';
+import { AdApiSource } from '../common/ExtLink';
+import { NumTd, TotalRow, TreeChildRow, TreeParentRow, childLabelOf } from '../common/TableRows';
 import { LIST_LIMIT, ShowMoreButton } from '../common/MoreButton';
 
 interface CatEfficiencyTableProps {
@@ -108,11 +108,14 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
     cpa != null ? `${fmt(cpa)}원` : '–';
 
   return (
-    <Card name="cat-table" tableWrap id="cat-table">
-      <h3 id="ttCatTable">
-        카테고리별 집행 성과 및 전환 효율 상세
-        <span className="muted">({periodLabel} 기준)</span>
-      </h3>
+    <Card
+      name="cat-table"
+      tableWrap
+      id="cat-table"
+      titleId="ttCatTable"
+      title="카테고리별 집행 성과 및 전환 효율 상세"
+      subtitle={`(${periodLabel} 기준)`}
+    >
       <table className="stk" id="tbCatEfficiency">
         <colgroup>
           <col className="col-eff-name" />
@@ -131,7 +134,7 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
             {th('광고전환', 'conv')}
             {th('견적전환율', 'convRate')}
             {th('총 접수 견적', 'quotes')}
-            {th('건당 광고비 (CPA)', 'cpa')}
+            {th('CPA', 'cpa')}
           </tr>
         </thead>
         <tbody>
@@ -141,71 +144,53 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
 
             return (
               <React.Fragment key={parentKey}>
-                <tr
-                  className={hasChildren ? `kw-cat-parent${isOpen ? ' open' : ''}` : undefined}
-                  onClick={hasChildren ? () => toggleParent(parentKey) : undefined}
-                  style={hasChildren ? { cursor: 'pointer' } : undefined}
+                <TreeParentRow
+                  label={parentKey}
+                  childCount={hasChildren ? items.length : 0}
+                  open={isOpen}
+                  onToggle={() => toggleParent(parentKey)}
                 >
-                  <td>
-                    {hasChildren && (
-                      <ChevronRight className={`kw-cat-chev${isOpen ? ' open' : ''}`} strokeWidth={2.25} aria-hidden="true" />
-                    )}
-                    <b>{parentKey}</b>
-                    {hasChildren && (
-                      <span className="kw-cat-child-count">{items.length}개</span>
-                    )}
-                  </td>
-                  <td className="n">{fmt(cost)}원</td>
-                  <td className="n">{fmt(clk)}</td>
-                  <td className="n">{fmt(conv)}</td>
-                  <td className="n">{convRateStr(quotes, clk)}</td>
-                  <td className="n"><b>{quotes ? `${fmt(quotes)}건` : '–'}</b></td>
-                  <td className="n"><b>{cpaStr(cpa)}</b></td>
-                </tr>
+                  <NumTd value={cost} unit="원" />
+                  <NumTd value={clk} />
+                  <NumTd value={conv} />
+                  <NumTd>{convRateStr(quotes, clk)}</NumTd>
+                  <NumTd value={quotes || null} unit="건" bold />
+                  <NumTd bold>{cpaStr(cpa)}</NumTd>
+                </TreeParentRow>
 
-                {hasChildren && isOpen && items.map((item) => {
-                  // 2차 없이 1차로만 분류된 항목은 잘라 낼 이름이 없어 '공통'으로 보여 준다
-                  const childLabel = item.k.slice(parentKey.length + 3) || '공통';
-                  return (
-                    <tr key={item.k} className="kw-cat-child">
-                      <td className="kw-cat-child-label">{childLabel}</td>
-                      <td className="n">{fmt(item.cost)}원</td>
-                      <td className="n">{fmt(item.clk)}</td>
-                      <td className="n">{fmt(item.conv)}</td>
-                      <td className="n">{convRateStr(item.quotes, item.clk)}</td>
-                      <td className="n">{item.quotes ? `${fmt(item.quotes)}건` : '–'}</td>
-                      <td className="n">{cpaStr(item.cpa)}</td>
-                    </tr>
-                  );
-                })}
+                {hasChildren && isOpen && items.map((item) => (
+                  <TreeChildRow key={item.k} label={childLabelOf(item.k, parentKey)}>
+                    <NumTd value={item.cost} unit="원" />
+                    <NumTd value={item.clk} />
+                    <NumTd value={item.conv} />
+                    <NumTd>{convRateStr(item.quotes, item.clk)}</NumTd>
+                    <NumTd value={item.quotes || null} unit="건" />
+                    <NumTd>{cpaStr(item.cpa)}</NumTd>
+                  </TreeChildRow>
+                ))}
               </React.Fragment>
             );
           })}
-          <tr className="grp">
-            <td>합계</td>
-            <td className="n">{fmt(totSpend)}원</td>
-            <td className="n">{fmt(totClk)}</td>
-            <td className="n">{fmt(totConv)}</td>
-            <td className="n">{totClk > 0 ? `${((totQuotes / totClk) * 100).toFixed(2)}%` : '–'}</td>
-            <td className="n"><b>{fmt(totQuotes)}건</b></td>
-            <td className="n"><b>{avgCpa ? `${fmt(avgCpa)}원` : '–'}</b></td>
-          </tr>
+          <TotalRow>
+            <NumTd value={totSpend} unit="원" />
+            <NumTd value={totClk} />
+            <NumTd value={totConv} />
+            <NumTd>{convRateStr(totQuotes, totClk)}</NumTd>
+            <NumTd value={totQuotes} unit="건" bold />
+            <NumTd bold>{cpaStr(avgCpa || null)}</NumTd>
+          </TotalRow>
         </tbody>
       </table>
       <ShowMoreButton total={sortedGroups.length} expanded={showAll} onToggle={() => setShowAll((v) => !v)} />
       <TableFootnote
         id="srcCatEfficiency"
         unit="원·건"
-        basis="산출 근거: 견적전환율 = (총 접수 견적 ÷ 클릭수) × 100 · CPA = 광고비 ÷ 총 접수 견적"
+        basis="산출 근거: 견적전환율 = 견적 ÷ 클릭 × 100 · CPA = 광고비 ÷ 견적"
         sources={[
           <span key="ads">
-            광고비·클릭·전환 —{' '}
-            <a href={EXTERNAL_LINKS.googleAds} target="_blank" rel="noopener">Google Ads</a>{' '}
-            /{' '}
-            <a href={EXTERNAL_LINKS.naverSearchAd} target="_blank" rel="noopener">네이버 검색광고</a>{' '}
-            API 자동 수집
+            광고비·클릭·전환 — <AdApiSource separator="/" suffix="API" />
           </span>,
-          '총 접수 견적 — 아이티켓 고도몰 견적 시트 + zbyhp·cadkorea 견적 + 전화·톡플러스 문의 (collectQuotes · collectQuoteSites · collectQuotePhone)',
+          '견적 — 아이티켓·zbyhp·cadkorea 견적 + 전화·톡플러스 문의',
         ]}
       />
     </Card>

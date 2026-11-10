@@ -4,6 +4,7 @@ import { axisC, fmt, measureSvgText, niceMax, rem } from '../../utils/format';
 import { useElementWidth } from '../../hooks/useElementWidth';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { EmptyState } from '../common/EmptyState';
+import { Legend, LegendItem } from '../common/Legend';
 
 interface MultiChartProps {
   id: string;
@@ -13,6 +14,8 @@ interface MultiChartProps {
   unit: string;
   emptyMessage?: string;
   defaultType?: ChartType;
+  /** 제목 오른쪽, 차트 종류 버튼 앞에 놓는 도구 (예: 보기 전환) */
+  tools?: React.ReactNode;
 }
 
 const CHART_TYPE_OPTIONS: { value: ChartType; label: string; title: string }[] = [
@@ -29,6 +32,7 @@ export const MultiChart: React.FC<MultiChartProps> = ({
   unit,
   emptyMessage = '표시할 데이터가 없습니다',
   defaultType = 'line',
+  tools,
 }) => {
   const [chartType, setChartType] = useState<ChartType>(defaultType);
   const [hoverSeries, setHoverSeries] = useState<number | null>(null);
@@ -423,17 +427,29 @@ export const MultiChart: React.FC<MultiChartProps> = ({
     );
   };
 
+  const typeControl = (
+    <SegmentedControl<ChartType>
+      mini
+      dataChart={id}
+      options={CHART_TYPE_OPTIONS}
+      value={chartType}
+      onChange={setChartType}
+    />
+  );
+
   return (
     <div className={`card card-chart ${id ? `card-chart-${id}` : ''}`} id={id ? `card-chart-${id}` : undefined} data-card={id || 'chart'}>
       <h3>
         {title}
-        <SegmentedControl<ChartType>
-          mini
-          dataChart={id}
-          options={CHART_TYPE_OPTIONS}
-          value={chartType}
-          onChange={setChartType}
-        />
+        {tools ? (
+          <div className="h3-tools">
+            {tools}
+            <span className="h3-tool-sep" />
+            {typeControl}
+          </div>
+        ) : (
+          typeControl
+        )}
       </h3>
       <div className="ch" id={id} ref={boxRef}>
         {!hasData ? (
@@ -445,21 +461,20 @@ export const MultiChart: React.FC<MultiChartProps> = ({
         )}
       </div>
       {hasData && (
-        <div className="leg">
+        <Legend unit={unit}>
           {series.map((s, si) => (
-            <span
+            <LegendItem
               key={s.k}
               className="leg-item"
               data-si={si}
+              color={s.c}
               onMouseEnter={() => setHoverSeries(si)}
               onMouseLeave={() => setHoverSeries(null)}
             >
-              <i style={{ background: `var(${s.c})` }} />
               {s.k}
-            </span>
+            </LegendItem>
           ))}
-          <span className="leg-note">단위: {unit}</span>
-        </div>
+        </Legend>
       )}
     </div>
   );

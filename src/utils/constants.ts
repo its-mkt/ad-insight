@@ -42,6 +42,7 @@ export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',
   'quotes',
+  'purchases',
   'cat-efficiency',
   'keywords',
   'search',
@@ -53,6 +54,7 @@ export const VIEW_TITLES: Record<ViewId, string> = {
   overview: '종합 요약',
   ads: '매체 광고비',
   quotes: '견적 상세',
+  purchases: '구매 상세',
   'cat-efficiency': '카테고리 효율',
   keywords: '키워드 · 소재',
   search: '검색 결과',
@@ -66,6 +68,9 @@ export const QUOTE_SITES = [
   { id: 'zbyhp', label: 'zbyhp', sheetId: '1vWHN_dT6biPcSM1mGETt6aieSTiUe3o2-ysPSRRpov8' },
   { id: 'cadkorea', label: 'cadkorea', sheetId: '1mmA4mAb3hRKLlMrAoU18ZyVbEgB2kgGZ3Xz0SJln-pg' },
 ] as const;
+
+/** 사이트 전체에 쓰는 기본 표준 카테고리 — 제목과 상관없이 적용하되 어드민 수동 지정이 우선한다. 수집 스크립트 CFG.QUOTE_SITES 의 category 와 맞춘다 */
+export const SITE_DEFAULT_CATEGORY: Record<string, string> = { zbyhp: 'HPE 서버', cadkorea: 'GstarCAD' };
 
 /** 아이티켓 견적요청 DB 의 전화문의 탭 (수집 스크립트 collectQuotePhone 이 읽는 탭) */
 export const QUOTE_PHONE_SHEET = { sheetId: '18tMYBQLuIhkmX_x_c8MK-aNXlGvOgz1TWauvqo8Dmjg', gid: 1011193634 } as const;

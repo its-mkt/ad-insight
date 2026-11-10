@@ -1,4 +1,7 @@
-export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'search' | 'data' | 'admin';
+export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'search' | 'data' | 'admin';
+
+/** 사이드바에서 고르는 사이트 — 온코어는 데이터 연결 전이라 안내만 보여 준다 */
+export type SiteId = 'itket' | 'oncore';
 
 export type ChartType = 'line' | 'grouped' | 'donut';
 
@@ -174,10 +177,18 @@ export interface DashboardData {
     google: string;
     naver: string;
     quote?: string;
+    /** 고도몰 주문 마지막 수집 시각 (godo_meta) */
+    godo?: string;
   };
   spend: SpendRow[];
   /** 일별 광고비 (최근 수집 구간만) — 없으면 일·기간 선택은 월 단위로 보여 준다 */
   spendDaily: SpendDailyRow[];
+  /** 매체별 최근 일별 구간의 첫 날 (첫 응답에 함께 오는 구간) */
+  dailyRecentFrom: Record<string, string>;
+  /** 매체별로 일별 과거분이 쌓여 있는 달 */
+  dailyHistMonths: Record<string, string[]>;
+  /** 일별 과거분을 받아 spendDaily 에 합친 달 */
+  dailyLoadedMonths: string[];
   manual: ManualRow[];
   mapping: MappingRow[];
   quotes: QuoteRow[];
@@ -352,10 +363,12 @@ export interface RawApiPayload {
   g_meta?: RawMetaApiRow[];
   n_meta?: RawMetaApiRow[];
   q_meta?: RawMetaApiRow[];
+  godo_meta?: RawMetaApiRow[];
   g_adgroup_monthly?: RawSpendApiRow[];
   g_campaign_monthly?: RawSpendApiRow[];
   n_adgroup_monthly?: RawSpendApiRow[];
   g_adgroup_daily?: RawSpendApiRow[];
+  daily_hist_months?: Record<string, string[]>;
   n_adgroup_daily?: RawSpendApiRow[];
   manual?: RawManualApiRow[];
   mapping?: MappingRow[];
@@ -364,6 +377,14 @@ export interface RawApiPayload {
   quotes_raw_sites?: RawQuoteRawApiRow[];
   quotes_phone?: RawQuotePhoneApiRow[];
   quotes_stats_extra?: RawQuoteStatsExtraApiRow[];
+  godo_orders_monthly?: { month?: unknown; count?: unknown }[];
+  godo_goods_monthly?: { month?: unknown; goods_no?: unknown; goods_name?: unknown; orders?: unknown; qty?: unknown; amount?: unknown }[];
+  godo_order_inflow_monthly?: { month?: unknown; source?: unknown; count?: unknown }[];
+  godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
+  godo_goods_inflow_monthly?: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[];
+  godo_order_lines?: Record<string, unknown>[];
+  /** 관리자 로그인 응답에만 있다 */
+  godo_order_customers?: Record<string, unknown>[];
   manual_categories?: RawManualCategoryApiRow[];
   g_keywords?: RawKeywordApiRow[];
   n_keywords?: RawKeywordApiRow[];

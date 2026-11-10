@@ -1,16 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../../types/dashboard';
-import { fmt, mLabel, THIS_M } from '../../utils/format';
-import { EXTERNAL_LINKS } from '../../utils/constants';
+import { ctrText as ctr, fmt, mLabel, THIS_M } from '../../utils/format';
 import { MediaPill } from '../common/MediaPill';
 import { TableFootnote } from '../common/TableFootnote';
 import { MoreButton } from '../common/MoreButton';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useSort } from '../../hooks/useSort';
 import { SortableTh } from '../common/SortableTh';
 import { Th } from '../common/Th';
 import { TabButton } from '../common/TabButton';
 import { Card } from '../common/Card';
+import { EmptyState } from '../common/EmptyState';
+import { AdApiSource } from '../common/ExtLink';
+import { NumTd } from '../common/TableRows';
+import { Muted } from '../common/Muted';
+import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
 interface KeywordAccordionTableProps {
   topGroups: KeywordGroup[];
@@ -31,16 +35,18 @@ interface KeywordAccordionTableProps {
 }
 
 const mediaKo = (m: string) => (m === 'Naver' ? '네이버' : m === 'Google' ? '구글' : m);
-// CTR = 클릭 ÷ 노출 × 100 (노출 0 이면 –)
-const ctr = (clk: number, imp: number) => (imp ? `${((clk / imp) * 100).toFixed(1)}%` : '–');
+// 평균 CPC = 광고비 ÷ 클릭 (클릭 0 이면 – , 정렬에서는 맨 뒤로 가도록 -1)
+const cpc = (cost: number, clk: number) => (clk ? cost / clk : undefined);
+const cpcSort = (cost: number, clk: number) => (clk ? cost / clk : -1);
 
-type SortKey = 'name' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cost';
+type SortKey = 'name' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cpc' | 'cost';
 
 const NUMERIC_COLS: { key: Exclude<SortKey, 'name'>; label: string }[] = [
   { key: 'imp', label: '노출' },
   { key: 'clk', label: '클릭' },
   { key: 'ctr', label: 'CTR' },
   { key: 'conv', label: '전환' },
+  { key: 'cpc', label: '평균 CPC' },
   { key: 'cost', label: '광고비' },
 ];
 
@@ -59,6 +65,7 @@ const getGroupMetric = (g: KeywordGroup, key: SortKey) => {
   if (key === 'clk') return clk;
   if (key === 'ctr') return imp > 0 ? clk / imp : 0;
   if (key === 'conv') return conv;
+  if (key === 'cpc') return cpcSort(g.cost, clk);
   return 0;
 };
 
@@ -68,6 +75,7 @@ const getKwMetric = (k: KeywordRow, key: SortKey) => {
   if (key === 'clk') return k.clk;
   if (key === 'conv') return k.conv;
   if (key === 'ctr') return k.imp > 0 ? k.clk / k.imp : 0;
+  if (key === 'cpc') return cpcSort(k.cost, k.clk);
   return 0;
 };
 /** 탭으로 바로 보이는 캠페인 수. 나머지는 '더보기' 목록에서 고른다 */
@@ -192,35 +200,29 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
   const periodLabel = periodLabelProp || `${month.slice(0, 4)}년 ${mLabel(month)}`;
 
   return (
-    <Card name="kw-list" id="kw-list">
-      <h3 id="ttKw">
-        {type === 'DA' ? (
-          title
-        ) : !campaigns.length ? (
-          <>
-            {title}
-            <span className="muted">{periodLabel} · 광고비 상위 캠페인</span>
-          </>
+    <Card
+      name="kw-list"
+      id="kw-list"
+      titleId="ttKw"
+      title={title}
+      subtitle={
+        type === 'DA' ? undefined : !campaigns.length ? (
+          <>{periodLabel} · 광고비 상위 캠페인</>
         ) : safeKwIdx === 0 ? (
           <>
-            {title}
-            <span className="muted">
-              {periodLabel} · 광고비 상위{' '}
-              {visibleCount < topGroups.length
-                ? `${visibleCount} / ${topGroups.length}`
-                : topGroups.length}개 그룹, 그룹당 상위 10개
-            </span>
+            {periodLabel} · 광고비 상위{' '}
+            {visibleCount < topGroups.length
+              ? `${visibleCount} / ${topGroups.length}`
+              : topGroups.length}개 그룹, 그룹당 상위 10개
           </>
         ) : (
           <>
-            {title}
-            <span className="muted">
-              {periodLabel} · {selectedCamp?.campaign}
-              <small className="kw-head-sub">({selectedCamp?.groups.length}개 광고그룹)</small>
-            </span>
+            {periodLabel} · {selectedCamp?.campaign}
+            <small className="kw-head-sub">({selectedCamp?.groups.length}개 광고그룹)</small>
           </>
-        )}
-      </h3>
+        )
+      }
+    >
 
       {type === 'SA' && campaigns.length > 0 && (
         <div id="kwTabBar" className="kw-tabs" ref={tabBarRef}>
@@ -296,19 +298,17 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
             <col className="col-kw-clk" />
             <col className="col-kw-ctr" />
             <col className="col-kw-conv" />
+            <col className="col-kw-cpc" />
             <col className="col-kw-cost" />
           </colgroup>
           {type === 'DA' ? (
             <tbody>
               <tr>
-                <td colSpan={6}>
-                  <div className="empty">
-                    디스플레이 광고(DA)는 키워드 입찰을 진행하지 않습니다.
-                    <br />
-                    <small className="muted">
-                      타겟팅 배너로 운영되어 키워드 목록이 없습니다.
-                    </small>
-                  </div>
+                <td colSpan={7}>
+                  <EmptyState
+                    message="디스플레이 광고(DA)는 키워드 입찰을 진행하지 않습니다."
+                    subMessage="타겟팅 배너로 운영되어 키워드 목록이 없습니다."
+                  />
                 </td>
               </tr>
             </tbody>
@@ -321,27 +321,23 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   <Th className="n">클릭</Th>
                   <Th className="n">CTR</Th>
                   <Th className="n">전환</Th>
+                  <Th className="n">평균 CPC</Th>
                   <Th className="n">광고비</Th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td colSpan={6}>
-                    <div className="empty">
-                      {media === 'Google' ? (
-                        <>
-                          수집된 Google 검색광고 키워드가 없습니다.
-                          <br />
-                          <small className="muted">
-                            Google Ads 스크립트 실행 후 자동 수집됩니다.
-                          </small>
-                        </>
-                      ) : firstMonth && month < firstMonth ? (
-                        '키워드 재구성 이전 기간이라 키워드별 실적이 없습니다.'
-                      ) : (
-                        '조회 조건에 해당하는 키워드가 없습니다.'
-                      )}
-                    </div>
+                  <td colSpan={7}>
+                    <EmptyState
+                      message={
+                        media === 'Google'
+                          ? '수집된 Google 검색광고 키워드가 없습니다.'
+                          : firstMonth && month < firstMonth
+                            ? '키워드 재구성 이전 기간이라 키워드별 실적이 없습니다.'
+                            : '조회 조건에 해당하는 키워드가 없습니다.'
+                      }
+                      subMessage={media === 'Google' ? 'Google Ads 스크립트 실행 후 자동 수집됩니다.' : undefined}
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -383,65 +379,51 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
 
                   return (
                     <React.Fragment key={groupKey}>
-                      <tr
-                        className={`grp grp-accordion grp-${g.media.toLowerCase()}${isOpen ? ' open' : ''}`}
-                        onClick={canOpen ? () => toggleGroup(groupKey) : undefined}
-                        style={canOpen ? undefined : { cursor: 'default' }}
-                        title={!canOpen ? undefined : isOpen ? '클릭하여 키워드 목록 접기' : '클릭하여 키워드 목록 펼치기'}
+                      <GroupAccordionRow
+                        title={selectedCamp ? g.adgroup : `${g.campaign} › ${g.adgroup}`}
+                        icon={detailed && <MediaPill media={g.media} iconOnly size="0.875rem" />}
+                        count={<>({g.list.length}개 키워드 · {mediaKo(g.media)})</>}
+                        open={isOpen}
+                        canOpen={canOpen}
+                        onToggle={() => toggleGroup(groupKey)}
+                        toggleLabel="키워드 목록"
+                        tone={`grp-${g.media.toLowerCase()}`}
                       >
-                        <td>
-                          <div className="grp-acc-cell">
-                            <span className="grp-acc-main">
-                              <ChevronRight
-                                className={`grp-acc-chev${isOpen ? ' open' : ''}`}
-                                strokeWidth={2.25}
-                                style={canOpen ? undefined : { visibility: 'hidden' }}
-                              />
-                              {detailed && <MediaPill media={g.media} iconOnly size="0.875rem" />}
-                              <span className="grp-acc-title">
-                                {selectedCamp ? g.adgroup : `${g.campaign} › ${g.adgroup}`}
-                              </span>
-                              <small className="grp-acc-cnt">
-                                ({g.list.length}개 키워드 · {mediaKo(g.media)})
-                              </small>
-                            </span>
-                          </div>
-                        </td>
-                        <td className="n">{fmt(grpImp)}</td>
-                        <td className="n">{fmt(grpClk)}</td>
-                        <td className="n">
-                          {ctr(grpClk, grpImp)}
-                        </td>
-                        <td className="n">{fmt(grpConv)}</td>
-                        <td className="n">
-                          <b>{fmt(g.cost)}원</b>
-                        </td>
-                      </tr>
+                        <NumTd value={grpImp} />
+                        <NumTd value={grpClk} />
+                        <NumTd>{ctr(grpClk, grpImp)}</NumTd>
+                        <NumTd value={grpConv} />
+                        <NumTd value={cpc(g.cost, grpClk)} unit="원" />
+                        <NumTd value={g.cost} unit="원" bold />
+                      </GroupAccordionRow>
 
                       {isOpen &&
                         sortedKws.map((k, ki) => (
-                          <tr key={`${k.keyword}-${ki}`} className="kw-child">
-                            <td className="ind">
-                              {k.keyword}
-                              {detailed && (k.bid > 0 || k.quality > 0) && (
-                                <small className="muted kw-detail">
-                                  {[k.bid > 0 && `입찰가 ${fmt(k.bid)}원`, k.quality > 0 && `품질지수 ${k.quality}`].filter(Boolean).join(' · ')}
-                                </small>
-                              )}
-                            </td>
-                            <td className="n">{fmt(k.imp)}</td>
-                            <td className="n">{fmt(k.clk)}</td>
-                            <td className="n">
-                              {ctr(k.clk, k.imp)}
-                            </td>
-                            <td className="n">{fmt(k.conv)}</td>
-                            <td className="n">{fmt(k.cost)}원</td>
-                          </tr>
+                          <GroupChildRow
+                            key={`${k.keyword}-${ki}`}
+                            label={
+                              <>
+                                {k.keyword}
+                                {detailed && (k.bid > 0 || k.quality > 0) && (
+                                  <Muted small className="kw-detail">
+                                    {[k.bid > 0 && `입찰가 ${fmt(k.bid)}원`, k.quality > 0 && `품질지수 ${k.quality}`].filter(Boolean).join(' · ')}
+                                  </Muted>
+                                )}
+                              </>
+                            }
+                          >
+                            <NumTd value={k.imp} />
+                            <NumTd value={k.clk} />
+                            <NumTd>{ctr(k.clk, k.imp)}</NumTd>
+                            <NumTd value={k.conv} />
+                            <NumTd value={cpc(k.cost, k.clk)} unit="원" />
+                            <NumTd value={k.cost} unit="원" />
+                          </GroupChildRow>
                         ))}
 
                       {isOpen && remainCount > 0 && (
                         <tr className="kw-more-row">
-                          <td colSpan={6}>
+                          <td colSpan={7}>
                             <MoreButton
                               label={isKwExpanded ? '상위 10개만 보기' : `키워드 더보기 (+${remainCount}개)`}
                               open={isKwExpanded}
@@ -458,13 +440,12 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   <td>
                     합계<small className="grp-total-cnt">({fmt(totalGroups.length)}개 그룹)</small>
                   </td>
-                  <td className="n">{fmt(kwTotal.imp)}</td>
-                  <td className="n">{fmt(kwTotal.clk)}</td>
-                  <td className="n">{ctr(kwTotal.clk, kwTotal.imp)}</td>
-                  <td className="n">{fmt(kwTotal.conv)}</td>
-                  <td className="n">
-                    <b>{fmt(kwTotal.cost)}원</b>
-                  </td>
+                  <NumTd value={kwTotal.imp} />
+                  <NumTd value={kwTotal.clk} />
+                  <NumTd>{ctr(kwTotal.clk, kwTotal.imp)}</NumTd>
+                  <NumTd value={kwTotal.conv} />
+                  <NumTd value={cpc(kwTotal.cost, kwTotal.clk)} unit="원" />
+                  <NumTd value={kwTotal.cost} unit="원" bold />
                 </tr>
               </tbody>
             </>
@@ -482,19 +463,9 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
 
         <TableFootnote
           unit="원·회"
-          basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고비 상위 캠페인/그룹 · CTR = 클릭 ÷ 노출`}
+          basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고비 상위 캠페인/그룹 · CTR = 클릭 ÷ 노출 · 평균 CPC = 광고비 ÷ 클릭`}
           sources={[
-            <span key="src">
-              출처:{' '}
-              <a href={EXTERNAL_LINKS.googleAds} target="_blank" rel="noopener">
-                Google Ads
-              </a>{' '}
-              ·{' '}
-              <a href={EXTERNAL_LINKS.naverSearchAd} target="_blank" rel="noopener">
-                네이버 검색광고
-              </a>{' '}
-              API 자동 수집
-            </span>,
+            <AdApiSource key="src" prefix="출처:" suffix="API" />,
           ]}
         />
       </div>

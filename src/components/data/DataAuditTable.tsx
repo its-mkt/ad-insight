@@ -16,19 +16,15 @@ export const DataAuditTable: React.FC<DataAuditTableProps> = ({ audit, loading =
     <Card
       name="audit"
       id="data-audit"
-      title={
-        <>
-          실시간 데이터 매칭 · 통계 무결성 검증
-          <span className="muted">
-            {loading ? (
-              <SkelBar w="6rem" h="1.25rem" className="skel-inline" />
-            ) : (
-              <StatusBadge size="sm" level={audit.overallLevel === 'ok' ? 'ok' : 'chk'}>
-                {audit.passedCount}/{audit.totalCount} 항목 통과
-              </StatusBadge>
-            )}
-          </span>
-        </>
+      title="실시간 데이터 매칭 · 통계 무결성 검증"
+      subtitle={
+        loading ? (
+          <SkelBar w="6rem" h="1.25rem" className="skel-inline" />
+        ) : (
+          <StatusBadge size="sm" level={audit.overallLevel === 'ok' ? 'ok' : 'chk'}>
+            {audit.passedCount}/{audit.totalCount} 항목 통과
+          </StatusBadge>
+        )
       }
     >
       <div className="tw">
@@ -66,10 +62,10 @@ export const DataAuditTable: React.FC<DataAuditTableProps> = ({ audit, loading =
           </tbody>
         </table>
         <TableFootnote
-          basis="검증 근거: 취합 시트 11개 전수 대조 · 견적·광고비 교차 검증 (dataAudit.ts)"
+          basis="검증 근거: 취합 시트 11개 전수 대조 · 견적·광고비 교차 검증"
           sources={[
-            '검증 주기 — Apps Script 1시간 자동 동기화 시 실시간 실행',
-            '오차 판정 기준 — 누락 0건 (100% 무결성 보장)',
+            '검증 주기 — 1시간 자동 동기화 때 실행',
+            '오차 판정 — 누락 0건 (100% 무결성)',
           ]}
         />
       </div>

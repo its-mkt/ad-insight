@@ -1,24 +1,43 @@
 import type { DashboardData, QuoteRawRow, QuoteRow, SpendDailyRow, SpendRow } from '../types/dashboard';
-import { inDayRange, monthsOfRange, type DayRange } from './dayRange';
+import { prevM } from './format';
+import { daysOfMonth, inDayRange, lastDayOf, monthsOfRange, previousRange, rangeDays, type DayRange } from './dayRange';
 
-/**
- * 일별 광고비가 모인 구간의 첫 날 — 매체마다 모은 구간이 다를 수 있어(네이버는 처음에 며칠씩 채운다) 가장 늦은 시작일을 쓴다.
- * 일별 데이터가 없으면 null.
- */
-export function dailyCoverageFrom(data: Pick<DashboardData, 'spendDaily'>): string | null {
-  const firstOf = new Map<string, string>();
-  data.spendDaily.forEach((r) => {
-    const cur = firstOf.get(r.media);
-    if (!cur || r.date < cur) firstOf.set(r.media, r.date);
+const DAILY_MEDIA = ['Google', 'Naver'];
+type DailyCoverage = Pick<DashboardData, 'spend' | 'spendDaily' | 'dailyRecentFrom' | 'dailyHistMonths' | 'dailyLoadedMonths'>;
+
+/** 그 달에 월 광고비가 있는 매체 — 집행이 없던 매체는 일별 자료를 요구하지 않는다 */
+const mediaOfMonth = (data: DailyCoverage, month: string): string[] =>
+  DAILY_MEDIA.filter((m) => data.spend.some((r) => r.media === m && r.month === month));
+
+/** 일·기간 전체의 광고비가 일별 자료로 갖춰졌는지 — 아니면 월 단위로 보여 준다 */
+export function rangeCovered(data: DailyCoverage, range: DayRange): boolean {
+  if (!data.spendDaily.length) return false;
+  return monthsOfRange(range).every((month) => {
+    const start = month === range.from.slice(0, 7) ? range.from : `${month}-01`;
+    return mediaOfMonth(data, month).every(
+      (m) => start >= (data.dailyRecentFrom[m] ?? '9999') || (data.dailyLoadedMonths.includes(month) && (data.dailyHistMonths[m] || []).includes(month))
+    );
   });
-  if (!firstOf.size) return null;
-  return [...firstOf.values()].sort().pop() as string;
 }
 
-/** 일·기간 전체가 일별 광고비 구간 안에 드는지 — 아니면 월 단위로 보여 준다 */
-export function rangeCovered(data: Pick<DashboardData, 'spendDaily'>, range: DayRange): boolean {
-  const from = dailyCoverageFrom(data);
-  return !!from && range.from >= from;
+/** 이 기간과 직전 같은 일수를 계산하려면 더 받아야 하는 달 */
+export function dailyMonthsToLoad(data: DailyCoverage, range: DayRange): string[] {
+  const months = new Set([...monthsOfRange(range), ...monthsOfRange(previousRange(range))]);
+  return [...months].filter(
+    (month) =>
+      !data.dailyLoadedMonths.includes(month) &&
+      DAILY_MEDIA.some((m) => `${month}-01` < (data.dailyRecentFrom[m] ?? '9999') && (data.dailyHistMonths[m] || []).includes(month))
+  );
+}
+
+/** 받아 온 일별 과거분을 합친다 — 최근 구간과 겹치는 날은 더 새로 수집한 최근 구간을 쓴다 */
+export function withDailyHist(data: DashboardData, rows: SpendDailyRow[], months: string[]): DashboardData {
+  if (!months.length) return data;
+  return {
+    ...data,
+    spendDaily: [...data.spendDaily, ...rows.filter((r) => r.date < (data.dailyRecentFrom[r.media] ?? '9999'))],
+    dailyLoadedMonths: months,
+  };
 }
 
 /** 범위 안 일별 광고비를 광고그룹별로 합쳐, 종료일이 속한 달(month)의 월 행으로 만든다 */
@@ -52,23 +71,8 @@ interface ApplyOptions {
   quotes?: boolean;
 }
 
-/**
- * 일·기간으로 본다 — 광고비·노출·클릭·전환은 일별 자료로, 견적은 접수일로 다시 모아 "종료일이 속한 달" 한 달로 넘긴다.
- * 그러면 화면들은 기준월 하나만 보는 지금 방식 그대로 기간 값을 보여 준다.
- * 일별 자료가 없는 것(키워드·소재 성과, GFA·Meta 등 월 단위 매체)은 이 달 값이 그대로 남거나 빠진다.
- * 기간이 일별 구간 밖이면 원본을 그대로 돌려준다 (월 단위로 보여 준다).
- */
-export function applyDayRange(data: DashboardData, range: DayRange | null, opts: ApplyOptions = {}): DashboardData {
-  if (!range || !rangeCovered(data, range)) return data;
-  const month = range.to.slice(0, 7);
-  const months = new Set(monthsOfRange(range));
-  const out: DashboardData = {
-    ...data,
-    spend: [...data.spend.filter((r) => !months.has(r.month)), ...spendInRange(data.spendDaily, range, month)],
-  };
-  if (opts.quotes === false) return out;
-
-  const raw = shiftToMonth(data.quotesRaw, range, month);
+/** 접수 건을 month 한 달의 카테고리·유입별 건수로 모은다 */
+const quoteRowsOf = (raw: QuoteRawRow[], month: string): QuoteRow[] => {
   const agg = new Map<string, QuoteRow>();
   raw.forEach((r) => {
     const k = [month, r.category, r.source].join('\u0001');
@@ -76,12 +80,95 @@ export function applyDayRange(data: DashboardData, range: DayRange | null, opts:
     if (cur) cur.count += 1;
     else agg.set(k, { month, category: r.category, source: r.source, count: 1 });
   });
+  return [...agg.values()];
+};
+
+/**
+ * 일·기간으로 본다 — 광고비·노출·클릭·전환은 일별 자료로, 견적은 접수일로 다시 모아 "종료일이 속한 달" 한 달로 넘긴다.
+ * 그 전달 자리에는 직전 같은 일수의 값을 넣어, 화면들의 "기준월 vs 전월" 비교가 그대로 같은 일수끼리의 비교가 되게 한다.
+ * 직전 구간이 일별 자료 밖이면 광고비 비교값은 비워 둔다 (달 전체와 비교하면 오해를 부른다).
+ * 일별 자료가 없는 것(키워드·소재 성과, GFA·Meta 등 월 단위 매체)은 이 달 값이 그대로 남거나 빠진다.
+ * 기간이 일별 구간 밖이면 원본을 그대로 돌려준다 (월 단위로 보여 준다).
+ */
+export function applyDayRange(data: DashboardData, range: DayRange | null, opts: ApplyOptions = {}): DashboardData {
+  if (!range || !rangeCovered(data, range)) return data;
+  const month = range.to.slice(0, 7);
+  const months = new Set(monthsOfRange(range));
+  // 검색 결과는 일·기간에서 비교를 하지 않으므로 전달을 바꾸지 않는다
+  if (opts.quotes === false) {
+    return { ...data, spend: [...data.spend.filter((r) => !months.has(r.month)), ...spendInRange(data.spendDaily, range, month)] };
+  }
+
+  const prevMonth = prevM(month);
+  const before = previousRange(range);
+  months.add(prevMonth);
+  const both = <T extends QuoteRawRow>(rows: T[]): T[] => [...shiftToMonth(rows, range, month), ...shiftToMonth(rows, before, prevMonth)];
   return {
-    ...out,
-    quotes: [...data.quotes.filter((r) => !months.has(r.month)), ...agg.values()],
-    quotesRaw: raw,
-    quotesSites: shiftToMonth(data.quotesSites, range, month),
-    quotesPhone: shiftToMonth(data.quotesPhone, range, month),
-    quotesExtra: shiftToMonth(data.quotesExtra, range, month),
+    ...data,
+    spend: [
+      ...data.spend.filter((r) => !months.has(r.month)),
+      ...spendInRange(data.spendDaily, range, month),
+      ...(rangeCovered(data, before) ? spendInRange(data.spendDaily, before, prevMonth) : []),
+    ],
+    quotes: [
+      ...data.quotes.filter((r) => !months.has(r.month)),
+      ...quoteRowsOf(shiftToMonth(data.quotesRaw, range, month), month),
+      ...quoteRowsOf(shiftToMonth(data.quotesRaw, before, prevMonth), prevMonth),
+    ],
+    quotesRaw: both(data.quotesRaw),
+    quotesSites: both(data.quotesSites),
+    quotesPhone: both(data.quotesPhone),
+    quotesExtra: both(data.quotesExtra),
+  };
+}
+
+/** 진행 중인 달의 비교 기준 */
+export interface SameDateCompare {
+  /** 비교 문구 */
+  cmpLabel: string;
+  /** 비교한 전달 구간의 일수 — 일평균 계산용 */
+  days: number;
+}
+
+/**
+ * 진행 중인 달 보기 — 전달 자리만 "1일~같은 날짜" 값으로 바꿔, 며칠 치 이번 달과 다 끝난 전달을 비교하지 않게 한다.
+ * 광고비는 일별 자료가 수집된 마지막 날까지, 견적은 오늘까지 맞춘다. 전달이 짧으면 그 달 말일까지만 본다.
+ * 일별 자료가 없는 매체(Meta·GFA 등)는 전달 금액을 같은 일수 비율로 줄인 추정값으로 비교한다.
+ * 전달 일별 자료가 갖춰지지 않았으면 null — 월 전체와 비교하고 문구도 '전월' 로 둔다.
+ */
+export function withSameDatePrev(data: DashboardData, today: string): { data: DashboardData; compare: SameDateCompare } | null {
+  const month = today.slice(0, 7);
+  const prevMonth = prevM(month);
+  const rangeUntil = (day: string): DayRange => {
+    const to = `${prevMonth}-${day.slice(8, 10)}`;
+    const last = lastDayOf(prevMonth);
+    return { from: `${prevMonth}-01`, to: to < last ? to : last };
+  };
+  const lastCollected = DAILY_MEDIA.map((m) =>
+    data.spendDaily.reduce((max, r) => (r.media === m && r.date.startsWith(month) && r.date > max ? r.date : max), '')
+  ).filter(Boolean);
+  const spendRange = rangeUntil(lastCollected.length ? lastCollected.sort()[0] : today);
+  if (!rangeCovered(data, spendRange)) return null;
+
+  const quoteRange = rangeUntil(today);
+  const keep = <T extends QuoteRawRow>(rows: T[]): T[] => rows.filter((r) => !r.date?.startsWith(prevMonth) || inDayRange(r.date, quoteRange));
+  const quotesRaw = keep(data.quotesRaw);
+  const days = rangeDays(spendRange);
+  const share = days / daysOfMonth(prevMonth);
+  const estimated = data.spend
+    .filter((r) => r.month === prevMonth && !DAILY_MEDIA.includes(r.media))
+    .map((r) => ({ ...r, cost: Math.round(r.cost * share), imp: Math.round(r.imp * share), clk: Math.round(r.clk * share), conv: r.conv * share }));
+
+  return {
+    data: {
+      ...data,
+      spend: [...data.spend.filter((r) => r.month !== prevMonth), ...spendInRange(data.spendDaily, spendRange, prevMonth), ...estimated],
+      quotes: [...data.quotes.filter((r) => r.month !== prevMonth), ...quoteRowsOf(quotesRaw.filter((r) => r.date?.startsWith(prevMonth)), prevMonth)],
+      quotesRaw,
+      quotesSites: keep(data.quotesSites),
+      quotesPhone: keep(data.quotesPhone),
+      quotesExtra: keep(data.quotesExtra),
+    },
+    compare: { cmpLabel: '전월 동기간', days },
   };
 }

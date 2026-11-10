@@ -4,6 +4,8 @@ export interface SegmentOption<T extends string | number> {
   value: T;
   label: React.ReactNode;
   title?: string;
+  /** 누를 수 없게 비활성화한다 (준비 중인 항목 등) */
+  disabled?: boolean;
 }
 
 interface SegmentedControlProps<T extends string | number> {
@@ -39,6 +41,7 @@ export function SegmentedControl<T extends string | number>({
           data-btn={`seg-${String(opt.value).toLowerCase()}`}
           className={`seg-btn seg-btn-${String(opt.value).toLowerCase()}${value === opt.value ? ' on' : ''}`}
           title={opt.title}
+          disabled={opt.disabled}
           onClick={() => onChange(opt.value)}
         >
           {opt.label}

@@ -38,6 +38,13 @@
   --grp-google-ink: #b42318;
   --grp-google-hov: #fbe8e6;
   --th: 4rem;
+  // 표 열 너비 — 같은 종류의 칸은 어느 표에서든 같은 너비 (머리글+정렬 아이콘과 전체 기간 최댓값이 들어가는 폭)
+  --col-date: 6.5rem; // 날짜 (2026-11-04 · 26.11.04)
+  --col-count: 7rem; // 건수·수량·노출·클릭·전환 ("총 접수 견적" 머리글)
+  --col-rate: 6.5rem; // 비율 (CTR·클릭률·견적전환율)
+  --col-unit-price: 7rem; // 단가 (평균 CPC·CPA — 머리글 "평균 CPC" + 정렬 아이콘)
+  --col-amount: 8rem; // 금액 (광고비·판매 금액, 9자리 + "원")
+  --col-source: 14rem; // 유입 경로
   color-scheme: light;
 }
 

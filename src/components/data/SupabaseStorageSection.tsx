@@ -5,6 +5,7 @@ import { saveDashboardSnapshot, testSupabaseConnection } from '../../lib/supabas
 import { Button } from '../common/Button';
 import { Notice } from '../common/Notice';
 import { Card } from '../common/Card';
+import { Muted } from '../common/Muted';
 
 interface SupabaseStorageSectionProps {
   data: DashboardData;
@@ -107,7 +108,7 @@ create policy "Allow public update dashboard_snapshots"
       {showSql && (
         <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg)', border: '1px solid var(--line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <small className="muted">Supabase 대시보드 › SQL Editor에 붙여넣고 실행하세요:</small>
+            <Muted small>Supabase 대시보드 › SQL Editor에 붙여넣고 실행하세요:</Muted>
             <Button size="xs" onClick={handleCopySql}>
               {copied ? '복사됨!' : 'SQL 복사'}
             </Button>

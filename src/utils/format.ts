@@ -12,6 +12,9 @@ import { categoryFromAdNames } from './categoryText';
 
 export const fmt = (n: number): string => Math.round(n).toLocaleString('ko-KR');
 
+/** CTR = 클릭 ÷ 노출 × 100, 소수 둘째 자리까지 (노출 0 이면 –) — 표·카드 모두 이 표기를 쓴다 */
+export const ctrText = (clk: number, imp: number): string => (imp > 0 ? `${((clk / imp) * 100).toFixed(2)}%` : '–');
+
 /** 만원 단위 약식 표기 (1만 미만은 원 단위) */
 export const fmtWon = (n: number): string =>
   n >= 10000 ? `${fmt(Math.round(n / 10000))}만원` : `${fmt(n)}원`;

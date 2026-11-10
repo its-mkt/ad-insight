@@ -287,30 +287,26 @@ p.small {
 #tbKw {
   table-layout: fixed;
   width: 100%;
-  min-width: 48rem;
+  min-width: 62rem;
 
-  .col-kw-name {
-    width: 38%;
-  }
-  .col-kw-imp {
-    width: 13%;
-  }
-  .col-kw-clk {
-    width: 10%;
+  // 이름 칸은 남는 폭을 모두 쓴다. 숫자 칸은 공통 열 너비(_variables --col-*)
+  .col-kw-imp,
+  .col-kw-clk,
+  .col-kw-conv {
+    width: var(--col-count);
   }
   .col-kw-ctr {
-    width: 10%;
+    width: var(--col-rate);
   }
-  .col-kw-conv {
-    width: 12%;
+  .col-kw-cpc {
+    width: var(--col-unit-price);
   }
   .col-kw-cost {
-    width: 17%;
+    width: var(--col-amount);
   }
 }
 
-#tbQuotesCat,
-#tbQuotesSrcMonth,
+.quotes-group-table,
 #tbSpendDetail {
   table-layout: fixed;
   width: 100%;
@@ -393,53 +389,78 @@ tr.kw-cat-child {
   color: var(--sub);
 }
 
-#tbCatConv {
+// 구매 상세 표 — 기간을 바꿔도 내용 길이에 따라 열 너비가 달라지지 않게 고정한다
+#tbPurchasesGoods {
   table-layout: fixed;
   width: 100%;
-  min-width: 32rem;
+  min-width: 62rem;
 
-  .col-cat-name {
-    width: 28%;
+  .col-pg-num {
+    width: var(--col-count);
   }
-  .col-cat-cost {
-    width: 24%;
+  .col-pg-amount {
+    width: var(--col-amount);
   }
-  .col-cat-clk {
-    width: 16%;
+  .col-pg-inflow {
+    width: var(--col-source);
   }
-  .col-cat-conv {
-    width: 12%;
+  .pg-inflow {
+    white-space: normal;
   }
-  .col-cat-cpa {
-    width: 20%;
+  // 펼친 주문 줄 첫 칸 — 날짜 · 상태 뱃지 · 결제 수단·회원 (좁은 화면에서는 다음 줄로)
+  .pg-order {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  // 날짜 칸 — 자릿수를 맞춰 줄마다 같은 폭으로
+  .col-pg-date {
+    width: var(--col-date);
+  }
+  .pg-date {
+    font-variant-numeric: tabular-nums;
+  }
+  tbody td:first-child {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+#purchases-table table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 56rem;
+
+  th:first-child {
+    width: 7rem;
+  }
+  th:last-child {
+    width: 8rem;
   }
 }
 
 #tbCatEfficiency {
   table-layout: fixed;
   width: 100%;
-  min-width: 48rem;
+  min-width: 55rem;
 
-  .col-eff-name {
-    width: 21%;
-  }
+  // 카테고리 칸은 남는 폭을 모두 쓴다. 숫자 칸은 공통 열 너비(_variables --col-*)
   .col-eff-cost {
-    width: 16%;
+    width: var(--col-amount);
   }
-  .col-eff-clk {
-    width: 10%;
-  }
-  .col-eff-conv {
-    width: 10%;
-  }
+  .col-eff-clk,
+  .col-eff-conv,
   .col-eff-quotes {
-    width: 13%;
+    width: var(--col-count);
   }
   .col-eff-rate {
-    width: 10%;
+    width: var(--col-rate);
   }
   .col-eff-cpa {
-    width: 20%;
+    width: var(--col-unit-price);
   }
 }
 
@@ -517,6 +538,11 @@ tr.grp-accordion {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+// 강조색 없는 펼침 줄(GroupAccordionRow plain) — 이름만 굵게
+tr.grp-accordion:not(.grp) .grp-acc-title {
+  font-weight: 600;
 }
 
 .grp-acc-cnt {
@@ -646,17 +672,20 @@ tr.kw-more-row td {
   }
 
   .col-cr-imp,
-  .col-cr-cost {
-    width: 7rem;
+  .col-cr-clk {
+    width: var(--col-count);
   }
 
-  .col-cr-clk,
   .col-cr-ctr {
-    width: 5rem;
+    width: var(--col-rate);
   }
 
   .col-cr-cpc {
-    width: 6.5rem;
+    width: var(--col-unit-price);
+  }
+
+  .col-cr-cost {
+    width: var(--col-amount);
   }
 
   td {
@@ -1369,7 +1398,6 @@ tr.kw-more-row td {
   }
 }
 
-
 /* ── 반응형 미디어 쿼리 ── */
 @media (max-width: 1280px) {
   .kpis {
@@ -2003,12 +2031,20 @@ tr.kw-more-row td {
   width: 100%;
   min-width: 52rem;
 
-  .col-skw-val {
-    width: 6rem;
+  .col-skw-count {
+    width: var(--col-count);
+  }
+
+  .col-skw-rate {
+    width: var(--col-rate);
+  }
+
+  .col-skw-unit {
+    width: var(--col-unit-price);
   }
 
   .col-skw-cost {
-    width: 8rem; // 광고비: 최대 7자리 + "원"
+    width: var(--col-amount);
   }
 
   .search-sub-line {
@@ -2321,4 +2357,79 @@ tr.kw-more-row td {
   background: transparent;
   color: var(--sub);
   cursor: pointer;
+}
+
+// 견적 상세 — 읽기 전용 접수 목록
+.card-quote-list {
+  .ql-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  // 공용 .pagination 은 inline-flex 라 왼쪽에 붙으므로, 한 줄을 다 쓰게 해 가운데로 모은다
+  .pagination {
+    display: flex;
+    margin-top: 0.75rem;
+  }
+
+  // 열 너비는 어드민 견적 접수 원본 리스트(.qr-table)와 같게 둔다 — 최소 폭은 열 너비의 합
+  #tbQuoteList {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 50rem;
+
+    &.with-subject {
+      min-width: 86.5rem;
+    }
+  }
+
+  .ql-col-origin {
+    width: 5rem;
+  }
+
+  .ql-col-sno {
+    width: 4rem;
+  }
+
+  .ql-col-date {
+    width: 7rem;
+  }
+
+  // 로그인 때만 보이는 원본 열
+  .ql-col-subject {
+    width: 14rem;
+  }
+
+  .ql-col-company {
+    width: 6rem;
+  }
+
+  .ql-col-name {
+    width: 6.5rem;
+  }
+
+  .ql-col-email {
+    width: 10rem;
+  }
+
+  .ql-col-rep {
+    width: 6rem;
+  }
+
+  .ql-col-cat {
+    width: 18rem;
+  }
+
+  .ql-col-source {
+    width: 10rem;
+  }
+
+  .ql-nowrap,
+  .ql-subject {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }

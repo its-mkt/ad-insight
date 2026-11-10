@@ -206,7 +206,8 @@
 /* ── 유입 매체 도넛 차트 ──
  * 범례(.leg)는 빼야 다른 차트처럼 가로 한 줄이 된다 (id 선택자가 .leg 의 가로 배치를 이긴다) */
 #overview-src > div:not(.leg),
-#quotes-src > div:not(.leg) {
+#quotes-src > div:not(.leg),
+#quotes-origin > div:not(.leg) {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -221,7 +222,6 @@
   font-weight: 600;
   color: var(--sub);
 
-  .src-bar-rank,
   .src-bar-val .count,
   .src-bar-val .pct,
   .src-bar-val .amt,
@@ -310,25 +310,6 @@
   align-items: center;
   gap: 0.75rem;
   font-size: 0.75rem;
-
-  .src-bar-rank {
-    width: 1.25rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--sub);
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  &:nth-child(2) .src-bar-rank {
-    color: var(--acc);
-  }
-  &:nth-child(3) .src-bar-rank {
-    color: var(--ink);
-  }
-  &:nth-child(4) .src-bar-rank {
-    color: var(--ink2);
-  }
 
   /* 유입 매체 이름: 카테고리명(.cat-name)과 같은 모양의 플레인 텍스트 + 매체 색 점 */
   .src-name {
@@ -571,21 +552,6 @@
   }
 }
 
-// 월별 견적 순위 막대 (MonthlyQuotesTable)
-.quote-rank-list {
-  margin-top: 0.75rem;
-
-  // 색이 항목을 구분하므로 흐리게 하지 않는다
-  .cpa-bar {
-    opacity: 1;
-  }
-}
-
-.leg-note.quote-src-note {
-  display: block;
-  margin: -0.5rem 0 0.75rem;
-}
-
 .cpa-track {
   background: var(--bg);
   height: 1.25rem;
@@ -638,16 +604,6 @@
   flex-shrink: 0;
 }
 
-/* ── 견적 차트 모드 전용 그리드 ── */
-
-.quote-chart-view .cpa-row {
-  grid-template-columns: 9rem 1fr 9rem;
-
-  .cpa-val {
-    width: 3.25rem;
-  }
-}
-
 /* 1024px 초과 1200px 이하: 2열 그리드에서 카드가 좁아져 1fr 막대가 사라지는 구간 — 이름 열을 줄여 막대 공간을 확보 */
 @media (min-width: 1025px) and (max-width: 1200px) {
   .cpa-row {
@@ -670,13 +626,30 @@
     width: 4.25rem;
     font-size: 0.625rem;
   }
+}
 
-  .quote-chart-view .cpa-row {
-    grid-template-columns: 6.5rem 1fr 7.5rem;
 
-    .cpa-val {
-      width: 2.75rem;
-    }
+/* 좁은 카드(견적 상세): 막대가 눌리지 않게 이름·값은 윗줄, 막대는 아랫줄 전체 폭으로 둔다 */
+#quotes-src .src-bar-row,
+#quotes-origin .src-bar-row,
+.card-quotes-monthly .src-bar-row {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+
+  .src-name {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  .src-bar-bars {
+    order: 3;
+    flex: 0 0 100%;
   }
 }
 
+#quotes-src .src-bar-head .src-bar-bars,
+#quotes-origin .src-bar-head .src-bar-bars,
+.card-quotes-monthly .src-bar-head .src-bar-bars {
+  display: none;
+}

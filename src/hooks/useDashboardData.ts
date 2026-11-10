@@ -20,6 +20,8 @@ import type {
   SyncStatus,
 } from '../types/dashboard';
 import { buildCategoryMap, LEGACY_ONLY_CATS, quoteKey, THIS_M } from '../utils/format';
+import { SITE_DEFAULT_CATEGORY } from '../utils/constants';
+import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
@@ -58,6 +60,9 @@ function emptyData(): DashboardData {
     sources: { google: '', naver: '' },
     spend: [],
     spendDaily: [],
+    dailyRecentFrom: {},
+    dailyHistMonths: {},
+    dailyLoadedMonths: [],
     manual: [],
     mapping: [],
     quotes: [],
@@ -114,12 +119,22 @@ function withCurrentQuoteCategories(data: DashboardData, manual: Map<string, str
  * rows 는 접수일 오름차순이어야 한다.
  */
 function withLatestRepTitles<T extends { salesRep?: string }>(rows: T[]): T[] {
-  const nameOf = (rep: string) => rep.split(' ')[0];
+  return applyRepTitles(rows, latestRepTitles(rows));
+}
+
+const repNameOf = (rep: string) => rep.split(' ')[0];
+
+/** 이름 → 사람마다 쓸 표기. rows 는 접수일 오름차순이어야 한다 */
+function latestRepTitles(rows: { salesRep?: string }[]): Map<string, string> {
   const latest = new Map<string, string>();
   rows.forEach(({ salesRep: rep }) => {
-    if (rep && (rep.includes(' ') || !latest.has(nameOf(rep)))) latest.set(nameOf(rep), rep);
+    if (rep && (rep.includes(' ') || !latest.has(repNameOf(rep)))) latest.set(repNameOf(rep), rep);
   });
-  return rows.map((r) => (r.salesRep ? { ...r, salesRep: latest.get(nameOf(r.salesRep)) } : r));
+  return latest;
+}
+
+function applyRepTitles<T extends { salesRep?: string }>(rows: T[], latest: Map<string, string>): T[] {
+  return rows.map((r) => (r.salesRep ? { ...r, salesRep: latest.get(repNameOf(r.salesRep)) ?? r.salesRep } : r));
 }
 
 /**
@@ -143,6 +158,15 @@ export function quoteStatsOf(data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 
     quotes: [...agg.values()],
     quotesRaw: withLatestRepTitles([...data.quotesRaw, ...extra].sort((a, b) => a.date.localeCompare(b.date))),
   };
+}
+
+/** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
+export async function fetchDailyHist(months: string[]): Promise<SpendDailyRow[]> {
+  const c = getCfg();
+  const res = await fetch(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`);
+  const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
+  if (j.error) throw new Error(j.error);
+  return fromApi({ g_adgroup_daily: j.g_adgroup_daily_hist, n_adgroup_daily: j.n_adgroup_daily_hist } as RawApiPayload).spendDaily;
 }
 
 export function fromApi(j: RawApiPayload): DashboardData {
@@ -181,6 +205,11 @@ export function fromApi(j: RawApiPayload): DashboardData {
     ...(j.g_adgroup_daily || []).map((r) => toDailyRow('Google', r)),
     ...(j.n_adgroup_daily || []).map((r) => toDailyRow('Naver', r)),
   ].filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+
+  const dailyRecentFrom: Record<string, string> = {};
+  spendDaily.forEach((r) => {
+    if (!dailyRecentFrom[r.media] || r.date < dailyRecentFrom[r.media]) dailyRecentFrom[r.media] = r.date;
+  });
 
   const manual: ManualRow[] = (j.manual || [])
     .map((r) => ({
@@ -310,9 +339,12 @@ export function fromApi(j: RawApiPayload): DashboardData {
 
   const data: DashboardData = {
     updated: fmtUpdatedTimestamp(rawUpdated),
-    sources: { google: upd(j.g_meta), naver: upd(j.n_meta), quote: upd(j.q_meta) },
+    sources: { google: upd(j.g_meta), naver: upd(j.n_meta), quote: upd(j.q_meta), godo: upd(j.godo_meta) },
     spend,
     spendDaily,
+    dailyRecentFrom,
+    dailyHistMonths: j.daily_hist_months || {},
+    dailyLoadedMonths: [],
     manual,
     mapping: j.mapping || [],
     quotes: (j.quotes_monthly || []).map((r) => {
@@ -324,10 +356,10 @@ export function fromApi(j: RawApiPayload): DashboardData {
         count: n(r.count),
       };
     }),
-    quotesRaw: withLatestRepTitles((j.quotes_raw || [])
+    quotesRaw: (j.quotes_raw || [])
       .map((r, idx) => toQuoteRawRow(r, r.id ? String(r.id) : ('q_' + (idx + 1))))
       .filter((r) => r.date)
-      .sort((a, b) => a.date.localeCompare(b.date))),
+      .sort((a, b) => a.date.localeCompare(b.date)),
     quotesSites: (j.quotes_raw_sites || [])
       .map((r, idx) => ({ ...toQuoteRawRow(r, 'qs_' + (idx + 1)), site: String(r.site || '').trim() }))
       .filter((r) => r.date && r.site)
@@ -361,6 +393,14 @@ export function fromApi(j: RawApiPayload): DashboardData {
       ...(j.n_ad_stats || []).map((r) => toAdStatRow('Naver', r)),
     ],
   };
+  // 수집 시각 기록이 있으면 그날을 기준일로 쓴다 (없던 때는 응답 시각)
+  applyGodoOrders(j.godo_orders_monthly || [], upd(j.godo_meta) || j.served);
+  applyGodoGoods(j.godo_goods_monthly || []);
+  applyGodoOrderInflow(j.godo_order_inflow_monthly || []);
+  applyGodoDaily(j.godo_orders_daily || []);
+  applyGodoGoodsInflow(j.godo_goods_inflow_monthly || []);
+  applyGodoOrderLines(j.godo_order_lines || []);
+  applyGodoOrderCustomers(j.godo_order_customers || []);
   const marks = new Map<string, QuoteManualMark>();
   (j.manual_categories || []).forEach((r) => {
     const sno = String(r.sno ?? '').trim();
@@ -374,13 +414,20 @@ export function fromApi(j: RawApiPayload): DashboardData {
   // 수동 지정 흔적: 저장 기록과, 비교용 자동 분류 결과 (제목이 있을 때만)
   const withTrace = (r: QuoteRawRow): QuoteRawRow => {
     const mark = marks.get(quoteKey(r));
-    const autoCategory = r.subject ? quoteCategoryOf(r.subject, r.sourceDetail) : undefined;
-    return mark || autoCategory ? { ...r, autoCategory, manual: mark } : r;
+    const siteCategory = r.site ? SITE_DEFAULT_CATEGORY[r.site] : undefined;
+    const autoCategory = siteCategory || (r.subject ? quoteCategoryOf(r.subject, r.sourceDetail) : undefined);
+    return mark || autoCategory ? { ...r, category: siteCategory && !mark ? siteCategory : r.category, autoCategory, manual: mark } : r;
   };
+  // 영업담당 표기는 아이티켓·다른 사이트·전화문의를 함께 보고 맞춘다 (한쪽에만 직급이 적혀 있어도 같은 표기가 되도록)
+  const repTitles = latestRepTitles(
+    [...out.quotesRaw, ...out.quotesSites, ...out.quotesPhone, ...out.quotesExtra].sort((a, b) => a.date.localeCompare(b.date))
+  );
   return {
     ...out,
-    quotesRaw: out.quotesRaw.map(withTrace),
-    quotesSites: out.quotesSites.map(withTrace),
+    quotesRaw: applyRepTitles(out.quotesRaw.map(withTrace), repTitles),
+    quotesSites: applyRepTitles(out.quotesSites.map(withTrace), repTitles),
+    quotesPhone: applyRepTitles(out.quotesPhone, repTitles),
+    quotesExtra: applyRepTitles(out.quotesExtra, repTitles),
   };
 }
 
@@ -414,7 +461,7 @@ function toQuotePhoneRow(r: RawQuotePhoneApiRow, id: string): QuoteRawRow {
     category: text(r.category),
     source: text(r.source),
     sourceDetail: '',
-    salesRep: text(r.sales_rep),
+    salesRep: text(r.sales_rep).replace(/\s+/g, ' '),
     receiver: text(r.receiver),
   };
 }
@@ -452,7 +499,7 @@ export function useDashboardData() {
 
   const tryLoadStaticFallback = useCallback(async () => {
     try {
-      const localRes = await fetch('data/latest.json');
+      const localRes = await fetch(`${import.meta.env.BASE_URL}data/latest.json`);
       if (!localRes.ok) return;
       const localJ = (await localRes.json()) as RawApiPayload;
       if (liveLoaded.current) return;

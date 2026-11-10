@@ -2,6 +2,7 @@ import React from 'react';
 import type { SourceShareItem } from '../../types/dashboard';
 
 import { sourceTone } from '../../utils/format';
+import { BarDelta } from '../common/BarDelta';
 import { EmptyState } from '../common/EmptyState';
 
 interface SourceBarChartProps {
@@ -14,6 +15,14 @@ interface SourceBarChartProps {
   curLabel?: string;
   /** 주면 매체 이름이 버튼이 되어, 누르면 그 매체 이름을 넘긴다 (검색 결과로 이동 등) */
   onSelect?: (source: string) => void;
+  /** 이름 열의 머리글 */
+  nameLabel?: string;
+  /** 매체 이름으로 정한 색 대신 항목의 색(c)을 쓴다 — 유입 매체가 아닌 목록용 */
+  itemColors?: boolean;
+  /** 주면 이 순위까지만 색을 쓰고 나머지는 회색으로 둔다 */
+  colorTop?: number;
+  /** 건수 열의 머리글 */
+  countLabel?: string;
 }
 
 // 유입 매체 비중: 순위형 가로 막대 (매체가 많아 도넛·누적 막대보다 순위·값이 잘 읽힌다)
@@ -24,6 +33,10 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
   compareLabel,
   curLabel,
   onSelect,
+  nameLabel = '매체',
+  itemColors = false,
+  colorTop,
+  countLabel = '건수',
 }) => {
   if (!items.length) {
     return (
@@ -48,11 +61,10 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
     <div id={id} className={`src-bars-wrap${compareLabel ? ' cmp' : ''}`}>
       {/* 열 머리글: 아래 행과 같은 구조(.src-bar-row)를 써서 칸 폭이 어긋나지 않게 한다 */}
       <div className="src-bar-row src-bar-head" aria-hidden="true">
-        <span className="src-bar-rank">#</span>
-        <span className="src-name">매체</span>
+        <span className="src-name">{nameLabel}</span>
         <div className="src-bar-bars">점유율</div>
         <div className="src-bar-val">
-          {!compareLabel && <span className="count">건수</span>}
+          {!compareLabel && <span className="count">{countLabel}</span>}
           {!compareLabel && <span className="pct">점유율</span>}
           {compareLabel && <span className="delta">증감</span>}
         </div>
@@ -64,10 +76,9 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
           s.count != null ? `${s.count.toLocaleString('ko-KR')}건 (${fmtPct(s.v)})` : fmtPct(s.v)
         }`;
         const prevTip = `${s.k} · ${compareLabel}|${(s.prevCount ?? 0).toLocaleString('ko-KR')}건 (${fmtPct(s.prevV ?? 0)})`;
-        const tone = sourceTone(s.k);
+        const tone = colorTop !== undefined && idx >= colorTop ? { bar: 'var(--c-rest)' } : itemColors ? { bar: `var(${s.c})` } : sourceTone(s.k);
         return (
         <div key={s.k} className={`src-bar-row${compareLabel ? ' has-prev' : ''}`}>
-          <span className="src-bar-rank">{idx + 1}</span>
           {/* 카테고리 표처럼 플레인 텍스트 이름. 매체 구분 색은 앞의 작은 점으로 남긴다 */}
           {onSelect ? (
             <button
@@ -132,9 +143,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
             )}
             {!compareLabel && <span className="pct">{fmtPct(s.v)}</span>}
             {compareLabel && (
-              <span className={`delta${d == null || d === 0 ? '' : d > 0 ? ' up' : ' down'}`}>
-                {d == null || d === 0 ? '–' : `${d > 0 ? '▲' : '▼'}${Math.abs(d)}%`}
-              </span>
+              <BarDelta d={d} />
             )}
           </div>
         </div>

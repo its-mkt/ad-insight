@@ -6,6 +6,7 @@ import { SegmentedControl } from '../components/common/SegmentedControl';
 import { getCfg } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { quoteKey } from '../utils/format';
+import type { DayRange } from '../utils/dayRange';
 
 const CHANNEL_OPTIONS: { value: QuoteChannel; label: string }[] = [
   { value: 'live', label: '견적문의' },
@@ -22,13 +23,21 @@ interface AdminViewProps {
   data: DashboardData;
   /** 실데이터를 받는 중 (화면은 저장해 둔 이전 데이터로 먼저 그린다) */
   isSyncing?: boolean;
+  /** 상단 기간 바에서 고른 달 (YYYY-MM) */
+  selectedMonth: string;
+  /** 상단 기간 바의 전체 기간 */
+  allPeriod?: boolean;
+  /** 상단 기간 바의 연도 합계 */
+  yearTotal?: boolean;
+  /** 상단 기간 바의 일·기간 선택 */
+  dayRange?: DayRange | null;
   onUpdateQuotesRaw?: (newQuotes: QuoteRawRow[]) => void;
   onUpdateQuotesSites?: (newQuotes: QuoteRawRow[]) => void;
   /** 저장 후 서버에서 다시 계산한 데이터를 받아 온다 */
   onReload?: () => void;
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, onUpdateQuotesRaw, onUpdateQuotesSites, onReload }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, selectedMonth, allPeriod, yearTotal, dayRange, onUpdateQuotesRaw, onUpdateQuotesSites, onReload }) => {
   const [localQuotes, setLocalQuotes] = useState<QuoteRawRow[]>(() =>
     toAdminRows(data.quotesRaw || [], data.quotesSites || [])
   );
@@ -193,6 +202,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, o
         <QuotesRawAdminTable
           quotes={localQuotes}
           channel={channel}
+          selectedMonth={selectedMonth}
+          allPeriod={allPeriod}
+          yearTotal={yearTotal}
+          dayRange={dayRange}
           phoneQuotes={data.quotesPhone || []}
           originals={originals}
           loading={isSyncing}
