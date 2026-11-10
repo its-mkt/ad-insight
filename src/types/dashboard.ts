@@ -1,4 +1,4 @@
-export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'search' | 'data' | 'admin';
+export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'search' | 'data' | 'admin';
 
 export type ChartType = 'line' | 'grouped' | 'donut';
 
@@ -174,6 +174,8 @@ export interface DashboardData {
     google: string;
     naver: string;
     quote?: string;
+    /** 고도몰 주문 마지막 수집 시각 (godo_meta) */
+    godo?: string;
   };
   spend: SpendRow[];
   /** 일별 광고비 (최근 수집 구간만) — 없으면 일·기간 선택은 월 단위로 보여 준다 */
@@ -358,6 +360,7 @@ export interface RawApiPayload {
   g_meta?: RawMetaApiRow[];
   n_meta?: RawMetaApiRow[];
   q_meta?: RawMetaApiRow[];
+  godo_meta?: RawMetaApiRow[];
   g_adgroup_monthly?: RawSpendApiRow[];
   g_campaign_monthly?: RawSpendApiRow[];
   n_adgroup_monthly?: RawSpendApiRow[];
@@ -371,6 +374,10 @@ export interface RawApiPayload {
   quotes_raw_sites?: RawQuoteRawApiRow[];
   quotes_phone?: RawQuotePhoneApiRow[];
   quotes_stats_extra?: RawQuoteStatsExtraApiRow[];
+  godo_orders_monthly?: { month?: unknown; count?: unknown }[];
+  godo_goods_monthly?: { month?: unknown; goods_no?: unknown; goods_name?: unknown; orders?: unknown; qty?: unknown; amount?: unknown }[];
+  godo_order_inflow_monthly?: { month?: unknown; source?: unknown; count?: unknown }[];
+  godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
   manual_categories?: RawManualCategoryApiRow[];
   g_keywords?: RawKeywordApiRow[];
   n_keywords?: RawKeywordApiRow[];
