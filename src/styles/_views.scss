@@ -423,6 +423,10 @@ tr.kw-cat-child {
   .pg-date {
     font-variant-numeric: tabular-nums;
   }
+  // 관리자에게만 보이는 주문자 메일 도메인
+  .pg-order-customer {
+    opacity: 0.8;
+  }
   tbody td:first-child {
     overflow-wrap: anywhere;
     white-space: normal;

@@ -94,7 +94,7 @@ const isExceptionStatus = (code: string): boolean => /^[crbef]/.test(code);
 
 /**
  * 펼친 주문 한 줄의 첫 칸 — (취소·환불 등일 때만) 상태 뱃지 · 결제 수단(결제일이 다르면 함께)·회원 여부. 주문일은 날짜 칸에 둔다.
- * 관리자에게는 회원 등급을 더 보여 준다 (회원 등급이 있으면 '회원' 대신 등급 이름)
+ * 관리자에게는 회원 등급과 주문자 메일 도메인을 더 보여 준다 (회원 등급이 있으면 '회원' 대신 등급 이름)
  */
 const OrderSummary: React.FC<{ line: GodoOrderLine; withYear: boolean }> = ({ line, withYear }) => {
   const customer = GODOMALL_ORDER_CUSTOMERS.get(line.key);
@@ -111,6 +111,11 @@ const OrderSummary: React.FC<{ line: GodoOrderLine; withYear: boolean }> = ({ li
         {settleLabel(line.settle)}
         {paidOther && ` (${paidAt} 결제)`} · {customer?.memberGroup || line.member}
       </Muted>
+      {customer?.emailDomain && (
+        <Muted small className="pg-order-customer">
+          @{customer.emailDomain}
+        </Muted>
+      )}
     </span>
   );
 };
@@ -210,7 +215,7 @@ export const PurchasedGoodsTable: React.FC<PurchasedGoodsTableProps> = ({ months
             </tbody>
           </table>
           <ShowMoreButton noun="제품" total={rows.length} expanded={showAll} onToggle={() => setShowAll((v) => !v)} dataBtn="purchases-goods-more" />
-          <TableFootnote basis="결제완료일 기준이며 판매 건수와 같이 이후 취소·환불된 주문도 포함합니다 · 금액은 할인 반영, 배송비 제외 · 한 주문에 제품이 여러 개면 제품마다 1건으로 세므로 건수 합계는 실제 판매 건수보다 클 수 있습니다 · 개별 결제 상품은 고객별 결제 건을 묶은 값입니다 · 유입 경로는 주문 완료 화면이 주문번호와 함께 남긴 실제 기록만 표시하며, 기록을 시작한 2026.11.09 이전 주문과 기록이 남지 않은 주문은 미수집입니다 ·제품을 누르면 주문별로 펼쳐지며, 회원 등급은 관리자 로그인 때만 보입니다" />
+          <TableFootnote basis="결제완료일 기준이며 판매 건수와 같이 이후 취소·환불된 주문도 포함합니다 · 금액은 할인 반영, 배송비 제외 · 한 주문에 제품이 여러 개면 제품마다 1건으로 세므로 건수 합계는 실제 판매 건수보다 클 수 있습니다 · 개별 결제 상품은 고객별 결제 건을 묶은 값입니다 · 유입 경로는 주문 완료 화면이 주문번호와 함께 남긴 실제 기록만 표시하며, 기록을 시작한 2026.11.09 이전 주문과 기록이 남지 않은 주문은 미수집입니다 ·제품을 누르면 주문별로 펼쳐지며, 회원 등급과 주문자 메일 도메인은 관리자 로그인 때만 보입니다" />
         </>
       ) : (
         <EmptyState message="이 기간의 구매 제품 데이터가 없습니다." />
