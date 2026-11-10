@@ -1,7 +1,7 @@
 import React from 'react';
-import type { SyncStatus, ViewId } from '../../types/dashboard';
+import type { DashboardData, SyncStatus, ViewId } from '../../types/dashboard';
 import { useAuth } from '../../context/AuthContext';
-import { ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, Search, X } from 'lucide-react';
+import { ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, Search, ShoppingCart, X } from 'lucide-react';
 import { Button } from '../common/Button';
 
 interface SidebarProps {
@@ -9,13 +9,15 @@ interface SidebarProps {
   drawerOpen: boolean;
   status: SyncStatus;
   updated: string;
+  /** 매체별 마지막 수집 시각 — 수집 배지에 마우스를 올리면 툴팁으로 보여 준다 */
+  sources?: DashboardData['sources'];
   isSyncing: boolean;
   onNavigate: (view: ViewId) => void;
   onCloseDrawer: () => void;
   onReload: () => void;
 }
 
-// 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세
+// 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세는 맨 아래
 const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
   {
     id: 'overview',
@@ -52,6 +54,13 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
       <Search />
     ),
   },
+  {
+    id: 'purchases',
+    label: '구매 상세',
+    icon: (
+      <ShoppingCart />
+    ),
+  },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   drawerOpen,
   status,
   updated,
+  sources,
   isSyncing,
   onNavigate,
   onCloseDrawer,
@@ -66,6 +76,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { isLoggedIn } = useAuth();
   const live = status === 'live';
+  // 배지 시각은 화면이 데이터를 받아 온 시각이다. 실제로 수집한 시각은 매체마다 다르므로 툴팁에서 나눠 보여 준다
+  const sourceLines = [
+    ['Google 광고비·키워드', sources?.google],
+    ['네이버 광고비·키워드', sources?.naver],
+    ['아이티켓 견적 접수', sources?.quote],
+    // 고도몰 수집 시각은 수집기가 기록하기 시작한 뒤부터 있다
+    ...(sources?.godo ? [['고도몰 주문·제품', sources.godo]] : []),
+  ]
+    .map(([label, at]) => `${label} · ${at || '기록 없음'}`)
+    .join('\n');
+  const restNote = `${sources?.godo ? '' : '고도몰 주문·'}GA4 등 나머지 값은 각 화면 안내 문구의 기준일을 따릅니다`;
+  const updTip = live ? `${updated || '취합본'} 기준 데이터|${sourceLines}\n${restNote}` : undefined;
   return (
     <>
       <div className={`scrim${drawerOpen ? ' on' : ''}`} id="scrim" onClick={onCloseDrawer} />
@@ -141,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
         {/* 마케팅팀 · 배포 날짜 기준 릴리즈 (같은 날 여러 번이면 -2, -3 …) */}
         <div className="sfoot">
-          <span className={`upd${live ? ' live' : ''}`}>
+          <span className={`upd${live ? ' live' : ''}`} data-tip={updTip} data-tip-desc={updTip ? '' : undefined} data-tip-pos="top">
             {live ? (
               <span className="upd-body">
                 <span>{updated || '취합본'} 수집</span>

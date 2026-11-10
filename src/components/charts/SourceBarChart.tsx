@@ -20,6 +20,8 @@ interface SourceBarChartProps {
   itemColors?: boolean;
   /** 주면 이 순위까지만 색을 쓰고 나머지는 회색으로 둔다 */
   colorTop?: number;
+  /** 건수 열의 머리글 */
+  countLabel?: string;
 }
 
 // 유입 매체 비중: 순위형 가로 막대 (매체가 많아 도넛·누적 막대보다 순위·값이 잘 읽힌다)
@@ -33,6 +35,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
   nameLabel = '매체',
   itemColors = false,
   colorTop,
+  countLabel = '건수',
 }) => {
   if (!items.length) {
     return (
@@ -60,7 +63,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
         <span className="src-name">{nameLabel}</span>
         <div className="src-bar-bars">점유율</div>
         <div className="src-bar-val">
-          {!compareLabel && <span className="count">건수</span>}
+          {!compareLabel && <span className="count">{countLabel}</span>}
           {!compareLabel && <span className="pct">점유율</span>}
           {compareLabel && <span className="delta">증감</span>}
         </div>

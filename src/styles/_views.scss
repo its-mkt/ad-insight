@@ -392,6 +392,37 @@ tr.kw-cat-child {
   color: var(--sub);
 }
 
+// 구매 상세 표 — 기간을 바꿔도 내용 길이에 따라 열 너비가 달라지지 않게 고정한다
+#tbPurchasesGoods {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 44rem;
+
+  .col-pg-num {
+    width: 7rem;
+  }
+  .col-pg-amount {
+    width: 10rem;
+  }
+  tbody td:first-child {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+#purchases-table table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 56rem;
+
+  th:first-child {
+    width: 7rem;
+  }
+  th:last-child {
+    width: 8rem;
+  }
+}
+
 #tbCatConv {
   table-layout: fixed;
   width: 100%;

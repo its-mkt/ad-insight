@@ -17,6 +17,7 @@ import { AdsView } from './views/AdsView';
 import { CatEfficiencyView } from './views/CatEfficiencyView';
 import { KeywordsView } from './views/KeywordsView';
 import { QuotesView } from './views/QuotesView';
+import { PurchasesView } from './views/PurchasesView';
 import { SearchView } from './views/SearchView';
 import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
@@ -301,6 +302,7 @@ export const App: React.FC = () => {
           drawerOpen={drawerOpen}
           status={status}
           updated={data.updated}
+          sources={data.sources}
           isSyncing={isSyncing}
           onNavigate={handleNavigate}
           onCloseDrawer={closeDrawer}
@@ -387,7 +389,9 @@ export const App: React.FC = () => {
               yearTotal={isSearchView ? searchPeriod.mode === 'year' : yearTotal}
               dayRange={searchDay}
               dayNote={
-                searchDay && !isSearchView && currentView !== 'admin'
+                searchDay && currentView === 'purchases'
+                  ? `구매 상세는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
+                  : searchDay && !isSearchView && currentView !== 'admin'
                   ? dayCovered
                     ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
                     : dailyLoading
@@ -485,6 +489,7 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
+              {!isLoading && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
               {!isLoading && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}
