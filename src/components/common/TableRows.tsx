@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { AccordionChevron } from './AccordionChevron';
 import { fmt } from '../../utils/format';
 
 interface NumTdProps extends Omit<React.TdHTMLAttributes<HTMLTableCellElement>, 'children'> {
@@ -45,12 +45,16 @@ interface TreeParentRowProps {
   childCount?: number;
   open?: boolean;
   onToggle?: () => void;
+  /** 하위 항목 수 뒤에 붙일 단위 (기본 '개') */
+  countUnit?: string;
+  /** 이름 옆에 하위 항목 수를 보일지 (기본 true) — 같은 수가 다른 칸에 이미 있으면 끈다 */
+  showCount?: boolean;
   /** 나머지 칸 */
   children: React.ReactNode;
 }
 
 /** 1차 항목 줄 — 하위 항목이 있으면 눌러서 펼친다 */
-export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount = 0, open = false, onToggle, children }) => {
+export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount = 0, open = false, onToggle, countUnit = '개', showCount = true, children }) => {
   const expandable = childCount > 0;
   return (
     <tr
@@ -59,9 +63,9 @@ export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount 
       style={expandable ? { cursor: 'pointer' } : undefined}
     >
       <td>
-        {expandable && <ChevronRight className={`kw-cat-chev${open ? ' open' : ''}`} strokeWidth={2.25} aria-hidden="true" />}
+        {expandable && <AccordionChevron variant="tree" open={open} />}
         <b>{label}</b>
-        {expandable && <span className="kw-cat-child-count">{childCount}개</span>}
+        {expandable && showCount && <span className="kw-cat-child-count">{childCount}{countUnit}</span>}
       </td>
       {children}
     </tr>
@@ -130,7 +134,7 @@ export const MonthRow: React.FC<MonthRowProps> = ({ label, columns, value, total
     style={onToggle ? { cursor: 'pointer' } : undefined}
   >
     <td className={child ? 'sub-t kw-cat-child-label' : sub ? 'sub-t' : undefined}>
-      {onToggle && <ChevronRight className={`kw-cat-chev${open ? ' open' : ''}`} strokeWidth={2.25} aria-hidden="true" />}
+      {onToggle && <AccordionChevron variant="tree" open={open} />}
       {label}
     </td>
     {columns.map((mo) => (

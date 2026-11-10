@@ -396,13 +396,46 @@ tr.kw-cat-child {
 #tbPurchasesGoods {
   table-layout: fixed;
   width: 100%;
-  min-width: 44rem;
+  min-width: 56rem;
 
   .col-pg-num {
     width: 7rem;
   }
   .col-pg-amount {
     width: 10rem;
+  }
+  tbody td:first-child {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .col-pg-inflow {
+    width: 14rem;
+  }
+  .pg-inflow {
+    white-space: normal;
+  }
+  // 펼친 주문 줄 첫 칸 — 날짜 · 상태 뱃지 · 결제 수단·회원 · 메일 도메인 (좁은 화면에서는 다음 줄로)
+  .pg-order {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  // 날짜는 자릿수를 맞춰 줄마다 세로로 정렬되게 한다
+  .pg-order-date {
+    min-width: 2.75rem;
+    color: var(--ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+
+    &.with-year {
+      min-width: 4.25rem;
+    }
+  }
+  .pg-order-customer {
+    opacity: 0.8;
   }
   tbody td:first-child {
     overflow-wrap: anywhere;
@@ -547,6 +580,11 @@ tr.grp-accordion {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+// 강조색 없는 펼침 줄(GroupAccordionRow plain) — 이름만 굵게
+tr.grp-accordion:not(.grp) .grp-acc-title {
+  font-weight: 600;
 }
 
 .grp-acc-cnt {

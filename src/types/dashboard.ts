@@ -378,6 +378,10 @@ export interface RawApiPayload {
   godo_goods_monthly?: { month?: unknown; goods_no?: unknown; goods_name?: unknown; orders?: unknown; qty?: unknown; amount?: unknown }[];
   godo_order_inflow_monthly?: { month?: unknown; source?: unknown; count?: unknown }[];
   godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
+  godo_goods_inflow_monthly?: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[];
+  godo_order_lines?: Record<string, unknown>[];
+  /** 관리자 로그인 응답에만 있다 */
+  godo_order_customers?: Record<string, unknown>[];
   manual_categories?: RawManualCategoryApiRow[];
   g_keywords?: RawKeywordApiRow[];
   n_keywords?: RawKeywordApiRow[];
