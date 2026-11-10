@@ -15,11 +15,7 @@ export const CpaRankList: React.FC<CpaRankListProps> = ({ sortedCats, periodLabe
   const maxCpa = Math.max(...sortedCats.map((c) => c.cpa), 1);
 
   return (
-    <Card name="cat-cpa" id="cat-cpa">
-      <h3 id="ttCatCpa">
-        카테고리별 견적 획득 단가 (CPA)
-        <span className="muted">({periodLabel} 실적 기준)</span>
-      </h3>
+    <Card name="cat-cpa" id="cat-cpa" titleId="ttCatCpa" title="카테고리별 견적 획득 단가 (CPA)" subtitle={`(${periodLabel} 실적 기준)`}>
       <div id="chCatCpa">
         {sortedCats.length ? (
           <div className="cpa-list">

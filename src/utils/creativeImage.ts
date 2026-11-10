@@ -20,9 +20,22 @@ export type AdStat = Pick<AdStatRow, 'cost' | 'imp' | 'clk' | 'conv'>;
 /** 소재 성과 조회 키 — 매체마다 소재 ID 체계가 달라 매체를 함께 쓴다 */
 export const adStatKey = (media: string, adId: string) => `${media}\u0001${adId}`;
 
-/** 소재의 모든 이미지 (대표 이미지가 맨 앞) */
+/**
+ * Google 스톡 이미지는 API 가 실제 주소 대신 이 안내 그림("Stock image unavailable")을 돌려준다.
+ * 여러 장이어도 같은 주소라 한 장으로 합쳐지므로, 실제 이미지로 보여 주거나 세지 않는다.
+ */
+const isUnavailableImage = (url: string) => /\/simgad\/15838574335205574330(?:\D|$)/.test(url);
+
+const collectedImages = (c: AdRow): string[] => (c.images?.length ? c.images : c.image ? [c.image] : []);
+
+/** 소재의 실제 이미지 (대표 이미지가 맨 앞) */
 export function getCreativeImages(c: AdRow): string[] {
-  return c.images?.length ? c.images : c.image ? [c.image] : [];
+  return collectedImages(c).filter((url) => !isUnavailableImage(url));
+}
+
+/** 미리보기를 받을 수 없는 스톡 이미지가 포함된 소재인가 */
+export function hasUnavailableImage(c: AdRow): boolean {
+  return collectedImages(c).some(isUnavailableImage);
 }
 
 /** 네이버 키워드 삽입 문법 {keyword:기본문구} 은 검색어가 없을 때 보이는 기본 문구로 보여 준다 */

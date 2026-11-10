@@ -72,9 +72,9 @@ export const DataSourceTable: React.FC<DataSourceTableProps> = ({ sourceRows, lo
           </tbody>
         </table>
         <TableFootnote
-          basis="데이터 기준: API 연동 매체(Google·Naver·스토어) 실시간 수집 · 그 외 시트 배치 수집"
+          basis="데이터 기준: Google·Naver·스토어는 API 실시간 수집, 그 외는 시트 배치 수집"
           sources={[
-            '과거 수치는 사내 공유 폴더 월간보고서·키워드TFT 엑셀에서 1회 정규화 이관해 전년·전분기 비교에 사용',
+            '과거 수치는 월간보고서·키워드TFT 엑셀을 1회 이관해 전년·전분기 비교에 사용',
           ]}
         />
       </div>

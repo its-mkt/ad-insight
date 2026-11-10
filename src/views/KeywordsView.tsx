@@ -5,7 +5,7 @@ import type {
   DashboardData,
   SyncStatus,
 } from '../types/dashboard';
-import { catSum, catsOf, fmt, fmtWon, mLabel, THIS_M } from '../utils/format';
+import { catSum, catsOf, ctrText, fmt, fmtWon, mLabel, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
@@ -21,7 +21,6 @@ import {
   useCategoryFilterState,
 } from '../components/common/CategoryFilter';
 import { PeriodNavSlot } from '../components/common/PeriodNav';
-import { KeywordCategoryTable } from '../components/keywords/KeywordCategoryTable';
 import { KeywordAccordionTable } from '../components/keywords/KeywordAccordionTable';
 import { AdCreativesList } from '../components/keywords/AdCreativesList';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
@@ -103,7 +102,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const totalClk  = rows.reduce((s, r) => s + r.clk, 0);
   const totalImp  = rows.reduce((s, r) => s + r.imp, 0);
   const totalConv = rows.reduce((s, r) => s + r.conv, 0);
-  const kpiCtr = totalImp > 0 ? `${((totalClk / totalImp) * 100).toFixed(2)}%` : '–';
+  const kpiCtr = ctrText(totalClk, totalImp);
   const kpiCpc = totalClk > 0 ? Math.round(totalCost / totalClk) : 0;
   const kpiAdCpa = totalConv > 0 ? Math.round(totalCost / totalConv) : 0;
 
@@ -145,14 +144,12 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   if (cpcItems.length) cpcItems.push(...missing);
   const cpcDetail = cpcItems.length > 0 ? <KpiDetailItems items={cpcItems} /> : null;
 
+  // 카테고리 필터 목록 — 이 기간 광고비가 있는 카테고리를 광고비 큰 순으로
   const cost = catSum(categoryMap, rows, (r) => r.cost);
-  const clk = catSum(categoryMap, rows, (r) => r.clk);
-  const conv = catSum(categoryMap, rows, (r) => r.conv);
   const ck = Object.keys(cost).sort((a, b) => cost[b] - cost[a]);
 
   // 1차/2차 카테고리 필터 — ck에 실제로 존재하는 값만 노출
   const catFilter = buildCategoryFilter(ck, catState);
-  const filteredCk = ck.filter((k) => matchesCategory(k, catFilter.cat1, catFilter.cat2));
 
   // 키워드 그룹 집계 (SA) - 선택된 기간 기준 집계
   const monthKs = data.keywords.filter((k) => inPeriod(k) && pass(k));
@@ -296,16 +293,6 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           <CategoryFilter filter={catFilter} />
         </PeriodNavSlot>
       </div>
-
-      <KeywordCategoryTable
-        periodLabel={allPeriod ? '전체 기간' : yearTotal ? yearRangeLabel(mo) : mLabel(mo)}
-        categoryKeys={filteredCk}
-        costByCat={cost}
-        clkByCat={clk}
-        convByCat={conv}
-        media={media}
-        type={type}
-      />
 
       {type === 'SA' && (
         <KeywordAccordionTable

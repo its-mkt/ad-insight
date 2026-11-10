@@ -2,6 +2,7 @@ import React from 'react';
 import type { SourceShareItem } from '../../types/dashboard';
 
 import { sourceTone } from '../../utils/format';
+import { BarDelta } from '../common/BarDelta';
 import { EmptyState } from '../common/EmptyState';
 
 interface SourceBarChartProps {
@@ -142,9 +143,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
             )}
             {!compareLabel && <span className="pct">{fmtPct(s.v)}</span>}
             {compareLabel && (
-              <span className={`delta${d == null || d === 0 ? '' : d > 0 ? ' up' : ' down'}`}>
-                {d == null || d === 0 ? '–' : `${d > 0 ? '▲' : '▼'}${Math.abs(d)}%`}
-              </span>
+              <BarDelta d={d} />
             )}
           </div>
         </div>

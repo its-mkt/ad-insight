@@ -295,13 +295,13 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
       </KpiSection>
 
       <div className="grid">
-        <Card name="cat-spend" id="cat-spend">
-          <h3 id="ttCatEff">
-            카테고리별 광고비 소진 비교
-            <span className="muted">
-              {allPeriod ? `(${periodLabel})` : `(${periodLabel} vs ${prevLabel})`}
-            </span>
-          </h3>
+        <Card
+          name="cat-spend"
+          id="cat-spend"
+          titleId="ttCatEff"
+          title="카테고리별 광고비 소진 비교"
+          subtitle={allPeriod ? `(${periodLabel})` : `(${periodLabel} vs ${prevLabel})`}
+        >
           <CategoryBarChart
             id="chCatEff"
             list={list}

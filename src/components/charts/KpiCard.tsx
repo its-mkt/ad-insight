@@ -2,11 +2,14 @@ import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { ViewId } from '../../types/dashboard';
 import { VIEW_TITLES } from '../../utils/constants';
+import { navigateTo, parseRoute, routePath } from '../../utils/route';
 import { fmt, pct } from '../../utils/format';
+import { Muted } from '../common/Muted';
 
 interface KpiCardProps {
   label: React.ReactNode;
-  value: string;
+  /** 큰 값 — 글자, 또는 보조 값을 흐리게 덧붙일 때는 요소 */
+  value: React.ReactNode;
   cur?: number | null;
   prev?: number | null;
   cmpLabel?: string;
@@ -32,6 +35,27 @@ const ppDelta = (a: number, b: number) => {
   const d = Math.round((a - b) * 10) / 10;
   return { cls: d === 0 ? 'flat' : d > 0 ? 'up' : 'down', txt: `${d === 0 ? '–' : d > 0 ? '▲' : '▼'} ${Math.abs(d)}%` };
 };
+
+/** 큰 값 뒤에 작고 흐린 보조 값을 붙인다 — KpiCard 의 value 로 쓴다 */
+export const KpiSubValue: React.FC<{
+  /** 큰 값 */
+  main: React.ReactNode;
+  /** 뒤에 붙는 작고 흐린 값 */
+  sub: React.ReactNode;
+}> = ({ main, sub }) => (
+  <>
+    {main}
+    <Muted small>{sub}</Muted>
+  </>
+);
+
+/** 견적 카드 값 — "견적 48건/판매 3건" 꼴로, 판매 건수는 흐리게. 판매 값이 없으면 '–' */
+export const QuoteSalesValue: React.FC<{
+  /** 견적 건수 */
+  quotes: number;
+  /** 같은 기간 고도몰 판매 건수 (수집 범위 밖이면 null) */
+  sales: number | null;
+}> = ({ quotes, sales }) => <KpiSubValue main={`${fmt(quotes)}건`} sub={`/${sales === null ? '–' : `${fmt(sales)}건`}`} />;
 
 /** 카드 하단 보조 줄의 항목 목록 — "이름 값 | 이름 값" */
 export const KpiDetailItems: React.FC<{ items: [string, number | string][] }> = ({ items }) => (
@@ -85,14 +109,21 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   );
 
   if (!to) return <div className={`kpi${cls}`}>{body}</div>;
+  const href = routePath(parseRoute().site, to);
   return (
     <a
       className={`kpi kpi-link${cls}`}
-      href={`#${to}`}
+      href={href}
       data-tip={`${VIEW_TITLES[to]}에서 자세히 보기|${VIEW_TIPS[to] ?? '눌러서 관련 화면으로 이동합니다.'}`}
       data-tip-desc=""
-      // 해시 이동으로 화면이 바뀐 뒤 새 화면의 맨 위부터 보이게 한다
-      onClick={() => window.scrollTo({ top: 0 })}
+      onClick={(e) => {
+        // 새 탭·창으로 여는 경우는 브라우저에 맡기고, 그냥 누르면 새로고침 없이 이동한다
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+        e.preventDefault();
+        navigateTo(href);
+        // 화면이 바뀐 뒤 새 화면의 맨 위부터 보이게 한다
+        window.scrollTo({ top: 0 });
+      }}
     >
       <ArrowUpRight className="kpi-link-ico" aria-hidden="true" />
       {body}

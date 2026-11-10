@@ -1,15 +1,18 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, Images } from 'lucide-react';
+import { Images } from 'lucide-react';
 import type { AdGroupCreatives, AdRow } from '../../types/dashboard';
-import { adStatKey, displayAdTitle, getCreativeImages, MEDIA_COLOR_VARS, type AdStat } from '../../utils/creativeImage';
-import { fmt } from '../../utils/format';
-import { EXTERNAL_LINKS } from '../../utils/constants';
+import { adStatKey, displayAdTitle, getCreativeImages, hasUnavailableImage, MEDIA_COLOR_VARS, type AdStat } from '../../utils/creativeImage';
+import { ctrText, fmt } from '../../utils/format';
 import { useSort } from '../../hooks/useSort';
 import { SortableTh } from '../common/SortableTh';
 import { Card } from '../common/Card';
+import { EmptyState } from '../common/EmptyState';
+import { AdApiSource, ExtLink } from '../common/ExtLink';
 import { SkelTable } from '../common/SkeletonView';
 import { TableFootnote } from '../common/TableFootnote';
+import { Muted } from '../common/Muted';
+import { AccordionChevron } from '../common/AccordionChevron';
 import { LIST_LIMIT, MoreButton, ShowMoreButton } from '../common/MoreButton';
 import { GoogleLogo, NaverLogo } from '../common/MediaPill';
 
@@ -37,7 +40,7 @@ const METRICS: { key: string; label: string; value: (s: AdStat) => string }[] = 
   {
     key: 'ctr',
     label: '클릭률',
-    value: (s) => (s.imp ? `${((s.clk / s.imp) * 100).toFixed(1)}%` : '–'),
+    value: (s) => ctrText(s.clk, s.imp),
   },
   {
     key: 'cpc',
@@ -111,6 +114,8 @@ const CreativeImage: React.FC<{ ad: AdRow; src: string; title: string }> = ({ ad
 // 표 열 수: 광고그룹 + 이미지 + 성과 5
 const COLS = 7;
 
+const UNAVAILABLE_NOTE = 'Google 스톡 이미지는 미리보기를 제공하지 않아 여기에 표시되지 않습니다. 전체 이미지는 Google Ads에서 확인해 주세요.';
+
 /** 펼친 상세의 한 묶음 — 왼쪽에 이름·개수, 오른쪽에 내용 */
 const DetailGroup: React.FC<{
   label: string;
@@ -119,7 +124,7 @@ const DetailGroup: React.FC<{
 }> = ({ label, count, children }) => (
   <section className="cr-group" aria-label={count == null ? label : `${label} ${count}개`}>
     <h4>
-      {label} {count != null && <span className="muted">{count}</span>}
+      {label} {count != null && <Muted>{count}</Muted>}
     </h4>
     {children}
   </section>
@@ -239,9 +244,9 @@ const AdBody: React.FC<{
           {oneTitle && <h4 className="cr-preview-title">{oneTitle}</h4>}
           {oneDesc && <span>{oneDesc}</span>}
           {url && (
-            <a className="cr-url" href={url} target="_blank" rel="noopener">
+            <ExtLink className="cr-url" href={url}>
               {url}
-            </a>
+            </ExtLink>
           )}
         </div>
       )}
@@ -255,7 +260,7 @@ const AdBody: React.FC<{
           <TextList items={descs} />
         </DetailGroup>
       )}
-      {showImages && images.length > 1 && <Gallery ad={ad} images={images} />}
+      {showImages && images.length > 0 && <Gallery ad={ad} images={images} />}
     </>
   );
 };
@@ -298,7 +303,7 @@ const MetricCells: React.FC<{ stat?: AdStat; loading: boolean }> = ({ stat, load
 // 제목·설명·링크는 펼친 상세에서만 보이므로 하나라도 있으면 펼칠 수 있어야 한다
 const singleHasDetail = (ad: AdRow) => {
   const { titles, descs } = adTexts(ad);
-  return !!ad.url || titles.length > 0 || descs.length > 0 || getCreativeImages(ad).length > 1;
+  return !!ad.url || titles.length > 0 || descs.length > 0 || getCreativeImages(ad).length > 0;
 };
 
 type SortKey = 'name' | 'img' | 'imp' | 'clk' | 'ctr' | 'cpc' | 'cost';
@@ -309,6 +314,8 @@ interface GroupRow {
   stat?: AdStat;
   /** 그룹 안 소재들의 이미지 수 (같은 이미지는 한 번만) */
   imageCount: number;
+  /** 미리보기를 받을 수 없는 스톡 이미지가 포함되어 있다 */
+  hasUnavailable: boolean;
 }
 
 // 실적이 없는 줄은 내림차순에서 맨 뒤로 가도록 -1
@@ -345,7 +352,7 @@ const CreativeItem: React.FC<{
   stats: Record<string, AdStat>;
   loading: boolean;
 }> = ({ row, stats, loading }) => {
-  const { group, stat, imageCount } = row;
+  const { group, stat, imageCount, hasUnavailable } = row;
   const [open, setOpen] = useState(false);
   const [showAllAds, setShowAllAds] = useState(false);
   const detailId = useId();
@@ -353,18 +360,13 @@ const CreativeItem: React.FC<{
   const top = ads[0];
   const statOf = (a: AdRow) => stats[adStatKey(a.media, a.adId)];
   const multi = ads.length > 1;
-  const hasDetail = multi || singleHasDetail(top);
+  const hasDetail = multi || hasUnavailable || singleHasDetail(top);
   // 확장소재 이미지는 광고그룹에 걸려 소재마다 같은 경우가 많다 — 모두 같으면 한 번만 보여 준다
   const imageSets = ads.map((a) => getCreativeImages(a).join(' '));
   const sharedImages = multi && imageSets[0] !== '' && imageSets.every((k) => k === imageSets[0]);
   const titleContent = (
     <>
-      <ChevronRight
-        className={`grp-acc-chev${open ? ' open' : ''}`}
-        strokeWidth={2.25}
-        style={hasDetail ? undefined : { visibility: 'hidden' }}
-        aria-hidden="true"
-      />
+      <AccordionChevron open={open} placeholder={!hasDetail} />
       <MediaMark media={group.media} />
       <b>
         {group.campaign} › {group.adgroup}
@@ -400,12 +402,14 @@ const CreativeItem: React.FC<{
         </td>
         <td className="c">
           {imageCount > 0 ? (
-            <span className="cr-count" title={`이미지 ${imageCount}장`}>
+            <span className="cr-count" title={hasUnavailable ? `이미지 ${imageCount}장 · ${UNAVAILABLE_NOTE}` : `이미지 ${imageCount}장`}>
               <Images size="0.75rem" aria-hidden="true" />
               {imageCount}
             </span>
+          ) : hasUnavailable ? (
+            <Muted title={UNAVAILABLE_NOTE}>미제공</Muted>
           ) : (
-            <span className="muted">–</span>
+            <Muted>–</Muted>
           )}
         </td>
         <MetricCells stat={stat} loading={loading} />
@@ -414,6 +418,11 @@ const CreativeItem: React.FC<{
         <tr className="cr-detail-row" id={detailId} hidden={!open}>
           <td colSpan={COLS}>
             <div className="cr-detail">
+              {hasUnavailable && (
+                <DetailGroup label="미리보기 불가">
+                  <p className="muted">{UNAVAILABLE_NOTE}</p>
+                </DetailGroup>
+              )}
               {sharedImages && <Gallery ad={top} images={getCreativeImages(top)} label="공통 이미지" />}
               {multi ? (
                 <>
@@ -469,6 +478,7 @@ export const AdCreativesList: React.FC<AdCreativesListProps> = ({
       group,
       stat: sumStats(group.ads.map((a) => stats[adStatKey(a.media, a.adId)])),
       imageCount: new Set(group.ads.flatMap(getCreativeImages)).size,
+      hasUnavailable: group.ads.some(hasUnavailableImage),
     }));
     const dir = sortOrder === 'desc' ? -1 : 1;
     return list.sort((a, b) =>
@@ -491,14 +501,12 @@ export const AdCreativesList: React.FC<AdCreativesListProps> = ({
     <Card
       name="ad-creatives"
       id="ad-creatives"
-      title={
+      title="주요 · 확장 소재"
+      subtitle={
         <>
-          주요 · 확장 소재
-          <span className="muted">
-            {periodLabel}
-            {rows.length > 0 &&
-              ` · 광고그룹 ${remain > 0 ? `${shown.length} / ${rows.length}` : rows.length}개 · 펼치면 소재별 제목·설명·이미지`}
-          </span>
+          {periodLabel}
+          {rows.length > 0 &&
+            ` · 광고그룹 ${remain > 0 ? `${shown.length} / ${rows.length}` : rows.length}개 · 펼치면 소재별 제목·설명·이미지`}
         </>
       }
     >
@@ -564,42 +572,31 @@ export const AdCreativesList: React.FC<AdCreativesListProps> = ({
           )}
           <TableFootnote
             unit="원·회"
-            basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고그룹 내 소재 합계 · 클릭률 = 클릭 ÷ 노출 · 평균 CPC = 비용 ÷ 클릭`}
+            basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고그룹별 소재 합계 · 클릭률 = 클릭 ÷ 노출 · CPC = 비용 ÷ 클릭`}
             sources={[
-              <span key="src">
-                출처:{' '}
-                <a href={EXTERNAL_LINKS.googleAds} target="_blank" rel="noopener">
-                  Google Ads
-                </a>{' '}
-                ·{' '}
-                <a href={EXTERNAL_LINKS.naverSearchAd} target="_blank" rel="noopener">
-                  네이버 검색광고
-                </a>{' '}
-                (소재 실적 하루 1회 갱신)
-              </span>,
+              <AdApiSource key="src" prefix="출처:" suffix="(하루 1회 갱신)" />,
             ]}
           />
         </>
       ) : loading ? (
         <SkelTable rows={5} />
       ) : (
-        <div className="empty">
-          {media === 'Google' ? (
-            <>
-              수집된 Google 광고 소재가 없습니다.
-              <br />
-              <small className="muted">Google Ads 스크립트 실행 후 자동 수집됩니다.</small>
-            </>
-          ) : type === 'DA' ? (
-            <>
-              수집된 디스플레이 광고(DA) 배너 소재가 없습니다.
-              <br />
-              <small className="muted">GFA 무인 스케줄러 동기화 후 자동 표시됩니다.</small>
-            </>
-          ) : (
-            '조회 조건에 해당하는 소재가 없습니다.'
-          )}
-        </div>
+        <EmptyState
+          message={
+            media === 'Google'
+              ? '수집된 Google 광고 소재가 없습니다.'
+              : type === 'DA'
+                ? '수집된 디스플레이 광고(DA) 배너 소재가 없습니다.'
+                : '조회 조건에 해당하는 소재가 없습니다.'
+          }
+          subMessage={
+            media === 'Google'
+              ? 'Google Ads 스크립트 실행 후 자동 수집됩니다.'
+              : type === 'DA'
+                ? 'GFA 무인 스케줄러 동기화 후 자동 표시됩니다.'
+                : undefined
+          }
+        />
       )}
     </Card>
   );

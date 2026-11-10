@@ -1,8 +1,11 @@
 import React from 'react';
-import type { DashboardData, SyncStatus, ViewId } from '../../types/dashboard';
+import type { DashboardData, SiteId, SyncStatus, ViewId } from '../../types/dashboard';
+import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
+import { SITE_ENABLED } from '../../utils/route';
 import { useAuth } from '../../context/AuthContext';
 import { ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, Search, ShoppingCart, X } from 'lucide-react';
 import { Button } from '../common/Button';
+import { Dropdown, type DropdownOption } from '../common/Dropdown';
 
 interface SidebarProps {
   currentView: ViewId;
@@ -15,7 +18,29 @@ interface SidebarProps {
   onNavigate: (view: ViewId) => void;
   onCloseDrawer: () => void;
   onReload: () => void;
+  /** 보고 있는 사이트 (아이티켓 / 온코어) */
+  site: SiteId;
+  onSiteChange: (site: SiteId) => void;
 }
+
+type DashboardId = 'ad-insight' | 'analytics';
+
+/** 브랜드 선택 박스로 오가는 대시보드 — 개발 서버에서는 각 프로젝트의 로컬 서버, 배포본에서는 운영 주소로 간다 */
+const DASHBOARDS: { id: DashboardId; label: string; local: string; live: string }[] = [
+  { id: 'ad-insight', label: 'its-ad-insight', local: 'http://localhost:2000/', live: 'https://its-ad-insight.itket.com/' },
+  { id: 'analytics', label: 'its-analytics', local: 'http://localhost:1000/', live: 'https://its-analytics.itket.com/' },
+];
+const DASHBOARD_OPTIONS: DropdownOption<DashboardId>[] = DASHBOARDS.map((d) => ({ value: d.id, label: d.label, title: import.meta.env.DEV ? d.local : d.live }));
+const goDashboard = (id: DashboardId) => {
+  const d = DASHBOARDS.find((x) => x.id === id);
+  if (d) window.location.href = import.meta.env.DEV ? d.local : d.live;
+};
+
+const SITE_OPTIONS: SegmentOption<SiteId>[] = [
+  { value: 'itket', label: '아이티켓' },
+  // 온코어는 데이터 연결 전이라 고를 수 없게 둔다 (route.ts SITE_ENABLED)
+  { value: 'oncore', label: '온코어', title: SITE_ENABLED.oncore ? undefined : '온코어 데이터 연결 준비 중', disabled: !SITE_ENABLED.oncore },
+];
 
 // 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세는 맨 아래
 const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
@@ -73,6 +98,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   onCloseDrawer,
   onReload,
+  site,
+  onSiteChange,
 }) => {
   const { isLoggedIn } = useAuth();
   const live = status === 'live';
@@ -93,22 +120,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={`scrim${drawerOpen ? ' on' : ''}`} id="scrim" onClick={onCloseDrawer} />
       <aside className={`side${drawerOpen ? ' open' : ''}`} id="side">
         <Button iconOnly icon={X} className="sclose" id="sclose" data-btn="close" aria-label="메뉴 닫기" onClick={onCloseDrawer} />
-        <a
-          className="brand"
-          id="brand"
-          href="./"
-          title="처음으로"
-          onClick={(e) => {
-            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
-            e.preventDefault();
-            onNavigate('overview');
-          }}
-        >
-          <i>
-            <ChartColumnIncreasing />
-          </i>
-          <span>아이티캣 광고 인사이트</span>
-        </a>
+        {/* 브랜드: 아이콘은 종합 요약으로, 이름은 대시보드 선택 박스 (its-ad-insight ↔ its-analytics) */}
+        <div className="brand" id="brand">
+          <a
+            className="brand-home"
+            href="/"
+            title="종합 요약으로"
+            aria-label="종합 요약으로"
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+              e.preventDefault();
+              onNavigate('overview');
+            }}
+          >
+            <i>
+              <ChartColumnIncreasing />
+            </i>
+          </a>
+          <Dropdown<DashboardId> className="brand-dd" id="dd-dashboard" ariaLabel="대시보드 선택" options={DASHBOARD_OPTIONS} value="ad-insight" onChange={goDashboard} />
+        </div>
+        <div className="site-switch">
+          <SegmentedControl<SiteId> id="seg-site" options={SITE_OPTIONS} value={site} onChange={onSiteChange} />
+        </div>
         <div className="sm">
           <div className="lbl">대시보드</div>
           <nav className="toc" id="toc">

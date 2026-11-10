@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { fmt, parseCatParts, sourceColorVar } from '../../utils/format';
+import { originOf } from '../../utils/quoteOrigin';
 import { CATEGORY_HIERARCHY, QUOTE_SITES } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useSort } from '../../hooks/useSort';
@@ -28,16 +29,15 @@ const PAGE_SIZE = 20;
 const ALL = '__all__';
 const NO_REP = '미지정';
 const NO_CAT2 = '2차 없음';
-const ORIGINS = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'];
-
-export const originOf = (r: QuoteRawRow): string =>
-  r.inquiryType ? '전화/톡플러스' : r.site === 'zbyhp' || r.site === 'cadkorea' ? r.site : 'itket';
+const ORIGINS = ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스', '메일'];
 const catsOf = (r: QuoteRawRow) => parseCatParts(r.category || '기타');
 const repOf = (r: QuoteRawRow): string => r.salesRep || NO_REP;
 const sourceOf = (r: QuoteRawRow): string => r.source || '미수집';
-/** 사이트 이름 — 어드민 원본 리스트와 같게 (아이티켓·zbyhp·cadkorea), 전화문의 시트 건은 접수처 이름 그대로 */
-const siteNameOf = (origin: string): string => QUOTE_SITES.find((s) => s.id === origin)?.label ?? origin;
-const siteLabelOf = (r: QuoteRawRow): string => siteNameOf(originOf(r));
+/** 사이트 칸 — 어드민 원본 리스트와 같은 이름 (아이티켓·zbyhp·cadkorea), 전화문의 시트 건은 경로 */
+const siteLabelOf = (r: QuoteRawRow): string => {
+  const origin = originOf(r);
+  return QUOTE_SITES.find((s) => s.id === origin)?.label ?? origin;
+};
 /** 이메일 칸 — 전화문의 시트 건은 이메일이 없어 전화번호를 보여 준다 */
 const contactOf = (r: QuoteRawRow): string => r.email || r.phone || '';
 
@@ -140,7 +140,10 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
           fixedMenu
           ariaLabel="사이트 필터"
           value={origin}
-          options={[{ value: ALL, label: '사이트 전체' }, ...ORIGINS.map((v) => ({ value: v, label: siteNameOf(v) }))]}
+          options={[
+            { value: ALL, label: '사이트 전체' },
+            ...[...new Set([...ORIGINS, ...rows.map(originOf)])].map((v) => ({ value: v, label: QUOTE_SITES.find((s) => s.id === v)?.label ?? v })),
+          ]}
           onChange={setOrigin}
         />
         <Dropdown fixedMenu ariaLabel="담당자 필터" value={rep} options={optionsOf(repValues, '담당자 전체')} onChange={setRep} />

@@ -17,14 +17,16 @@ import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteStatsOf } from '../hooks/useDashboardData';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
 import type { SameDateCompare } from '../utils/dayData';
-import { originOf, QuoteListTable } from '../components/quotes/QuoteListTable';
+import { QuoteListTable } from '../components/quotes/QuoteListTable';
+import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { SourceShareTable } from '../components/quotes/SourceShareTable';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { MonthlyQuotesTable } from '../components/quotes/MonthlyQuotesTable';
@@ -119,6 +121,10 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     quotes.filter((r) => r.month >= ym(yr, 1) && r.month <= curM),
     (r) => r.count
   );
+  // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 일·기간 보기는 그 기간, 전체는 견적과 같은 시작 달부터
+  const curSales = period ? salesInRange(period.range.from, period.range.to) : salesInMonths([curM]);
+  const ytdSales = salesInMonths(Array.from({ length: mm }, (_, i) => ym(yr, i + 1)));
+  const allSales = salesInMonths(Object.keys(GODOMALL_ORDERS).filter((mo) => mo >= firstM && mo <= curM));
 
 
 
@@ -167,14 +173,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     );
   };
 
-  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => {
-    const counts: Record<string, number> = {};
-    rows.forEach((r) => {
-      const k = r.inquiryType ? '전화/톡플러스' : !r.site ? 'itket' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
-      counts[k] = (counts[k] || 0) + 1;
-    });
-    return <KpiDetailItems items={['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, counts[k] ?? 0])} />;
-  };
+  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => <KpiDetailItems items={originGroupCounts(rows)} />;
   const curSiteDetail = siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
   const allSiteDetail = siteBreak(quotesRaw);
 
@@ -222,7 +221,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     : 0;
   const catDelta = !yearTotal && kpiTopCat ? kpiTopCat.c - pvTopCatCount : null;
   const catDeltaNode = catDelta !== null && catDelta !== 0
-    ? <span style={{ color: catDelta > 0 ? 'var(--up)' : 'var(--down)' }}>{' · '}{catDelta > 0 ? '▲' : '▼'} {fmt(Math.abs(catDelta))}건 {cmp}</span>
+    ? <span className={`s-delta ${catDelta > 0 ? 'up' : 'down'}`}>{' · '}{catDelta > 0 ? '▲' : '▼'} {fmt(Math.abs(catDelta))}건 {cmp}</span>
     : null;
 
   // KPI CPA: 월 선택 → 당월 / 전월 비교, 연도 전체 → 연간 / 전년 동기 비교
@@ -260,10 +259,9 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
   const listPeriod = period ? period.label : allPeriod ? '전체 기간' : kpiLabel;
   // 접수처 비중 — 아래 접수 목록과 같은 기간·같은 행으로 센다. 전화문의 시트 건은 시트의 경로(전화·톡플러스·메일)로 나눈다
   // 주요 접수처는 건수가 0이어도 남겨 어디가 비었는지 보이게 한다
-  const originKeyOf = (r: QuoteRawRow) => r.inquiryType || originOf(r);
-  const originItems = [...new Set(['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스', ...listRows.map(originKeyOf)])]
+  const originItems = [...new Set(['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스', ...listRows.map(originOf)])]
     .map((k) => {
-      const count = listRows.filter((r) => originKeyOf(r) === k).length;
+      const count = listRows.filter((r) => originOf(r) === k).length;
       return { k, c: ORIGIN_COLORS[k] || '--c-etc', count, v: listRows.length ? Math.round((count / listRows.length) * 1000) / 10 : 0 };
     })
     .sort((a, b) => b.count - a.count);
@@ -316,7 +314,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
       <KpiSection id="kpiQuotes">
         {allPeriod ? (
           <>
-            <KpiCard label="전체 누적 견적" value={`${fmt(allTotal)}건`} sub={`${dotYm(firstM)} ~ ${dotYm(curM)}`} detail={allSiteDetail} />
+            <KpiCard label="전체 누적 견적/판매" value={<QuoteSalesValue quotes={allTotal} sales={allSales} />} sub={`${dotYm(firstM)} ~ ${dotYm(curM)}`} detail={allSiteDetail} />
             <KpiCard to="cat-efficiency"
               label={<>견적당 광고비 (CPA)</>}
               value={allCpa ? `${fmt(allCpa)}원` : '–'}
@@ -335,8 +333,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
           <>
         {!yearTotal && (
           <KpiCard
-            label={`${kpiLabel} 총 견적`}
-            value={`${fmt(curTot)}건`}
+            label={`${kpiLabel} 총 견적/판매`}
+            value={<QuoteSalesValue quotes={curTot} sales={curSales} />}
             cur={curTot}
             prev={pvTot}
             cmpLabel={cmp}
@@ -345,8 +343,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
         )}
         {yearTotal && (
           <KpiCard
-            label={<>{yr}년 누적 견적 (1~{mm}월)</>}
-            value={`${fmt(ytdQuotes)}건`}
+            label={<>{yr}년 누적 견적/판매 (1~{mm}월)</>}
+            value={<QuoteSalesValue quotes={ytdQuotes} sales={ytdSales} />}
             cur={ytdQuotes}
             prev={sumBy(quotes.filter((r) => r.month >= ym(+yr - 1, 1) && r.month <= ym(+yr - 1, mm)), (r) => r.count)}
             cmpLabel="전년 동기"

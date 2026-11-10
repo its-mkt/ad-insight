@@ -20,11 +20,12 @@ import type {
   SyncStatus,
 } from '../types/dashboard';
 import { buildCategoryMap, LEGACY_ONLY_CATS, quoteKey, THIS_M } from '../utils/format';
+import { SITE_DEFAULT_CATEGORY } from '../utils/constants';
+import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
-import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 
 export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
@@ -118,12 +119,22 @@ function withCurrentQuoteCategories(data: DashboardData, manual: Map<string, str
  * rows 는 접수일 오름차순이어야 한다.
  */
 function withLatestRepTitles<T extends { salesRep?: string }>(rows: T[]): T[] {
-  const nameOf = (rep: string) => rep.split(' ')[0];
+  return applyRepTitles(rows, latestRepTitles(rows));
+}
+
+const repNameOf = (rep: string) => rep.split(' ')[0];
+
+/** 이름 → 사람마다 쓸 표기. rows 는 접수일 오름차순이어야 한다 */
+function latestRepTitles(rows: { salesRep?: string }[]): Map<string, string> {
   const latest = new Map<string, string>();
   rows.forEach(({ salesRep: rep }) => {
-    if (rep && (rep.includes(' ') || !latest.has(nameOf(rep)))) latest.set(nameOf(rep), rep);
+    if (rep && (rep.includes(' ') || !latest.has(repNameOf(rep)))) latest.set(repNameOf(rep), rep);
   });
-  return rows.map((r) => (r.salesRep ? { ...r, salesRep: latest.get(nameOf(r.salesRep)) } : r));
+  return latest;
+}
+
+function applyRepTitles<T extends { salesRep?: string }>(rows: T[], latest: Map<string, string>): T[] {
+  return rows.map((r) => (r.salesRep ? { ...r, salesRep: latest.get(repNameOf(r.salesRep)) ?? r.salesRep } : r));
 }
 
 /**
@@ -345,10 +356,10 @@ export function fromApi(j: RawApiPayload): DashboardData {
         count: n(r.count),
       };
     }),
-    quotesRaw: withLatestRepTitles((j.quotes_raw || [])
+    quotesRaw: (j.quotes_raw || [])
       .map((r, idx) => toQuoteRawRow(r, r.id ? String(r.id) : ('q_' + (idx + 1))))
       .filter((r) => r.date)
-      .sort((a, b) => a.date.localeCompare(b.date))),
+      .sort((a, b) => a.date.localeCompare(b.date)),
     quotesSites: (j.quotes_raw_sites || [])
       .map((r, idx) => ({ ...toQuoteRawRow(r, 'qs_' + (idx + 1)), site: String(r.site || '').trim() }))
       .filter((r) => r.date && r.site)
@@ -403,13 +414,20 @@ export function fromApi(j: RawApiPayload): DashboardData {
   // 수동 지정 흔적: 저장 기록과, 비교용 자동 분류 결과 (제목이 있을 때만)
   const withTrace = (r: QuoteRawRow): QuoteRawRow => {
     const mark = marks.get(quoteKey(r));
-    const autoCategory = r.subject ? quoteCategoryOf(r.subject, r.sourceDetail) : undefined;
-    return mark || autoCategory ? { ...r, autoCategory, manual: mark } : r;
+    const siteCategory = r.site ? SITE_DEFAULT_CATEGORY[r.site] : undefined;
+    const autoCategory = siteCategory || (r.subject ? quoteCategoryOf(r.subject, r.sourceDetail) : undefined);
+    return mark || autoCategory ? { ...r, category: siteCategory && !mark ? siteCategory : r.category, autoCategory, manual: mark } : r;
   };
+  // 영업담당 표기는 아이티켓·다른 사이트·전화문의를 함께 보고 맞춘다 (한쪽에만 직급이 적혀 있어도 같은 표기가 되도록)
+  const repTitles = latestRepTitles(
+    [...out.quotesRaw, ...out.quotesSites, ...out.quotesPhone, ...out.quotesExtra].sort((a, b) => a.date.localeCompare(b.date))
+  );
   return {
     ...out,
-    quotesRaw: out.quotesRaw.map(withTrace),
-    quotesSites: out.quotesSites.map(withTrace),
+    quotesRaw: applyRepTitles(out.quotesRaw.map(withTrace), repTitles),
+    quotesSites: applyRepTitles(out.quotesSites.map(withTrace), repTitles),
+    quotesPhone: applyRepTitles(out.quotesPhone, repTitles),
+    quotesExtra: applyRepTitles(out.quotesExtra, repTitles),
   };
 }
 
@@ -443,7 +461,7 @@ function toQuotePhoneRow(r: RawQuotePhoneApiRow, id: string): QuoteRawRow {
     category: text(r.category),
     source: text(r.source),
     sourceDetail: '',
-    salesRep: text(r.sales_rep),
+    salesRep: text(r.sales_rep).replace(/\s+/g, ' '),
     receiver: text(r.receiver),
   };
 }
@@ -481,7 +499,7 @@ export function useDashboardData() {
 
   const tryLoadStaticFallback = useCallback(async () => {
     try {
-      const localRes = await fetch('data/latest.json');
+      const localRes = await fetch(`${import.meta.env.BASE_URL}data/latest.json`);
       if (!localRes.ok) return;
       const localJ = (await localRes.json()) as RawApiPayload;
       if (liveLoaded.current) return;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { ExtLink } from './ExtLink';
 
 export interface FootnoteSourceItem {
   label?: string;
@@ -45,9 +46,9 @@ export const TableFootnote: React.FC<TableFootnoteProps> = ({
           <span key={idx}>
             {srcItem.label && `${srcItem.label} — `}
             {srcItem.href ? (
-              <a href={srcItem.href} target="_blank" rel="noopener">
+              <ExtLink href={srcItem.href}>
                 {srcItem.text || srcItem.label}
-              </a>
+              </ExtLink>
             ) : (
               srcItem.text
             )}
@@ -56,15 +57,10 @@ export const TableFootnote: React.FC<TableFootnoteProps> = ({
       })}
       {children}
       {action && (
-        <a
-          href={action.href}
-          target="_blank"
-          rel="noopener"
-          className="tbl-src-action"
-        >
+        <ExtLink href={action.href} className="tbl-src-action">
           {action.text}
           <ArrowUpRight size="0.75rem" aria-hidden="true" />
-        </a>
+        </ExtLink>
       )}
       {/* 단위는 차트 범례와 같이 우측 하단에 둔다 */}
       {unit && <span className="tbl-src-unit">단위: {unit}</span>}

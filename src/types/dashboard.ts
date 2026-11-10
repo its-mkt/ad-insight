@@ -1,5 +1,8 @@
 export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'search' | 'data' | 'admin';
 
+/** 사이드바에서 고르는 사이트 — 온코어는 데이터 연결 전이라 안내만 보여 준다 */
+export type SiteId = 'itket' | 'oncore';
+
 export type ChartType = 'line' | 'grouped' | 'donut';
 
 export type SyncStatus = 'init' | 'live' | 'error' | 'unlinked';

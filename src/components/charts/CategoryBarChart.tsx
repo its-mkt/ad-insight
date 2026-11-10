@@ -1,6 +1,7 @@
 import React from 'react';
 import type { CategoryBarItem } from '../../types/dashboard';
 import { fmt } from '../../utils/format';
+import { BarDelta } from '../common/BarDelta';
 
 import { EmptyState } from '../common/EmptyState';
 
@@ -120,9 +121,7 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
               {hidePrev && <span className="amt">{fmt(c.cur)}만</span>}
               {hidePrev && hasShare && <span className="pct">{fmtPct(curShare)}</span>}
               {!hidePrev && (
-                <span className={`delta${d == null || d === 0 ? '' : d > 0 ? ' up' : ' down'}`}>
-                  {d == null || d === 0 ? '–' : `${d > 0 ? '▲' : '▼'}${Math.abs(d)}%`}
-                </span>
+                <BarDelta d={d} />
               )}
               {hasQ && <span className="qn">{c.q != null && c.q > 0 ? `${c.q}건` : '–'}</span>}
             </div>

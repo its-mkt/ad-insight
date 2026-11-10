@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { CategoryMap, DashboardData, KeywordRow, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { cat1Of, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
+import { cat1Of, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
@@ -9,7 +9,9 @@ import { adStatKey, groupAdsByAdgroup, type AdStat } from '../utils/creativeImag
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { originGroupCounts } from '../utils/quoteOrigin';
+import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -18,10 +20,13 @@ import { TabButton } from '../components/common/TabButton';
 import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { MediaPill } from '../components/common/MediaPill';
 import { useSort } from '../hooks/useSort';
-import { ChevronRight } from 'lucide-react';
 import { KeywordAccordionTable } from '../components/keywords/KeywordAccordionTable';
 import { AdCreativesList } from '../components/keywords/AdCreativesList';
 import { TableFootnote } from '../components/common/TableFootnote';
+import { NumTd } from '../components/common/TableRows';
+import { AdApiSource } from '../components/common/ExtLink';
+import { Muted } from '../components/common/Muted';
+import { AccordionChevron } from '../components/common/AccordionChevron';
 import { SortableTh } from '../components/common/SortableTh';
 import { Th } from '../components/common/Th';
 import { colTip } from '../utils/columnTips';
@@ -62,7 +67,6 @@ function breakdownOf(rows: QuoteRawRow[], keyOf: (r: QuoteRawRow) => string, emp
   return [...counts.entries()].sort((a, b) => (a[0] === emptyLabel ? 1 : b[0] === emptyLabel ? -1 : b[1] - a[1]));
 }
 
-const ctr = (clk: number, imp: number) => (imp > 0 ? `${((clk / imp) * 100).toFixed(2)}%` : '–');
 
 type KeywordSort = 'bid' | 'quality' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cost';
 const KEYWORD_COLS: { key: KeywordSort; label: string }[] = [
@@ -74,6 +78,16 @@ const KEYWORD_COLS: { key: KeywordSort; label: string }[] = [
   { key: 'conv', label: '전환' },
   { key: 'cost', label: '광고비' },
 ];
+/** 열 종류별 공통 너비 클래스 — 입찰가는 단가, CTR 은 비율, 광고비는 금액, 나머지는 건수 폭 */
+const SKW_COL_CLASS: Record<KeywordSort, string> = {
+  bid: 'col-skw-unit',
+  quality: 'col-skw-count',
+  imp: 'col-skw-count',
+  clk: 'col-skw-count',
+  ctr: 'col-skw-rate',
+  conv: 'col-skw-count',
+  cost: 'col-skw-cost',
+};
 const keywordMetric = (k: KeywordRow, key: KeywordSort): number =>
   key === 'ctr' ? (k.imp > 0 ? k.clk / k.imp : 0) : k[key];
 
@@ -263,6 +277,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
   // 카드 제목용 짧은 기간 (예: 11월, 전체 기간)
   const kpiPeriod = dayRange || allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
   const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : '전월') : undefined;
+  // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 검색어로 거를 수 없어 같은 기간의 전체 판매 건수다
+  const periodSales = dayRange
+    ? salesInRange(dayRange.from, dayRange.to)
+    : salesInMonths(allPeriod ? Object.keys(GODOMALL_ORDERS) : yearTotal ? monthsUpTo(selectedMonth) : [selectedMonth]);
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
   // 광고비 카드 하단: 매체별 금액
   const mediaCost = (['Naver', 'Google', 'Meta'] as const)
@@ -270,13 +288,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     .filter(([k, v]) => v > 0 || k !== '메타') // 집행이 없어도 구글·네이버는 0 으로 보여 준다
     .map(([k, v]): [string, string] => [k, fmtWon(v)]);
   // 견적 카드 하단: 접수처별 건수
-  const siteCount: Record<string, number> = {};
-  result.quotes.forEach((r) => {
-    const k = r.inquiryType ? '전화/톡플러스' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
-    siteCount[k] = (siteCount[k] || 0) + 1;
-  });
-  const siteItems = ['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, siteCount[k] ?? 0]);
-  const siteDetail = <KpiDetailItems items={siteItems} />;
+  const siteDetail = <KpiDetailItems items={originGroupCounts(result.quotes)} />;
   // 견적 카드의 추정 CPA 기준 — 매체·유입 경로 검색은 추적 기간이 달라 계산하지 않는다
   const cpaLabel = dayRange && !dayCovered ? '일별 광고비 수집 전 기간은 계산하지 않음' : result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : `${dotYm(cpaFrom)} 이후 기준`;
 
@@ -341,8 +353,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {sourceScope ? (
         <KpiSection id="kpiSearch">
           <KpiCard
-            label={`${kpiPeriod} 총 접수 견적`}
-            value={`${fmt(result.quotes.length)}건`}
+            label={`${kpiPeriod} 총 견적/판매`}
+            value={<QuoteSalesValue quotes={result.quotes.length} sales={periodSales} />}
             cur={result.quotes.length}
             prev={prevResult?.quotes.length}
             cmpLabel={cmpLabel}
@@ -394,8 +406,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
           detail={mediaCost.length ? <KpiDetailItems items={mediaCost} /> : `광고그룹 ${fmt(result.groups.length)}개`}
         />
         <KpiCard
-          label={`${kpiPeriod} 총 접수 견적`}
-          value={`${fmt(result.quotes.length)}건`}
+          label={`${kpiPeriod} 총 견적/판매`}
+          value={<QuoteSalesValue quotes={result.quotes.length} sales={periodSales} />}
           cur={result.quotes.length}
           prev={prevResult?.quotes.length}
           cmpLabel={cmpLabel}
@@ -428,7 +440,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           prev={prevResult ? convCost(prevResult) : null}
           cmpLabel={cmpLabel}
           sub={result.conv > 0 ? `광고비 ÷ 광고전환 ${fmt(result.conv)}건` : '광고전환이 없어 계산하지 않습니다'}
-          detail={<KpiDetailItems items={[['클릭', result.clk], ['전환', result.conv], ['CTR', ctr(result.clk, result.imp)]]} />}
+          detail={<KpiDetailItems items={[['클릭', result.clk], ['전환', result.conv], ['CTR', ctrText(result.clk, result.imp)]]} />}
         />
       </KpiSection>
       )}
@@ -508,7 +520,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 <colgroup>
                   <col className="col-skw-name" />
                   {KEYWORD_COLS.map((c) => (
-                    <col key={c.key} className={c.key === 'cost' ? 'col-skw-cost' : 'col-skw-val'} />
+                    <col key={c.key} className={SKW_COL_CLASS[c.key]} />
                   ))}
                 </colgroup>
                 <thead>
@@ -536,13 +548,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
                             {k.campaign} › {k.adgroup}
                           </small>
                         </td>
-                        <td className="n">{k.bid ? `${fmt(k.bid)}원` : '–'}</td>
-                        <td className="n">{k.quality || '–'}</td>
-                        <td className="n">{fmt(k.imp)}</td>
-                        <td className="n">{fmt(k.clk)}</td>
-                        <td className="n">{ctr(k.clk, k.imp)}</td>
-                        <td className="n">{fmt(k.conv)}</td>
-                        <td className="n">{fmt(k.cost)}원</td>
+                        <NumTd value={k.bid || null} unit="원" />
+                        <NumTd value={k.quality || null} />
+                        <NumTd value={k.imp} />
+                        <NumTd value={k.clk} />
+                        <NumTd>{ctrText(k.clk, k.imp)}</NumTd>
+                        <NumTd value={k.conv} />
+                        <NumTd value={k.cost} unit="원" />
                       </tr>
                     ))}
                 </tbody>
@@ -552,7 +564,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             <TableFootnote
               unit="원·회"
               basis={`산출 근거: ${periodLabel} 실적 합계 · 입찰가·품질지수는 최근 달 값 · CTR = 클릭 ÷ 노출`}
-              sources={['Google Ads · 네이버 검색광고 API']}
+              sources={[<AdApiSource key="src" prefix="출처:" suffix="API" />]}
             />
           </>
         )}
@@ -569,7 +581,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                       <b>{fmt(n)}건</b>
                     </p>
                   ))}
-                  {!showAll && b.rows.length > BREAKDOWN_LIMIT && <small className="muted">외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</small>}
+                  {!showAll && b.rows.length > BREAKDOWN_LIMIT && <Muted small>외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</Muted>}
                 </div>
               ))}
             </div>
@@ -618,7 +630,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                                   aria-expanded={isOpen}
                                   aria-controls={`search-q-detail-${key}`}
                                 >
-                                  <ChevronRight className={`grp-acc-chev${isOpen ? ' open' : ''}`} strokeWidth={2.25} aria-hidden="true" />
+                                  <AccordionChevron open={isOpen} />
                                   {r.date.slice(0, 10)}
                                 </button>
                               </td>

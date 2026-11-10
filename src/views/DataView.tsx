@@ -4,6 +4,7 @@ import { DEFAULT_URL, getCfg } from '../hooks/useDashboardData';
 import { fmt, sumBy } from '../utils/format';
 import { runDataAudit } from '../utils/dataAudit';
 import { EXTERNAL_LINKS } from '../utils/constants';
+import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { DataAuditTable } from '../components/data/DataAuditTable';
 import { DataSourceTable } from '../components/data/DataSourceTable';
@@ -11,6 +12,8 @@ import { CategoryMappingSection } from '../components/data/CategoryMappingSectio
 import { ArrowUpRight } from 'lucide-react';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
+import { ExtLink } from '../components/common/ExtLink';
+import { Muted } from '../components/common/Muted';
 
 interface DataViewProps {
   data: DashboardData;
@@ -136,7 +139,7 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
   const okSources = autoRows.filter((r) => r.statusCls !== 'chk').length; // 수집 대기·스크립트 대기만 점검 필요 (집행 없음은 정상)
 
   return (
-    <div className="view on" data-view="data" data-title="데이터 연결">
+    <View name="data" title="데이터 연결">
       <ViewHeader
         title="데이터 연결 및 동기화"
         description="매체 API 및 견적 웹훅 수집 현황과 실시간 통계 무결성 검증"
@@ -196,15 +199,10 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
               <tr>
                 <th>취합 스프레드시트</th>
                 <td>
-                  <a
-                    href={EXTERNAL_LINKS.masterSheet}
-                    target="_blank"
-                    rel="noopener"
-                    className="link-acc"
-                  >
+                  <ExtLink href={EXTERNAL_LINKS.masterSheet} className="link-acc">
                     광고비·전환·견적 취합 시트 (1mxrTeh7bo...)
                     <ArrowUpRight size="0.75rem" aria-hidden="true" />
-                  </a>
+                  </ExtLink>
                 </td>
               </tr>
               <tr>
@@ -226,19 +224,19 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
                 <tr>
                   <th>매일 08:00</th>
                   <td>
-                    전일 확정 수치 수집 <span className="muted">(기본)</span>
+                    전일 확정 수치 수집 <Muted>(기본)</Muted>
                   </td>
                 </tr>
                 <tr>
                   <th>1시간마다</th>
                   <td>
-                    당일 비용·클릭 <span className="muted">— 잠정치로 표시</span>
+                    당일 비용·클릭 <Muted>— 잠정치로 표시</Muted>
                   </td>
                 </tr>
                 <tr>
                   <th>매월 초</th>
                   <td>
-                    전월 재수집 <span className="muted">— 매체 사후 보정 반영</span>
+                    전월 재수집 <Muted>— 매체 사후 보정 반영</Muted>
                   </td>
                 </tr>
               </tbody>
@@ -252,6 +250,6 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
             </ul>
           </Card>
         </div>
-    </div>
+    </View>
   );
 };

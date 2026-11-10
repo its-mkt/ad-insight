@@ -25,8 +25,10 @@ import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { originGroupCounts } from '../utils/quoteOrigin';
 import { colTip } from '../utils/columnTips';
+import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
@@ -184,15 +186,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const ytdCpaSpend = sumBy(data.spend.filter(inMonths(ytdValidMonths)), (r) => r.cost);
   const ytdAdQuotes = sumBy(stats.quotes.filter(inMonths(ytdValidMonths)), (r) => r.count);
 
+  // 견적 카드에 함께 보여 줄 고도몰 판매 건수 (구매 상세와 같은 결제완료 기준). 수집 범위 밖의 달은 '–'
+  // 일·기간을 고르면 견적도 그 기간만 세므로 판매도 일별 값으로 센다
+  const curSales = period ? salesInRange(period.range.from, period.range.to) : salesInMonths([curM]);
+  const ytdSales = salesInMonths(months);
+  // 전체 누적은 견적과 같은 시작 달부터 센다
+  const allSales = salesInMonths(Object.keys(GODOMALL_ORDERS).filter((mo) => mo >= quotesFrom));
+
   // 사이트별 견적 건수 breakdown — quotesExtra(어드민)가 있을 때만 의미 있다
-  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => {
-    const counts: Record<string, number> = {};
-    rows.forEach((r) => {
-      const k = r.inquiryType ? '전화/톡플러스' : !r.site ? 'itket' : r.site === 'zbyhp' ? 'zbyhp' : r.site === 'cadkorea' ? 'cadkorea' : 'itket';
-      counts[k] = (counts[k] || 0) + 1;
-    });
-    return <KpiDetailItems items={['itket', 'zbyhp', 'cadkorea', '전화/톡플러스'].map((k): [string, number] => [k, counts[k] ?? 0])} />;
-  };
+  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => <KpiDetailItems items={originGroupCounts(rows)} />;
   const curSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
   const ytdSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 4) === yr));
   const allSiteDetail = siteBreak(stats.quotesRaw);
@@ -319,7 +321,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               sub={`구글 ${dotYm(starts.google)}~ · 네이버 ${dotYm(starts.naver)}~${starts.meta ? ` · 메타 ${dotYm(starts.meta)}~` : ''}`}
               detail={spendMediaDetail(data.spend)}
             />
-            <KpiCard to="quotes" label="전체 누적 견적" value={`${fmt(allQuotes)}건`} sub={`${dotYm(quotesFrom)}~`} detail={allSiteDetail} />
+            <KpiCard to="quotes" label="전체 누적 견적/판매" value={<QuoteSalesValue quotes={allQuotes} sales={allSales} />} sub={`${dotYm(quotesFrom)}~`} detail={allSiteDetail} />
             <KpiCard to="cat-efficiency"
               label={
                 <>
@@ -350,8 +352,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               detail={spendMediaDetail(data.spend.filter((r) => r.month >= ym(yr, 1) && r.month <= curM))}
             />
             <KpiCard to="quotes"
-              label={`${yearLabel} 총 접수 견적`}
-              value={`${fmt(ytdQuotes)}건`}
+              label={`${yearLabel} 총 견적/판매`}
+              value={<QuoteSalesValue quotes={ytdQuotes} sales={ytdSales} />}
               cur={ytdQuotes}
               prev={quotesIn(lastYrMonths)}
               cmpLabel="전년 동기"
@@ -389,8 +391,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           detail={spendMediaDetail(atSpend(curM))}
         />
         <KpiCard to="quotes"
-          label={`${curCaption} 총 접수 견적`}
-          value={`${fmt(curQuotesTot)}건`}
+          label={`${curCaption} 총 견적/판매`}
+          value={<QuoteSalesValue quotes={curQuotesTot} sales={curSales} />}
           cur={curQuotesTot}
           prev={pvQuotesTot}
           cmpLabel={cmp}
@@ -433,10 +435,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       <div className="grid">
-        <Card name="overview-cat" id="overview-cat">
-          <h3 id="ttOverviewCat">
-            카테고리별 소진 ({allPeriod ? '전체 기간' : yearTotal ? `${yearLabel} vs 전년 동기` : `${curCaption} vs ${pvCaption}`})
-          </h3>
+        <Card
+          name="overview-cat"
+          id="overview-cat"
+          titleId="ttOverviewCat"
+          title={<>카테고리별 소진 ({allPeriod ? '전체 기간' : yearTotal ? `${yearLabel} vs 전년 동기` : `${curCaption} vs ${pvCaption}`})</>}
+        >
           <CategoryBarChart
             id="chOverviewCat"
             list={list}

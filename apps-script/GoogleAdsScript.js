@@ -65,38 +65,44 @@ function main() {
     if (f && f.url) img[r.asset.resourceName] = f.url;
   });
 
-  // 검색광고(SA) 이미지 확장소재 매핑: 광고그룹·캠페인 단위 AD_IMAGE 에셋
+  // 검색광고(SA) 이미지 확장소재 매핑: 광고그룹·캠페인·계정 단위 AD_IMAGE 에셋 (Google 과 같이 좁은 단위가 우선)
   // 한 광고그룹·캠페인에 이미지가 여러 장 걸릴 수 있어 목록으로 모은다
-  const grpImg = {}, campImg = {};
+  const grpImg = {}, campImg = {}, acctImg = [];
   const addImg = (map, id, res) => {
     if (img[res]) (map[id] = map[id] || []).push(img[res]);
   };
   try {
-    each_(`SELECT ad_group.id, asset.resource_name FROM ad_group_asset WHERE asset_field_type = 'AD_IMAGE' AND status = 'ENABLED'`, (r) => {
+    each_(`SELECT ad_group.id, asset.resource_name FROM ad_group_asset WHERE ad_group_asset.field_type = 'AD_IMAGE' AND ad_group_asset.status = 'ENABLED'`, (r) => {
       addImg(grpImg, String(r.adGroup.id), r.asset.resourceName);
     });
-  } catch (_) {}
+  } catch (e) { console.log(`광고그룹 이미지 조회 실패: ${e && e.message}`); }
   try {
-    each_(`SELECT campaign.id, asset.resource_name FROM campaign_asset WHERE asset_field_type = 'AD_IMAGE' AND status = 'ENABLED'`, (r) => {
+    each_(`SELECT campaign.id, asset.resource_name FROM campaign_asset WHERE campaign_asset.field_type = 'AD_IMAGE' AND campaign_asset.status = 'ENABLED'`, (r) => {
       addImg(campImg, String(r.campaign.id), r.asset.resourceName);
     });
-  } catch (_) {}
+  } catch (e) { console.log(`캠페인 이미지 조회 실패: ${e && e.message}`); }
+  try {
+    each_(`SELECT asset.resource_name FROM customer_asset WHERE customer_asset.field_type = 'AD_IMAGE' AND customer_asset.status = 'ENABLED'`, (r) => {
+      if (img[r.asset.resourceName]) acctImg.push(img[r.asset.resourceName]);
+    });
+  } catch (e) { console.log(`계정 이미지 조회 실패: ${e && e.message}`); }
+  console.log(`이미지 확장소재: 광고그룹 ${Object.keys(grpImg).length}개, 캠페인 ${Object.keys(campImg).length}개, 계정 ${acctImg.length}장`);
 
-  // image: 대표 이미지 1장 (이전 화면 호환) · images: 모든 이미지를 줄바꿈으로 이은 목록 (최대 10장)
+  // image: 대표 이미지 1장 (이전 화면 호환) · images: 모든 이미지를 줄바꿈으로 이은 목록 (최대 30장, 반응형 디스플레이의 가로형·정사각형 합계)
   // title: 대표 제목 (이전 화면 호환) · titles·descs: 반응형 광고의 제목·설명 전체를 줄바꿈으로 이은 목록
   const ads = [['type', 'campaign', 'ad_group', 'ad_id', 'ad_type', 'title', 'url', 'image', 'images', 'titles', 'descs']];
   const texts = (list) => [...new Set((list || []).map((t) => String((t && t.text) || '').trim()).filter(Boolean))];
   each_(`SELECT campaign.id, campaign.name, campaign.advertising_channel_type, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.ad.name,
                 ad_group_ad.ad.final_urls, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions,
                 ad_group_ad.ad.responsive_display_ad.headlines, ad_group_ad.ad.responsive_display_ad.long_headline, ad_group_ad.ad.responsive_display_ad.descriptions,
-                ad_group_ad.ad.responsive_display_ad.marketing_images, ad_group_ad.ad.image_ad.image_url
+                ad_group_ad.ad.responsive_display_ad.marketing_images, ad_group_ad.ad.responsive_display_ad.square_marketing_images, ad_group_ad.ad.image_ad.image_url
          FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED'`, (r) => {
     const a = r.adGroupAd.ad, rsa = a.responsiveSearchAd || {}, rda = a.responsiveDisplayAd || {};
     const titles = texts([].concat(rsa.headlines || [], rda.headlines || [], rda.longHeadline ? [rda.longHeadline] : [])).slice(0, 15);
     const descs = texts([].concat(rsa.descriptions || [], rda.descriptions || [])).slice(0, 5);
-    const mi = rda.marketingImages || [];
+    const mi = [].concat(rda.marketingImages || [], rda.squareMarketingImages || []);
     const own = (a.imageAd && a.imageAd.imageUrl ? [a.imageAd.imageUrl] : []).concat(mi.map((m) => img[m.asset]).filter(Boolean));
-    const list = [...new Set([own, grpImg[String(r.adGroup.id)], campImg[String(r.campaign.id)]].find((l) => l && l.length) || [])].slice(0, 10);
+    const list = [...new Set([own, grpImg[String(r.adGroup.id)], campImg[String(r.campaign.id)], acctImg].find((l) => l && l.length) || [])].slice(0, 30);
     ads.push([type_(r.campaign.advertisingChannelType), String(r.campaign.name || '').trim(), String(r.adGroup.name || '').trim(), String(a.id), a.type,
       String(titles[0] || a.name || '').trim(), (a.finalUrls || [])[0] || '', list[0] || '', list.join('\n'), titles.join('\n'), descs.join('\n')]);
   });

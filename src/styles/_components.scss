@@ -53,6 +53,23 @@
     font-variant-numeric: tabular-nums;
     margin: 0.25rem 0;
     overflow-wrap: anywhere; // 카테고리·매체 이름이 길어도 카드 밖으로 넘치지 않게
+
+    // 큰 값 뒤에 덧붙인 보조 값(견적 카드의 "/판매 건수" 등)은 작고 흐리게
+    small.muted {
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+  }
+
+  // 하단 보조 줄 안의 건수 증감 글자 — .d 를 쓰면 카드 배경까지 물들어 글자 색만 바꾼다
+  .s-delta {
+    &.up {
+      color: var(--up);
+    }
+    &.down {
+      color: var(--down);
+    }
   }
 
   // 하단 보조 줄은 증감(.d)과 같은 크기·굵기로 맞춘다
@@ -380,9 +397,15 @@ span.seg,
     cursor: pointer;
     transition: all 0.15s ease;
 
-    &:hover:not(.on) {
+    &:hover:not(.on):not(:disabled) {
       color: var(--ink);
       background: var(--bg);
+    }
+
+    // 준비 중 등으로 고를 수 없는 항목
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
 
     &.on {
