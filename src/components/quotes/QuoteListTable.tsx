@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { fmt, parseCatParts, sourceColorVar } from '../../utils/format';
-import { CATEGORY_HIERARCHY } from '../../utils/constants';
+import { CATEGORY_HIERARCHY, QUOTE_SITES } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useSort } from '../../hooks/useSort';
 import { Card } from '../common/Card';
@@ -12,7 +12,6 @@ import { Muted } from '../common/Muted';
 import { Pagination } from '../common/Pagination';
 import { SortableTh } from '../common/SortableTh';
 import { TableFootnote } from '../common/TableFootnote';
-import { Th } from '../common/Th';
 
 interface QuoteListTableProps {
   /** 선택한 기간의 접수 건 (실제 접수 날짜 그대로) */
@@ -23,7 +22,7 @@ interface QuoteListTableProps {
   resetKey: string;
 }
 
-type SortKey = 'date' | 'origin' | 'sno' | 'category' | 'source' | 'rep';
+type SortKey = 'date' | 'origin' | 'sno' | 'subject' | 'company' | 'name' | 'email' | 'category' | 'source' | 'rep';
 
 const PAGE_SIZE = 20;
 const ALL = '__all__';
@@ -36,11 +35,20 @@ export const originOf = (r: QuoteRawRow): string =>
 const catsOf = (r: QuoteRawRow) => parseCatParts(r.category || '기타');
 const repOf = (r: QuoteRawRow): string => r.salesRep || NO_REP;
 const sourceOf = (r: QuoteRawRow): string => r.source || '미수집';
+/** 사이트 이름 — 어드민 원본 리스트와 같게 (아이티켓·zbyhp·cadkorea), 전화문의 시트 건은 접수처 이름 그대로 */
+const siteNameOf = (origin: string): string => QUOTE_SITES.find((s) => s.id === origin)?.label ?? origin;
+const siteLabelOf = (r: QuoteRawRow): string => siteNameOf(originOf(r));
+/** 이메일 칸 — 전화문의 시트 건은 이메일이 없어 전화번호를 보여 준다 */
+const contactOf = (r: QuoteRawRow): string => r.email || r.phone || '';
 
 const SORT_VALUE: Record<SortKey, (r: QuoteRawRow) => string> = {
   date: (r) => r.date,
-  origin: originOf,
+  origin: siteLabelOf,
   sno: (r) => String(r.sno ?? ''),
+  subject: (r) => r.subject || '',
+  company: (r) => r.company || '',
+  name: (r) => r.name || '',
+  email: contactOf,
   category: (r) => r.category || '기타',
   source: sourceOf,
   rep: repOf,
@@ -59,8 +67,9 @@ const inHierarchyOrder = (used: string[], known: string[]): string[] => [
 ];
 
 /**
- * 견적 접수 목록 (읽기 전용) — 어드민 원본에서 집계에 쓰는 정리된 항목만 보여 준다.
- * 이 화면은 로그인 없이도 열리므로 이름·회사·이메일·전화번호는 쓰지 않고, 제목은 검색 결과와 같이 로그인했을 때만 보여 준다.
+ * 견적 접수 목록 (읽기 전용) — 어드민 '견적 접수 원본 리스트'와 같은 열·순서·너비로 보여 준다.
+ * 이 화면은 로그인 없이도 열리므로 제목·회사명·작성자·이메일은 로그인했을 때만 보여 준다
+ * (이름·회사·이메일은 서버가 관리자에게만 내려 준다). 카테고리 지정은 어드민에서만 한다.
  */
 export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabel, resetKey }) => {
   const { isLoggedIn } = useAuth();
@@ -70,7 +79,8 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
   const [source, setSource] = useState(ALL);
   const [rep, setRep] = useState(ALL);
   const [page, setPage] = useState(1);
-  const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date');
+  // 어드민 원본 리스트와 같이 접수날짜 오름차순으로 시작한다
+  const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date', 'asc');
 
   useEffect(() => setPage(1), [resetKey, origin, cat1, cat2, source, rep, sortKey, sortOrder]);
 
@@ -128,9 +138,9 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
       <div className="ql-filters">
         <Dropdown
           fixedMenu
-          ariaLabel="접수처 필터"
+          ariaLabel="사이트 필터"
           value={origin}
-          options={[{ value: ALL, label: '접수처 전체' }, ...ORIGINS.map((v) => ({ value: v, label: v }))]}
+          options={[{ value: ALL, label: '사이트 전체' }, ...ORIGINS.map((v) => ({ value: v, label: siteNameOf(v) }))]}
           onChange={setOrigin}
         />
         <Dropdown fixedMenu ariaLabel="담당자 필터" value={rep} options={optionsOf(repValues, '담당자 전체')} onChange={setRep} />
@@ -159,33 +169,52 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
                 <col className="ql-col-origin" />
                 <col className="ql-col-sno" />
                 <col className="ql-col-date" />
-                {isLoggedIn && <col />}
+                {isLoggedIn && (
+                  <>
+                    <col className="ql-col-subject" />
+                    <col className="ql-col-company" />
+                    <col className="ql-col-name" />
+                    <col className="ql-col-email" />
+                  </>
+                )}
                 <col className="ql-col-rep" />
                 <col className="ql-col-cat" />
                 <col className="ql-col-source" />
               </colgroup>
               <thead>
                 <tr>
-                  {th('origin', '접수처')}
+                  {th('origin', '사이트')}
                   {th('sno', 'SNO')}
-                  {th('date', '접수일')}
-                  {isLoggedIn && <Th>제목</Th>}
-                  {th('rep', '담당자')}
+                  {th('date', '접수날짜')}
+                  {isLoggedIn && (
+                    <>
+                      {th('subject', '제목 (문의 내용)')}
+                      {th('company', '회사명')}
+                      {th('name', '작성자')}
+                      {th('email', '이메일')}
+                    </>
+                  )}
+                  {th('rep', '영업담당')}
                   {th('category', '표준 카테고리')}
-                  {th('source', '유입 경로')}
+                  {th('source', '유입경로')}
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((r, i) => {
                   return (
                     <tr key={`${r.id ?? r.sno ?? ''}-${r.date}-${i}`}>
-                      <td className="ql-nowrap">{originOf(r)}</td>
+                      <td className="ql-nowrap">{siteLabelOf(r)}</td>
                       <td className="ql-nowrap">{r.sno || '–'}</td>
                       <td className="ql-nowrap">{r.date.slice(0, 10)}</td>
                       {isLoggedIn && (
-                        <td className="ql-subject" title={r.subject}>
-                          {r.subject || '–'}
-                        </td>
+                        <>
+                          <td className="ql-subject" title={r.subject}>
+                            {r.subject || '–'}
+                          </td>
+                          <td className="ql-nowrap" title={r.company || undefined}>{r.company || '–'}</td>
+                          <td className="ql-nowrap" title={r.name || undefined}>{r.name || '–'}</td>
+                          <td className="ql-nowrap" title={contactOf(r) || undefined}>{contactOf(r) || '–'}</td>
+                        </>
                       )}
                       <td className="ql-nowrap" title={repOf(r)}>{repOf(r)}</td>
                       <td className="ql-nowrap" title={r.category || '기타'}>{r.category || '기타'}</td>
@@ -204,7 +233,11 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
         </>
       )}
       <TableFootnote
-        basis={`읽기 전용 · 고객 이름·회사·연락처는 표시하지 않습니다${isLoggedIn ? '' : ' · 제목은 로그인 후 볼 수 있습니다'}`}
+        basis={
+          isLoggedIn
+            ? '읽기 전용 · 어드민 견적 접수 원본 리스트와 같은 데이터이며, 카테고리 지정은 어드민에서 합니다 · 전화문의 건은 이메일 칸에 전화번호를 보여 줍니다'
+            : '읽기 전용 · 제목·회사명·작성자·이메일은 로그인 후 볼 수 있습니다'
+        }
       />
     </Card>
   );

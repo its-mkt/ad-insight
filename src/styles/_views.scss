@@ -2406,38 +2406,56 @@ tr.kw-more-row td {
     margin-top: 0.75rem;
   }
 
+  // 열 너비는 어드민 견적 접수 원본 리스트(.qr-table)와 같게 둔다 — 최소 폭은 열 너비의 합
   #tbQuoteList {
     table-layout: fixed;
     width: 100%;
-    min-width: 56rem;
+    min-width: 50rem;
 
     &.with-subject {
-      min-width: 76rem;
-
-      .ql-col-source {
-        width: 18rem;
-      }
+      min-width: 86.5rem;
     }
   }
 
   .ql-col-origin {
-    width: 7.5rem;
+    width: 5rem;
   }
 
   .ql-col-sno {
-    width: 5rem;
+    width: 4rem;
   }
 
   .ql-col-date {
     width: 7rem;
   }
 
+  // 로그인 때만 보이는 원본 열
+  .ql-col-subject {
+    width: 14rem;
+  }
+
+  .ql-col-company {
+    width: 6rem;
+  }
+
+  .ql-col-name {
+    width: 6.5rem;
+  }
+
+  .ql-col-email {
+    width: 10rem;
+  }
+
   .ql-col-rep {
-    width: 7.5rem;
+    width: 6rem;
   }
 
   .ql-col-cat {
-    width: 15rem;
+    width: 18rem;
+  }
+
+  .ql-col-source {
+    width: 10rem;
   }
 
   .ql-nowrap,
