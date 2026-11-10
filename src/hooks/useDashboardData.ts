@@ -24,7 +24,7 @@ import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
-import { applyGodoDaily, applyGodoGoods, applyGodoOrderInflow, applyGodoOrders } from '../data/godomallOrders';
+import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 
 export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
@@ -387,6 +387,9 @@ export function fromApi(j: RawApiPayload): DashboardData {
   applyGodoGoods(j.godo_goods_monthly || []);
   applyGodoOrderInflow(j.godo_order_inflow_monthly || []);
   applyGodoDaily(j.godo_orders_daily || []);
+  applyGodoGoodsInflow(j.godo_goods_inflow_monthly || []);
+  applyGodoOrderLines(j.godo_order_lines || []);
+  applyGodoOrderCustomers(j.godo_order_customers || []);
   const marks = new Map<string, QuoteManualMark>();
   (j.manual_categories || []).forEach((r) => {
     const sno = String(r.sno ?? '').trim();

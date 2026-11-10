@@ -6,9 +6,9 @@ import { prevM, THIS_M } from '../utils/format';
 
 export let GA4_ORDER_SOURCES_AS_OF = '2026-11-09';
 
-/** GA4 가 달 중간부터 측정한 달. from 은 측정 시작일, salesBefore 는 그 전에 결제되어 비교에서 빼는 판매 건수 (2026-11-09 일별 대조) */
-export const GA4_PARTIAL_START: Record<string, { from: number; salesBefore: number }> = {
-  '2026-07': { from: 9, salesBefore: 4 },
+/** GA4 가 달 중간부터 측정한 달 → 측정 시작일 (GA4 일별 수집본의 첫 날). 그 달 판매는 고도몰 일별 실측값으로 이 날부터 센다 */
+export const GA4_PARTIAL_START: Record<string, { from: number }> = {
+  '2026-07': { from: 9 },
 };
 
 /** 값이 있는 달만 담는다 — 없는 달은 측정되지 않았다는 뜻이고 0건이 아니다 */

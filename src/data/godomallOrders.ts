@@ -47,6 +47,95 @@ export function applyGodoGoods(rows: { month?: unknown; goods_no?: unknown; good
   });
 }
 
+/** 달별 제품·유입 경로별 판매 건수 (주문번호로 맞춘 값). 유입 기록을 시작한 달부터만 있다. 시트 godo_goods_inflow_monthly 에서 받는다 */
+export const GODOMALL_GOODS_INFLOW: Record<string, { goodsNo: string; source: string; orders: number }[]> = {};
+
+export function applyGodoGoodsInflow(rows: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[]): void {
+  Object.keys(GODOMALL_GOODS_INFLOW).forEach((month) => delete GODOMALL_GOODS_INFLOW[month]);
+  rows.forEach((r) => {
+    const month = String(r.month ?? '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
+    (GODOMALL_GOODS_INFLOW[month] ??= []).push({ goodsNo: String(r.goods_no ?? ''), source: String(r.source ?? '미수집'), orders: Number(r.orders) || 0 });
+  });
+}
+
+/** 구매 제품 표 펼침용 주문 줄 (주문 × 제품). 시트 godo_order_lines 에서 받는다. 고객 정보는 없다 */
+export interface GodoOrderLine {
+  /** 결제 달 'YYYY-MM' */
+  month: string;
+  /** 주문 키 (주문번호의 짧은 해시) — 관리자 전용 주문자 정보와 잇는 데 쓴다 */
+  key: string;
+  goodsNo: string;
+  /** 주문(접수) 일시 'YYYY-MM-DD HH:mm' */
+  placed: string;
+  /** 결제 일시 'YYYY-MM-DD HH:mm' */
+  paid: string;
+  /** 고도몰 주문 상태 코드 (d2, c1 …) */
+  status: string;
+  /** 고도몰 결제 수단 코드 (pc, gb …) */
+  settle: string;
+  /** '회원' | '비회원' */
+  member: string;
+  qty: number;
+  amount: number;
+  /** 유입 경로 (화면 이름, 모르면 '미수집') */
+  source: string;
+  /** 경로 근거: '기록'(주문 완료 화면 기록) | 'GA4'(접수일 GA4 경로) | '' */
+  basis: string;
+  /** 유입 상세 (검색어·광고 종류·첫 페이지) — 기록이 있는 주문만 */
+  detail: string;
+}
+
+export const GODOMALL_ORDER_LINES: GodoOrderLine[] = [];
+
+export function applyGodoOrderLines(rows: Record<string, unknown>[]): void {
+  GODOMALL_ORDER_LINES.length = 0;
+  const s = (v: unknown) => String(v ?? '');
+  rows.forEach((r) => {
+    const month = s(r.month).slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
+    GODOMALL_ORDER_LINES.push({
+      month, key: s(r.key), goodsNo: s(r.goods_no), placed: s(r.placed), paid: s(r.paid), status: s(r.status), settle: s(r.settle), member: s(r.member),
+      qty: Number(r.qty) || 0, amount: Number(r.amount) || 0, source: s(r.source) || '미수집', basis: s(r.basis), detail: s(r.detail),
+    });
+  });
+}
+
+/** 마케팅용 주문자 정보 — 관리자 로그인 응답에만 있는 시트 godo_order_customers. 주문 키로 찾는다 (이름·연락처·주소·주문번호는 수집하지 않는다) */
+export interface GodoOrderCustomer {
+  /** 회원 등급 (비회원이면 빈 값) */
+  memberGroup: string;
+  /** 주문자 이메일 도메인 — 회사 메일이면 어느 회사인지 알 수 있다 */
+  emailDomain: string;
+}
+
+export const GODOMALL_ORDER_CUSTOMERS = new Map<string, GodoOrderCustomer>();
+
+export function applyGodoOrderCustomers(rows: Record<string, unknown>[]): void {
+  GODOMALL_ORDER_CUSTOMERS.clear();
+  const s = (v: unknown) => String(v ?? '').trim();
+  rows.forEach((r) => {
+    if (!s(r.key)) return;
+    GODOMALL_ORDER_CUSTOMERS.set(s(r.key), { memberGroup: s(r.member_group), emailDomain: s(r.email_domain) });
+  });
+}
+
+/** 고도몰 주문 상태 코드 → 화면 이름 (모르는 코드는 코드 그대로) */
+export function orderStatusLabel(code: string): string {
+  const exact: Record<string, string> = { d1: '배송 중', d2: '배송 완료' };
+  const byKind: Record<string, string> = { o: '입금 대기', p: '결제 완료', g: '상품 준비', d: '배송', s: '구매 확정', c: '취소', r: '환불', b: '반품', e: '교환', f: '결제 실패' };
+  return exact[code] ?? byKind[code.charAt(0)] ?? code;
+}
+
+/** 고도몰 결제 수단 코드 → 화면 이름 (모르는 코드는 코드 그대로) */
+export function settleLabel(code: string): string {
+  const labels: Record<string, string> = {
+    pc: '신용카드', pb: '계좌이체', pv: '가상계좌', ph: '휴대폰', gb: '무통장 입금',
+    ec: '에스크로 신용카드', eb: '에스크로 계좌이체', ev: '에스크로 가상계좌',
+  };
+  return labels[code] ?? code;
+}
+
 export interface GodoDailyRow {
   /** 'YYYY-MM-DD' */
   date: string;
@@ -67,6 +156,18 @@ export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?:
     const date = String(r.date ?? '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) GODOMALL_DAILY.push({ date, paid: Number(r.paid) || 0, reached: Number(r.reached) || 0, notWeb: Number(r.not_web) || 0 });
   });
+}
+
+/** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
+export function salesInMonths(months: string[]): number | null {
+  return months.some((m) => m in GODOMALL_ORDERS) ? months.reduce((sum, m) => sum + (GODOMALL_ORDERS[m] ?? 0), 0) : null;
+}
+
+/** 날짜 범위('YYYY-MM-DD', 양끝 포함)의 판매 건수 합. 일별 값은 주문이 있는 날만 있으므로, 수집 시작일 이후 범위면 빈 날은 0건으로 본다 */
+export function salesInRange(from: string, to: string): number | null {
+  const first = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
+  if (!first || to < first) return null;
+  return GODOMALL_DAILY.reduce((sum, r) => (r.date >= from && r.date <= to ? sum + r.paid : sum), 0);
 }
 
 /** 주문번호로 실제 결제 주문과 맞춘 달별·매체별 판매 건수. 유입 경로를 기록하기 시작한 달부터만 있다 */
