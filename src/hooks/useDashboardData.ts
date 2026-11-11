@@ -206,6 +206,13 @@ function withExtraDetails(extra: QuoteRawRow[], sites: QuoteRawRow[], phone: Quo
   });
 }
 
+/**
+ * 관리자 원본(고객 정보·다른 사이트·전화문의)을 아직 받는 중인가 — 화면은 처음에 고객 정보가 빠진 저장본을 먼저 보여 주므로,
+ * 로그인한 상태에서 실데이터를 받는 동안 빈 상세 칸을 '–' 대신 로딩으로 보여 줄 때 쓴다
+ */
+export const quoteDetailsPending = (data: Pick<DashboardData, 'quotesSites' | 'quotesPhone'>, isSyncing: boolean, isLoggedIn: boolean): boolean =>
+  isLoggedIn && isSyncing && !(data.quotesSites?.length || data.quotesPhone?.length);
+
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
 export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): Promise<SpendDailyRow[]> {
   const c = getCfg(site);

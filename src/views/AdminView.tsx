@@ -3,7 +3,7 @@ import type { DashboardData, QuoteRawRow } from '../types/dashboard';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { QuotesRawAdminTable, type QuoteChannel } from '../components/admin/QuotesRawAdminTable';
 import { SegmentedControl } from '../components/common/SegmentedControl';
-import { getCfg } from '../hooks/useDashboardData';
+import { getCfg, quoteDetailsPending } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { quoteKey } from '../utils/format';
 import type { DayRange } from '../utils/dayRange';
@@ -209,6 +209,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
           phoneQuotes={data.quotesPhone || []}
           originals={originals}
           loading={isSyncing}
+          detailsPending={quoteDetailsPending(data, isSyncing, true)}
           onUpdateQuoteCategory={handleUpdateQuoteCategory}
           changedCount={pendingOverrides.size}
           onSave={handleSaveOverrides}
