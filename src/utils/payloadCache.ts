@@ -1,4 +1,4 @@
-import type { RawApiPayload } from '../types/dashboard';
+import type { RawApiPayload, SiteId } from '../types/dashboard';
 
 /**
  * 마지막으로 받은 API 응답을 브라우저에 저장해 다음 방문 때 먼저 그린다.
@@ -7,6 +7,8 @@ import type { RawApiPayload } from '../types/dashboard';
 const DB_NAME = 'adi';
 const STORE = 'cache';
 const KEY = 'payload';
+/** 사이트별 저장 키 — 아이티켓은 예전 키를 그대로 쓴다 */
+const keyOf = (site: SiteId) => (site === 'itket' ? KEY : KEY + ':' + site);
 // 예전 localStorage 캐시 — 한 번 옮기고 지운다
 const LEGACY_KEY = 'adi_data_cache';
 
@@ -29,7 +31,21 @@ function readLegacy(): RawApiPayload | null {
   }
 }
 
-export async function readCachedPayload(): Promise<RawApiPayload | null> {
+export async function readCachedPayload(site: SiteId = 'itket'): Promise<RawApiPayload | null> {
+  if (site !== 'itket') {
+    try {
+      const db = await openDb();
+      const saved = await new Promise<RawApiPayload | undefined>((resolve, reject) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(keyOf(site));
+        req.onsuccess = () => resolve(req.result as RawApiPayload | undefined);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      return saved || null;
+    } catch {
+      return null;
+    }
+  }
   try {
     const db = await openDb();
     const saved = await new Promise<RawApiPayload | undefined>((resolve, reject) => {
@@ -55,12 +71,12 @@ function toPublicPayload(payload: RawApiPayload): RawApiPayload {
   };
 }
 
-export async function writeCachedPayload(payload: RawApiPayload): Promise<void> {
+export async function writeCachedPayload(payload: RawApiPayload, site: SiteId = 'itket'): Promise<void> {
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put(toPublicPayload(payload), KEY);
+      tx.objectStore(STORE).put(toPublicPayload(payload), keyOf(site));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });

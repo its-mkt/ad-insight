@@ -9,9 +9,18 @@
  *  - doGet        : ?key=비밀키 로 부르면 시트 전체를 JSON 으로 내려준다 (대시보드가 읽음). 키가 틀리면 아무것도 주지 않는다.
  * 네이버 키는 코드에 쓰지 않는다 — 프로젝트 설정 → 스크립트 속성에 NAVER_API_KEY · NAVER_SECRET · NAVER_CUSTOMER_ID 로 넣는다.
  * Google Ads 데이터(g_*)는 Google Ads 스크립트(GoogleAdsScript.js)가 같은 시트에 쓴다.
+ *
+ * 사이트별 프로젝트: 같은 Code.gs 를 사이트마다 따로 만든 Apps Script 프로젝트에 붙여넣는다.
+ *  - 아이티켓: 스크립트 속성 없이 그대로 (기본값)
+ *  - 온코어  : 스크립트 속성 SITE=oncore · SHEET_ID=<온코어 데이터 시트 ID> · QUOTE_SHEET_ID=<온코어 견적요청 DB 시트 ID>
+ *              온코어는 견적·네이버 검색광고만 수집한다 (고도몰·GFA·커머스·다른 사이트 견적·전화문의는 아이티켓 전용).
+ *              네이버 키(NAVER_*)가 없으면 네이버 수집은 건너뛴다.
  */
+const PROPS = PropertiesService.getScriptProperties();
+const SITE = PROPS.getProperty('SITE') || 'itket'; // 이 프로젝트가 수집하는 사이트 (itket · oncore)
+const IS_ITKET = SITE === 'itket';
 const CFG = {
-  SHEET_ID: '1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg', // its-ad-insight 데이터 시트 (주소의 /d/ 와 /edit 사이)
+  SHEET_ID: PROPS.getProperty('SHEET_ID') || '1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg', // 데이터 시트 (주소의 /d/ 와 /edit 사이). 기본값은 아이티켓
   FROM_YEAR: new Date().getFullYear() - 1,   // 전년 1월부터
   BASE: 'https://api.searchad.naver.com',
   CHUNK: 50,                                 // /stats 한 번에 묻는 ID 수
@@ -38,12 +47,11 @@ const CFG = {
   ADMIN_ONLY_SHEETS: ['quotes_raw_sites', 'quotes_phone', 'godo_order_customers'],
   // 다른 사이트 견적 시트. 원본은 어드민 리스트에만 보여 주고, 건수 통계는 고객 정보를 뺀 quotes_stats_extra 로 내보낸다.
   // quotes_raw·quotes_monthly 는 CPA·견적전환율 기준이라 아이티켓만 둔다
-  QUOTE_SITES: [
+  QUOTE_SITES: !IS_ITKET ? [] : [
     { id: 'zbyhp', sheetId: '1vWHN_dT6biPcSM1mGETt6aieSTiUe3o2-ysPSRRpov8', category: 'HPE 서버' }, // category: 제목과 상관없이 쓰는 기본 분류 (어드민 수동 지정이 우선)
     { id: 'cadkorea', sheetId: '1mmA4mAb3hRKLlMrAoU18ZyVbEgB2kgGZ3Xz0SJln-pg', category: 'GstarCAD' },
   ],
 };
-const PROPS = PropertiesService.getScriptProperties();
 const STAT_FIELDS = '["impCnt","clkCnt","salesAmt","ccnt"]';
 
 /* ── 처음 한 번 ── */
@@ -77,7 +85,9 @@ function syncAllBody_(t0) {
     && now - (Number(PROPS.getProperty('NAVER_STRUCT_TRY')) || 0) >= 2 * 3600 * 1000; // 실패하면 2시간 뒤 다시
   const statsEvery = Number(PROPS.getProperty('NAVER_EVERY_MIN')) || 15;
   const statsLast = Number(PROPS.getProperty('NAVER_LAST_RUN')) || 0;
-  if (apiLeft_() <= 0) {
+  if (!hasNaverKeys_()) {
+    console.log('- 네이버 검색광고: 스크립트 속성에 네이버 API 키가 없어 건너뜀');
+  } else if (apiLeft_() <= 0) {
     console.warn('- 네이버 검색광고: 오늘 호출 상한(' + apiCap_() + '회)에 도달해 내일까지 쉽니다');
     notifyOnce_('cap', '네이버 API 하루 상한 ' + apiCap_() + '회에 도달해 오늘 네이버 수집을 멈췄습니다. 평소 하루 약 1,300회이므로 수집 코드가 폭주하고 있을 수 있습니다.');
   } else if (structDue) {
@@ -90,6 +100,8 @@ function syncAllBody_(t0) {
   } else {
     console.log('- 네이버 검색광고: ' + statsEvery + '분 주기 대기 중 (마지막 ' + Utilities.formatDate(new Date(statsLast), 'Asia/Seoul', 'HH:mm') + ')');
   }
+  // 온코어 등 아이티켓이 아닌 사이트는 견적만 수집한다 (나머지는 아이티켓 계정·시트 전용이라 돌리면 아이티켓 데이터가 섞인다)
+  const itketOnly = ['collectQuoteSites', 'collectQuotePhone', 'collectQuoteStatsExtra', 'collectGodoOrders', 'collectGfaEmail', 'collectCommerce'];
   const rest = [
     ['견적 데이터', () => { if (PROPS.getProperty('QUOTE_SHEET_ID')) withQuoteLock_(collectQuotes); }, 'collectQuotes'],
     ['다른 사이트 견적 데이터', () => withQuoteLock_(collectQuoteSites), 'collectQuoteSites'],
@@ -103,6 +115,7 @@ function syncAllBody_(t0) {
     ['네이버 커머스', collectCommerce, 'collectCommerce'],
   ];
   for (const [label, fn, name] of rest) {
+    if (!IS_ITKET && itketOnly.includes(name)) continue;
     if (Date.now() - t0 > CFG.RUN_LIMIT_MS) { console.warn('- ' + label + ': 실행 시간 ' + Math.round(CFG.RUN_LIMIT_MS / 60000) + '분을 넘겨 다음 실행으로 미룸'); continue; }
     try { fn(); console.log('✓ ' + label + ' 동기화 완료'); } catch (e) { fail_(name, e); }
   }
@@ -564,6 +577,9 @@ function debugKeywordHistory() {
   }
 }
 
+function hasNaverKeys_() {
+  return ['NAVER_API_KEY', 'NAVER_SECRET', 'NAVER_CUSTOMER_ID'].every((k) => PROPS.getProperty(k));
+}
 function checkNaverKeys_() {
   ['NAVER_API_KEY', 'NAVER_SECRET', 'NAVER_CUSTOMER_ID'].forEach((k) => { if (!PROPS.getProperty(k)) throw new Error('스크립트 속성에 ' + k + ' 가 없습니다'); });
 }
@@ -1341,6 +1357,38 @@ function doPost(e) {
       return json_({ success: true, type: 'GFA', added: toAdd.length });
     }
 
+    // [A-1] Google Ads 스크립트가 시트에 직접 쓰지 못할 때(광고 계정과 데이터 시트의 구글 계정이 다를 때) 보내는 g_* 시트 묶음.
+    //  sheets: { g_campaign_monthly: [[머리글], [행]…], … } 는 통째로 바꾸고, append.g_adgroup_daily_hist 는 시트에 없는 달만 덧붙인다
+    if (data.action === 'adsHistMonths') return json_({ success: true, months: dailyHistMonths_(ss, CFG.DAILY_HIST.google) });
+    if (data.action === 'syncAdsSheets' && data.sheets && typeof data.sheets === 'object') {
+      const lock = LockService.getScriptLock();
+      if (!lock.tryLock(60 * 1000)) return json_({ error: 'busy' });
+      try {
+        const saved = {};
+        Object.keys(data.sheets).forEach((name) => {
+          const rows = data.sheets[name];
+          if (!/^g_[a-z_]+$/.test(name) || name === CFG.DAILY_HIST.google || !Array.isArray(rows) || !rows.length || !Array.isArray(rows[0])) return;
+          put_(ss, name, rows);
+          saved[name] = rows.length - 1;
+        });
+        const hist = data.append && data.append[CFG.DAILY_HIST.google];
+        if (Array.isArray(hist) && hist.length > 1) {
+          const name = CFG.DAILY_HIST.google, have = new Set(dailyHistMonths_(ss, name));
+          const add = hist.slice(1).filter((r) => Array.isArray(r) && !have.has(String(r[0]).slice(0, 7)));
+          if (add.length) {
+            const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+            if (sh.getLastRow() < 1) sh.getRange(1, 1, 1, hist[0].length).setValues([hist[0]]);
+            const at = sh.getLastRow() + 1;
+            sh.getRange(at, 1, add.length, 1).setNumberFormat('@');
+            sh.getRange(at, 1, add.length, hist[0].length).setValues(add);
+            bumpApiCache_();
+          }
+          saved[name] = add.length;
+        }
+        return json_({ success: true, type: 'AdsSheets', saved });
+      } finally { lock.releaseLock(); }
+    }
+
     // [A-2] 구글 광고 월별 실적 수신
     if (data.action === 'syncGoogleMonthly' && Array.isArray(data.rows)) {
       saveGoogleMonthlyRows_(ss, data.rows);
@@ -1574,7 +1622,7 @@ function notifyOnce_(kind, msg) {
   const day = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'), key = 'NOTIFY_' + kind.toUpperCase();
   if (PROPS.getProperty(key) === day) return;
   try {
-    GmailApp.sendEmail(Session.getEffectiveUser().getEmail(), '[its-ad-insight 수집기] ' + (kind === 'cap' ? '네이버 API 하루 상한 도달' : 'UrlFetch 하루 한도 소진'), msg);
+    GmailApp.sendEmail(Session.getEffectiveUser().getEmail(), '[its-ad-insight 수집기' + (IS_ITKET ? '' : ' · ' + SITE) + '] ' + (kind === 'cap' ? '네이버 API 하루 상한 도달' : 'UrlFetch 하루 한도 소진'), msg);
     PROPS.setProperty(key, day);
   } catch (err) { console.error('알림 메일 실패: ' + err.message); }
 }

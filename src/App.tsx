@@ -6,7 +6,7 @@ import { parseRoute, routePath } from './utils/route';
 /** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
 const APP_TITLE = '아이티스 광고 인사이트';
 import { THIS_M, THIS_Y } from './utils/format';
-import { fetchDailyHist, useDashboardData } from './hooks/useDashboardData';
+import { fetchDailyHist, siteConnected, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
@@ -53,7 +53,9 @@ function getInitialDark(): boolean {
 }
 
 export const App: React.FC = () => {
-  const { data, categoryMap, status, isSyncing, load, updateQuotesRaw, updateQuotesSites } = useDashboardData();
+  // 사이드바에서 고른 사이트 — 주소 경로 앞부분(/itket·/oncore/…)이 기준이라 링크를 공유해도 같은 사이트로 열린다
+  const [site, setSite] = useState<SiteId>(() => parseRoute().site);
+  const { data, categoryMap, status, isSyncing, load, updateQuotesRaw, updateQuotesSites } = useDashboardData(site);
   const [currentView, setCurrentView] = useState<ViewId>(() => parseRoute().view);
   const [searchQuery, setSearchQuery] = useState(() => parseRoute().query);
   const [searchTab, setSearchTab] = useState<SearchTab | undefined>();
@@ -68,8 +70,6 @@ export const App: React.FC = () => {
   const queryIsFavorite = favorites.some((q) => sameSearch(q, searchQuery));
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [isDark, setIsDark] = useState<boolean>(getInitialDark);
-  // 사이드바에서 고른 사이트 — 주소 경로 앞부분(/itket·/oncore/…)이 기준이라 링크를 공유해도 같은 사이트로 열린다
-  const [site, setSite] = useState<SiteId>(() => parseRoute().site);
   // 처음 열 때 사이트가 없는 주소('/', 예전 '#quotes'·'#itket/quotes')는 같은 화면의 경로 주소로 바꿔 둔다
   useEffect(() => {
     const { site: s, view, query } = parseRoute();
@@ -84,8 +84,8 @@ export const App: React.FC = () => {
   };
   // 로그인한 관리자만 보는 설정·운영 화면 (데이터 연결·어드민·이용 현황)
   const loginOnlyView = currentView === 'data' || currentView === 'admin' || currentView === 'usage';
-  // 온코어는 데이터 연결 전이라 아이티켓 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민·이용 현황은 사이트와 상관없다)
-  const oncorePending = site === 'oncore' && !loginOnlyView;
+  // 수집기 웹앱이 아직 연결되지 않은 사이트는 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민·이용 현황은 사이트와 상관없다)
+  const oncorePending = site === 'oncore' && !siteConnected(site) && !loginOnlyView;
 
   // 캐시가 없어 보여 줄 데이터가 하나도 없는 첫 동기화 동안만 스켈레톤 (캐시가 있으면 이전 데이터를 그대로 보여 준다)
   const hasData = data.spend.length > 0 || data.quotes.length > 0;
@@ -148,6 +148,11 @@ export const App: React.FC = () => {
   const [dailyLoading, setDailyLoading] = useState(false);
   const dailyFailed = useRef(new Set<string>());
   const fullData = useMemo(() => withDailyHist(data, dailyHist.rows, dailyHist.months), [data, dailyHist]);
+  // 사이트가 바뀌면 받아 둔 일별 과거분도 버린다
+  useEffect(() => {
+    setDailyHist({ rows: [], months: [] });
+    dailyFailed.current.clear();
+  }, [site]);
   useEffect(() => {
     const need = searchDay ? dailyMonthsToLoad(fullData, searchDay).filter((m) => !dailyFailed.current.has(m)).slice(0, 48) : [];
     if (!need.length) {
@@ -156,7 +161,7 @@ export const App: React.FC = () => {
     }
     let alive = true;
     setDailyLoading(true);
-    fetchDailyHist(need)
+    fetchDailyHist(need, site)
       .then((rows) => {
         if (alive) setDailyHist((p) => ({ rows: [...p.rows, ...rows], months: [...p.months, ...need] }));
       })
