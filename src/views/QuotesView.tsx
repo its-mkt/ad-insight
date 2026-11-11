@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { DashboardData, QuoteRawRow, SyncStatus } from '../types/dashboard';
+import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/dashboard';
 import {
   buildSourceShareData,
   fmt,
@@ -59,6 +59,11 @@ const QUOTES_SOURCES: SourceLinkItem[] = [
   { label: '1시간 자동 동기화' },
 ];
 
+/** 견적 상세 제목·설명 — 아이티켓은 zbyhp·cadkorea·전화문의를 합산하고, 다른 사이트는 그 사이트 견적만 */
+const quotesTitle = (site?: SiteId) => (site === 'oncore' ? '온코어 견적 상세 현황' : 'ITKET 견적 상세 현황');
+const quotesDescription = (site?: SiteId) =>
+  site === 'oncore' ? '온코어 견적의 월별·카테고리별 유입 추이' : '아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이';
+
 const ORIGIN_COLORS: Record<string, string> = {
   itket: '--c-it',
   zbyhp: '--c-n',
@@ -79,8 +84,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     return (
       <View name="quotes" title="견적 상세">
         <ViewHeader
-          title="ITKET 견적 상세 현황"
-          description="아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이"
+          title={quotesTitle(data.site)}
+          description={quotesDescription(data.site)}
           status={status}
         />
         <KpiSection id="kpiQuotes">
@@ -173,7 +178,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     );
   };
 
-  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => <KpiDetailItems items={originGroupCounts(rows)} />;
+  const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => <KpiDetailItems items={originGroupCounts(rows, data.site)} />;
   const curSiteDetail = siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
   const allSiteDetail = siteBreak(quotesRaw);
 
@@ -256,10 +261,11 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
     const mo = r.date?.slice(0, 7) ?? '';
     return yearTotal ? mo.startsWith(yr) && mo <= curM : mo === curM;
   });
+  const isOtherSite = !!data.site && data.site !== 'itket';
   const listPeriod = period ? period.label : allPeriod ? '전체 기간' : kpiLabel;
   // 접수처 비중 — 아래 접수 목록과 같은 기간·같은 행으로 센다. 전화문의 시트 건은 시트의 경로(전화·톡플러스·메일)로 나눈다
   // 주요 접수처는 건수가 0이어도 남겨 어디가 비었는지 보이게 한다
-  const originItems = [...new Set(['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스', ...listRows.map(originOf)])]
+  const originItems = [...new Set([...(isOtherSite ? [] : ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스']), ...listRows.map(originOf)])]
     .map((k) => {
       const count = listRows.filter((r) => originOf(r) === k).length;
       return { k, c: ORIGIN_COLORS[k] || '--c-etc', count, v: listRows.length ? Math.round((count / listRows.length) * 1000) / 10 : 0 };
@@ -300,8 +306,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMo
   return (
     <View name="quotes" title="견적 상세">
       <ViewHeader
-        title="ITKET 견적 상세 현황"
-        description="아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이"
+        title={quotesTitle(data.site)}
+        description={quotesDescription(data.site)}
         status={status}
       />
 

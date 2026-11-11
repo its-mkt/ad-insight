@@ -13,16 +13,24 @@
  *  - g_ad_stats         : 소재 × 월 비용·노출·클릭·전환 (2023년 1월부터)
  *  - g_device_monthly   : 캠페인 × 기기(desktop·mobile·tablet·other) × 월 비용·노출·클릭·전환 (2023년 1월부터)
  *  - g_meta             : 마지막 수집 시각
+ *
+ * 광고 계정의 구글 계정이 데이터 시트를 열 수 없을 때(예: 온코어 — 광고는 온코어 계정, 시트는 itketweb)는
+ * POST_URL·POST_KEY 에 그 사이트 수집기 웹앱 주소와 비밀키를 넣는다. 그러면 시트에 직접 쓰지 않고 같은 내용을 웹앱으로 보내고,
+ * 웹앱(Code.gs doPost 'syncAdsSheets')이 자기 데이터 시트에 쓴다. 아이티켓은 비워 둔다.
  */
 const CFG = {
   SHEET_URL: 'https://docs.google.com/spreadsheets/d/1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg/edit',   // its-ad-insight 데이터 시트 주소
   DAILY_DAYS: 62, // 일별 광고비를 모으는 최근 일수 (오늘 포함). 늘리면 시트·응답 크기가 그만큼 커진다
   DAILY_HIST_MONTHS: 60, // 일별 과거분을 한 번 실행에 채우는 달 수 (g_adgroup_daily_hist, 한 번 받은 달은 다시 받지 않는다)
   FROM_YEAR: 2023, // 시트를 비우고 다시 쓰므로 고정값으로 둔다. 계산식으로 바꾸면 해가 바뀔 때 과거 달이 지워진다
+  POST_URL: '', // 비워 두면 SHEET_URL 시트에 직접 쓴다. 채우면 그 웹앱으로 보낸다 (위 설명)
+  POST_KEY: '', // POST_URL 웹앱의 비밀키 (스크립트 속성 API_TOKEN)
 };
+// POST_URL 모드에서 웹앱으로 보낼 시트 묶음
+const OUT = { sheets: {}, append: {} };
 
 function main() {
-  const ss = SpreadsheetApp.openByUrl(CFG.SHEET_URL);
+  const ss = CFG.POST_URL ? null : SpreadsheetApp.openByUrl(CFG.SHEET_URL);
   const tz = AdsApp.currentAccount().getTimeZone();
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   const range = `segments.date BETWEEN '${CFG.FROM_YEAR}-01-01' AND '${today}'`;
@@ -137,6 +145,25 @@ function main() {
     ['account', AdsApp.currentAccount().getName()], ['customer_id', AdsApp.currentAccount().getCustomerId()]]);
 
   try { collectDailyHist_(ss, tz, M, camp); } catch (e) { console.log(`일별 과거분 수집 실패: ${e && e.message}`); }
+  if (CFG.POST_URL) {
+    const res = postJson_({ action: 'syncAdsSheets', sheets: OUT.sheets, append: OUT.append });
+    if (!res.success) throw new Error('웹앱 저장 실패: ' + JSON.stringify(res));
+    console.log('웹앱 저장 완료: ' + JSON.stringify(res.saved));
+  }
+}
+/** POST_URL 웹앱에 JSON 을 보내고 응답 JSON 을 돌려준다. 일시 오류는 10·20·30초 쉬고 다시 보낸다 */
+function postJson_(body) {
+  const payload = JSON.stringify(Object.assign({ key: CFG.POST_KEY }, body));
+  for (let i = 0; ; i++) {
+    const res = UrlFetchApp.fetch(CFG.POST_URL, { method: 'post', contentType: 'application/json', payload, muteHttpExceptions: true, followRedirects: true });
+    const code = res.getResponseCode(), text = res.getContentText();
+    let json = null;
+    try { json = JSON.parse(text); } catch (_) {}
+    if (json && !json.error) return json;
+    if (i >= 3 || (json && json.error !== 'busy')) return json || { error: 'HTTP ' + code + ' ' + text.slice(0, 200) };
+    console.log(`웹앱 전송 재시도 ${i + 1}/3: HTTP ${code}`);
+    Utilities.sleep(10000 * (i + 1));
+  }
 }
 
 const DAILY_HEAD = ['date', 'type', 'campaign', 'campaign_id', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
@@ -158,6 +185,19 @@ function dailyRows_(dRange, M) {
 /** 지난달까지의 일별 광고비를 달 단위로 g_adgroup_daily_hist 에 쌓는다. 최신 달부터 실행당 CFG.DAILY_HIST_MONTHS 달, 시트에 있는 달은 건너뛴다 */
 function collectDailyHist_(ss, tz, M, camp) {
   const name = 'g_adgroup_daily_hist';
+  if (CFG.POST_URL) {
+    // 웹앱 모드: 웹앱 시트에 없는 달만 모아 syncAdsSheets 의 append 로 보낸다
+    const got = postJson_({ action: 'adsHistMonths' });
+    if (!got.success) throw new Error('일별 과거분 달 목록을 받지 못했습니다: ' + JSON.stringify(got));
+    const haveP = new Set(got.months || []), thisM = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+    const rowsP = [DAILY_HEAD];
+    [...new Set(camp.slice(1).map((r) => r[0]))].filter((m) => m < thisM && !haveP.has(m)).sort().reverse().slice(0, CFG.DAILY_HIST_MONTHS).forEach((m) => {
+      const end = String(new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate()).padStart(2, '0');
+      dailyRows_(`segments.date BETWEEN '${m}-01' AND '${m}-${end}'`, M).forEach((r) => rowsP.push(r));
+    });
+    if (rowsP.length > 1) OUT.append[name] = rowsP;
+    return;
+  }
   const sh = retry_(() => ss.getSheetByName(name) || ss.insertSheet(name));
   if (sh.getLastRow() < 1) retry_(() => sh.getRange(1, 1, 1, DAILY_HEAD.length).setValues([DAILY_HEAD]));
   const last = sh.getLastRow();
@@ -191,6 +231,7 @@ function each_(q, fn) { const it = AdsApp.search(q); while (it.hasNext()) fn(it.
  * 새 값을 덮어쓴 뒤 남는 옛 행·열만 지운다. 실패해도 이전 값이 그대로 남고, 타임아웃이면 잠시 뒤 다시 시도한다.
  */
 function put_(ss, name, rows) {
+  if (CFG.POST_URL) { OUT.sheets[name] = rows; return; }
   const sh = retry_(() => ss.getSheetByName(name) || ss.insertSheet(name));
   const nR = rows.length, nC = rows[0].length;
   const textCols = /_meta$/.test(name) && nC >= 2 ? 2 : 1;

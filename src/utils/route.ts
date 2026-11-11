@@ -3,8 +3,8 @@ import { VALID_VIEWS } from './constants';
 
 export const SITES: SiteId[] = ['itket', 'oncore'];
 
-/** 지금 열 수 있는 사이트 — 온코어는 데이터 연결 전이라 막아 둔다 (연결하면 true 로 바꾼다). 막힌 사이트 주소는 아이티켓으로 연다 */
-export const SITE_ENABLED: Record<SiteId, boolean> = { itket: true, oncore: false };
+/** 지금 열 수 있는 사이트 — 막힌 사이트 주소는 아이티켓으로 연다 (온코어 수집기가 아직 연결 전이면 화면에서 안내를 보여 준다) */
+export const SITE_ENABLED: Record<SiteId, boolean> = { itket: true, oncore: true };
 
 export interface Route {
   site: SiteId;

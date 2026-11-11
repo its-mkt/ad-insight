@@ -172,6 +172,8 @@ export interface AdStatRow {
 }
 
 export interface DashboardData {
+  /** 이 데이터의 사이트 (없으면 아이티켓) — 견적 접수처 묶음을 사이트에 맞게 나눌 때 쓴다 */
+  site?: SiteId;
   updated: string;
   sources: {
     google: string;

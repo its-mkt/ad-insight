@@ -38,7 +38,7 @@ const goDashboard = (id: DashboardId) => {
 
 const SITE_OPTIONS: SegmentOption<SiteId>[] = [
   { value: 'itket', label: '아이티켓' },
-  // 온코어는 데이터 연결 전이라 고를 수 없게 둔다 (route.ts SITE_ENABLED)
+  // 막아 둔 사이트는 고를 수 없게 둔다 (route.ts SITE_ENABLED)
   { value: 'oncore', label: '온코어', title: SITE_ENABLED.oncore ? undefined : '온코어 데이터 연결 준비 중', disabled: !SITE_ENABLED.oncore },
 ];
 

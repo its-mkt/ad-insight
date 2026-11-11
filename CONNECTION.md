@@ -71,3 +71,21 @@ flowchart TD
 만약 향후 구글 스프레드시트의 Apps Script를 새로 배포하여 웹앱 URL이나 비밀키가 변경되는 경우:
 1. **방법 1 (간편)**: 대시보드 우측 상단 톱니바퀴 아이콘을 클릭하여 새 URL과 비밀키를 입력하고 [저장 · 불러오기]를 누릅니다.
 2. **방법 2 (영구 고정)**: [js/main.js](file:///C:/0.Project/its-ad-insight/js/main.js) 상단의 `DEFAULT_URL`과 `DEFAULT_KEY`를 새 값으로 수정합니다.
+
+---
+
+## 6. 온코어 (사이드바 사이트 선택 → 온코어)
+
+아이티켓과 같은 `Code.gs` 를 별도 Apps Script 프로젝트에 붙여넣어 쓰며, 스크립트 속성으로 사이트를 나눈다.
+
+| 항목 | 값 |
+| :--- | :--- |
+| 수집기 Apps Script | `its-ad-insight 온코어 수집기` (itketweb 소유, ID `1GUG659FEC6BWK_n3PuGlTAdgS7JYRdv4FJ8Xfozj8uaNCWVVxDqeB9Mg`) |
+| 스크립트 속성 | `SITE=oncore` · `SHEET_ID` · `QUOTE_SHEET_ID` (네이버는 `NAVER_API_KEY`·`NAVER_SECRET`·`NAVER_CUSTOMER_ID` 를 넣으면 그때부터 수집) |
+| 데이터 시트 | `its-ad-insight 온코어 데이터` `1iY2UYIDF1qfHNHHwnHq-D9tBDYqoK-x_rNJDN3tFxbg` (itketweb 소유) |
+| 견적 원본 | `온코어 견적요청 DB` `1nmsfZhEuX7ZQHRqx_vPot5hBHIYkpLH9AAmw1WNtMEc` (견적문의 탭, 아이티켓과 같은 양식) |
+| Google Ads | 온코어 주식회사 423-835-7990 (marketing@on-core.co.kr 로만 접근), 스크립트 `its-ad-insight 온코어 수집` ID 12687037 |
+| 웹앱 주소·키 | 프런트 `SITE_SOURCES.oncore` (`src/hooks/useDashboardData.ts`) |
+
+- 온코어 광고 계정의 구글 계정은 데이터 시트를 열 수 없어서, Ads 스크립트는 `POST_URL`·`POST_KEY` 로 수집기 웹앱(`doPost` `syncAdsSheets`)에 g_* 시트를 보내고 웹앱이 시트에 쓴다.
+- 온코어 수집기는 견적·네이버만 돌린다. 고도몰·GFA·커머스·다른 사이트 견적·전화문의는 아이티켓 전용이라 건너뛴다.

@@ -18,10 +18,11 @@ import type {
   QuoteRawRow,
   QuoteManualMark,
   SyncStatus,
+  SiteId,
 } from '../types/dashboard';
 import { buildCategoryMap, LEGACY_ONLY_CATS, quoteKey, THIS_M } from '../utils/format';
 import { SITE_DEFAULT_CATEGORY } from '../utils/constants';
-import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
+import { setSalesSite, applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 import { applyAdDevices } from '../data/deviceStats';
 import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
@@ -32,8 +33,27 @@ export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
 export const DEFAULT_KEY = '2d3b0cc2b04a4873a835583968ca7a0b';
 
+/**
+ * 아이티켓이 아닌 사이트의 수집기 웹앱 (사이트마다 Apps Script 프로젝트·데이터 시트가 따로다, apps-script/Code.gs 머리말 참고).
+ * 주소·키가 비어 있으면 그 사이트는 '데이터 연결 준비 중' 안내만 보여 준다.
+ */
+export const SITE_SOURCES: Record<Exclude<SiteId, 'itket'>, { url: string; key: string }> = {
+  oncore: {
+    url:
+      import.meta.env?.VITE_ONCORE_URL ||
+      'https://script.google.com/macros/s/AKfycbzG-C3hj6HF_JuKzzjUGOvtRIzM5KLqGrJCBeDfNsQnzw7dHqw60T5Wm3yUunmBUrbT/exec',
+    key: import.meta.env?.VITE_ONCORE_KEY || 'b3be208f75a04416914854086cfb72e5',
+  },
+};
 
-export function getCfg(): { url: string; key: string } {
+/** 그 사이트의 수집기 웹앱이 연결돼 있는지 */
+export function siteConnected(site: SiteId): boolean {
+  const c = getCfg(site);
+  return !!(c.url && c.key);
+}
+
+export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
+  if (site !== 'itket') return SITE_SOURCES[site];
   const c = window.ADI || {};
   const envUrl = import.meta.env?.VITE_ADI_URL;
   const envKey = import.meta.env?.VITE_ADI_KEY;
@@ -162,8 +182,8 @@ export function quoteStatsOf(data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 
 }
 
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
-export async function fetchDailyHist(months: string[]): Promise<SpendDailyRow[]> {
-  const c = getCfg();
+export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): Promise<SpendDailyRow[]> {
+  const c = getCfg(site);
   const res = await fetch(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`);
   const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
   if (j.error) throw new Error(j.error);
@@ -487,19 +507,36 @@ function toQuoteRawRow(r: RawQuoteRawApiRow, id: string): QuoteRawRow {
   };
 }
 
-const isUsableCache = (j: RawApiPayload | null): j is RawApiPayload =>
-  !!j && !!(j.quotes_monthly?.length || j.n_adgroup_monthly?.length) && !!j.quotes_raw?.length;
+/** 아이티켓이 아닌 사이트의 데이터에 사이트를 표시한다 (견적 원장에는 사이트 열이 없다) */
+function withSite(d: DashboardData, site: SiteId): DashboardData {
+  setSalesSite(site);
+  if (site === 'itket') return d;
+  return { ...d, site, quotesRaw: d.quotesRaw.map((r) => ({ ...r, site })) };
+}
 
-export function useDashboardData() {
+// 아이티켓은 견적 원장까지 있어야 쓴다 (원장 없는 옛 캐시 제외). 다른 사이트는 광고·견적 중 하나라도 있으면 쓴다
+const isUsableCache = (j: RawApiPayload | null, site: SiteId): j is RawApiPayload =>
+  !!j &&
+  (site === 'itket'
+    ? !!(j.quotes_monthly?.length || j.n_adgroup_monthly?.length) && !!j.quotes_raw?.length
+    : !!(j.quotes_monthly?.length || j.n_adgroup_monthly?.length || j.g_campaign_monthly?.length));
+
+/** site: 보고 있는 사이트 — 바뀌면 화면 데이터를 비우고 그 사이트의 웹앱에서 다시 받는다 */
+export function useDashboardData(site: SiteId = 'itket') {
   const [data, setData] = useState<DashboardData>(emptyData);
   const [status, setStatus] = useState<SyncStatus>('init');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   // 실데이터가 먼저 도착하면 늦게 읽힌 캐시로 덮어쓰지 않는다
   const liveLoaded = useRef(false);
+  // 요청 중에 사이트를 바꾸면 늦게 도착한 이전 사이트 응답은 버린다
+  const siteRef = useRef(site);
+  siteRef.current = site;
 
   const categoryMap = useMemo(() => buildCategoryMap(data.mapping), [data.mapping]);
 
   const tryLoadStaticFallback = useCallback(async () => {
+    // 배포에 묶인 스냅숏(data/latest.json)은 아이티켓 데이터다
+    if (site !== 'itket') return;
     try {
       const localRes = await fetch(`${import.meta.env.BASE_URL}data/latest.json`);
       if (!localRes.ok) return;
@@ -507,17 +544,17 @@ export function useDashboardData() {
       if (liveLoaded.current) return;
       setData((prevData) => {
         if (prevData.spend.length > 0 && prevData.quotesRaw.length > 0) return prevData;
-        writeCachedPayload(localJ);
+        writeCachedPayload(localJ, site);
         return fromApi(localJ);
       });
       setStatus('live');
     } catch {
       // ignore fallback failure
     }
-  }, []);
+  }, [site]);
 
   const load = useCallback(async () => {
-    const c = getCfg();
+    const c = getCfg(site);
     if (!c.url || !c.key) {
       setStatus((prev) => (prev !== 'live' ? 'unlinked' : prev));
       return;
@@ -533,27 +570,33 @@ export function useDashboardData() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as RawApiPayload;
       if (j.error) throw new Error(j.error);
+      if (siteRef.current !== site) return;
       liveLoaded.current = true;
-      setData(fromApi(j));
+      setData(withSite(fromApi(j), site));
       setStatus('live');
-      writeCachedPayload(j);
+      writeCachedPayload(j, site);
     } catch (e) {
+      if (siteRef.current !== site) return;
       console.error('[its-ad-insight] 실데이터 동기화 오류 (화면 데이터 유지):', e);
       setStatus((prev) => (prev === 'live' ? 'live' : 'error'));
       await tryLoadStaticFallback();
     } finally {
       setIsSyncing(false);
     }
-  }, [tryLoadStaticFallback]);
+  }, [site, tryLoadStaticFallback]);
 
   useEffect(() => {
+    // 사이트가 바뀌면 이전 사이트 데이터를 지우고 처음부터 받는다
+    liveLoaded.current = false;
+    setData(emptyData());
+    setStatus('init');
     // 실데이터 요청(수 초~수십 초)을 가장 먼저 띄워 두고, 그동안 지난번 받은 데이터(없으면 배포에 묶인 스냅숏)로 먼저 그린다.
     // 예전에는 캐시·스냅숏을 다 받은 뒤에야 요청을 시작해 그만큼 늦게 도착했다
     load();
-    readCachedPayload().then(async (cached) => {
-      if (liveLoaded.current) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
-      if (isUsableCache(cached)) {
-        setData(fromApi(cached));
+    readCachedPayload(site).then(async (cached) => {
+      if (liveLoaded.current || siteRef.current !== site) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
+      if (isUsableCache(cached, site)) {
+        setData(withSite(fromApi(cached), site));
         setStatus('live');
       } else {
         await tryLoadStaticFallback();
@@ -562,7 +605,7 @@ export function useDashboardData() {
 
     const timer = setInterval(load, 15 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [load, tryLoadStaticFallback]);
+  }, [site, load, tryLoadStaticFallback]);
 
   // 로그인·로그아웃하면 그 권한에 맞는 데이터로 다시 받는다 (토큰 갱신처럼 계정이 그대로면 받지 않는다)
   useEffect(() => {

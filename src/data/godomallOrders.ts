@@ -1,3 +1,4 @@
+import type { SiteId } from '../types/dashboard';
 /**
  * 아이티켓 고도몰 관리자 > 통계 > 주문통계(월별)의 '구매건수'.
  * 결제완료 일자 기준이고 고객 정보는 담지 않는다. 시트(godo_orders_monthly)를 받기 전에 보여 주는 초기값이며, 시트 값이 오면 applyGodoOrders 로 덮는다.
@@ -160,13 +161,21 @@ export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?:
   });
 }
 
+/** 지금 보고 있는 사이트 — 고도몰 주문은 아이티켓 것이라 다른 사이트에서는 판매 건수를 내지 않는다 (useDashboardData 가 데이터와 함께 맞춘다) */
+let salesSite: SiteId = 'itket';
+export function setSalesSite(site: SiteId): void {
+  salesSite = site;
+}
+
 /** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
 export function salesInMonths(months: string[]): number | null {
+  if (salesSite !== 'itket') return null;
   return months.some((m) => m in GODOMALL_ORDERS) ? months.reduce((sum, m) => sum + (GODOMALL_ORDERS[m] ?? 0), 0) : null;
 }
 
 /** 날짜 범위('YYYY-MM-DD', 양끝 포함)의 판매 건수 합. 일별 값은 주문이 있는 날만 있으므로, 수집 시작일 이후 범위면 빈 날은 0건으로 본다 */
 export function salesInRange(from: string, to: string): number | null {
+  if (salesSite !== 'itket') return null;
   const first = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
   if (!first || to < first) return null;
   return GODOMALL_DAILY.reduce((sum, r) => (r.date >= from && r.date <= to ? sum + r.paid : sum), 0);
