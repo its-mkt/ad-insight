@@ -299,22 +299,22 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
           <table className="stk" id="tbDeviceAds">
             <colgroup>
               <col />
-              <col className="col-dev-amount" />
               <col className="col-dev-count" />
               <col className="col-dev-count" />
               <col className="col-dev-rate" />
               <col className="col-dev-count" />
               <col className="col-dev-unit" />
+              <col className="col-dev-amount" />
             </colgroup>
             <thead>
               <tr>
                 <Th>매체 · 기기</Th>
-                <Th className="n">광고비</Th>
                 <Th className="n">노출</Th>
                 <Th className="n">클릭</Th>
                 <Th className="n">CTR</Th>
                 <Th className="n">광고전환</Th>
                 <Th className="n">평균 CPC</Th>
+                <Th className="n">광고비</Th>
               </tr>
             </thead>
             <tbody>
@@ -326,21 +326,21 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                       {DEVICE_LABELS[r.device]}
                     </span>
                   </td>
-                  <NumTd value={r.cost} unit="원" />
                   <NumTd value={r.imp} />
                   <NumTd value={r.clk} />
                   <NumTd>{ctrText(r.clk, r.imp)}</NumTd>
                   <NumTd value={r.conv} />
                   <NumTd value={r.clk > 0 ? r.cost / r.clk : null} unit="원" />
+                  <NumTd value={r.cost} unit="원" />
                 </tr>
               ))}
               <TotalRow>
-                <NumTd value={adTotal.cost} unit="원" bold />
                 <NumTd value={adTotal.imp} bold />
                 <NumTd value={adTotal.clk} bold />
                 <NumTd bold>{ctrText(adTotal.clk, adTotal.imp)}</NumTd>
                 <NumTd value={adTotal.conv} bold />
                 <NumTd value={adTotal.clk > 0 ? adTotal.cost / adTotal.clk : null} unit="원" bold />
+                <NumTd value={adTotal.cost} unit="원" bold />
               </TotalRow>
             </tbody>
           </table>

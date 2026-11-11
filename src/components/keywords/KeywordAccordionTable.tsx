@@ -45,10 +45,30 @@ const NUMERIC_COLS: { key: Exclude<SortKey, 'name'>; label: string }[] = [
   { key: 'imp', label: '노출' },
   { key: 'clk', label: '클릭' },
   { key: 'ctr', label: 'CTR' },
-  { key: 'conv', label: '전환' },
+  { key: 'conv', label: '광고전환' },
   { key: 'cpc', label: '평균 CPC' },
   { key: 'cost', label: '광고비' },
 ];
+
+/**
+ * 광고그룹 실적 중 키워드별로 잡히지 않은 몫 — 그룹 합계를 따로 받은 경우(검색 결과·키워드 화면)만 생긴다.
+ * 네이버는 광고그룹 실적에 키워드 확장으로 노출된 검색어, 삭제된 키워드, 쇼핑검색(상품 단위 입찰) 실적까지 들어 있지만 키워드 실적은 등록된 키워드만 모은다.
+ * 차이가 없으면(구글처럼 키워드 합과 같으면) null
+ */
+const restOf = (g: KeywordGroup) => {
+  if (!g.totals) return null;
+  const sum = (f: (k: KeywordRow) => number) => g.list.reduce((a, k) => a + f(k), 0);
+  const rest = {
+    imp: Math.round(g.totals.imp - sum((k) => k.imp)),
+    clk: Math.round(g.totals.clk - sum((k) => k.clk)),
+    conv: Math.round(g.totals.conv - sum((k) => k.conv)),
+    cost: Math.round(g.cost - sum((k) => k.cost)),
+  };
+  // 반올림 차이(1원·1회 미만)는 없는 것으로 본다
+  return rest.imp > 0 || rest.clk > 0 || rest.conv > 0 || rest.cost > 0 ? rest : null;
+};
+const REST_TITLE =
+  '광고그룹 실적에서 키워드 실적 합을 뺀 값입니다. 키워드 확장으로 노출된 검색어, 삭제되거나 수집 전에 중지된 키워드, 쇼핑검색(상품 단위 입찰)처럼 키워드가 없는 광고의 실적은 광고그룹에만 집계됩니다.';
 
 /** 그룹 합계 — 따로 받은 실적이 있으면 그 값, 없으면 키워드 합 */
 const groupTotals = (g: KeywordGroup) =>
@@ -320,7 +340,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   <Th className="n">노출</Th>
                   <Th className="n">클릭</Th>
                   <Th className="n">CTR</Th>
-                  <Th className="n">전환</Th>
+                  <Th className="n">광고전환</Th>
                   <Th className="n">평균 CPC</Th>
                   <Th className="n">광고비</Th>
                 </tr>
@@ -375,7 +395,8 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   const sortedKws = isKwExpanded ? allSortedKws : allSortedKws.slice(0, 10);
                   const remainCount = allSortedKws.length - 10;
                   const { imp: grpImp, clk: grpClk, conv: grpConv } = groupTotals(g);
-                  const canOpen = g.list.length > 0;
+                  const rest = restOf(g);
+                  const canOpen = g.list.length > 0 || !!rest;
 
                   return (
                     <React.Fragment key={groupKey}>
@@ -420,6 +441,23 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                             <NumTd value={k.cost} unit="원" />
                           </GroupChildRow>
                         ))}
+
+                      {isOpen && rest && (
+                        <GroupChildRow
+                          label={
+                            <Muted title={REST_TITLE}>
+                              그 밖의 실적 <small>(키워드별로 집계되지 않음)</small>
+                            </Muted>
+                          }
+                        >
+                          <NumTd value={rest.imp} />
+                          <NumTd value={rest.clk} />
+                          <NumTd>{ctr(rest.clk, rest.imp)}</NumTd>
+                          <NumTd value={rest.conv} />
+                          <NumTd value={rest.clk > 0 ? rest.cost / rest.clk : undefined} unit="원" />
+                          <NumTd value={rest.cost} unit="원" />
+                        </GroupChildRow>
+                      )}
 
                       {isOpen && remainCount > 0 && (
                         <tr className="kw-more-row">

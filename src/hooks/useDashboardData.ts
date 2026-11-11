@@ -203,6 +203,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
     imp: n(r.impressions),
     clk: n(r.clicks),
     conv: n(r.conversions),
+    ...(r.campaign_tp ? { campaignTp: String(r.campaign_tp).trim() } : {}),
   });
 
   const spend: SpendRow[] = (j.g_adgroup_monthly || []).map((r) => toSpendRow('Google', r));

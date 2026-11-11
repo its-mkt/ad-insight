@@ -23,6 +23,7 @@ import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../componen
 import { MultiChart } from '../components/charts/MultiChart';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 import { SpendDetailTable } from '../components/ads/SpendDetailTable';
+import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel } from '../utils/allPeriod';
@@ -194,6 +195,12 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 수동 입력 MDF 는 달 전체 금액이라, 같은 날짜 비교에서는 일수 비율만큼만 쓴다
   const pvMdf = sameDate && man(pv, 'MDF') ? (man(pv, 'MDF') * sameDate.days) / daysInMonth(pv) : mdfCost(pv);
   const missing = uncollectedMedia(data.spend, [curM]).map((m): [string, string] => [m, '미수집']);
+  // 매체별 성과 표 — 위 KPI 와 같은 기간 (전체 / 연도 합계 / 선택한 달·일 기간)
+  const statsRows = allPeriod ? data.spend : data.spend.filter((r) => (yearTotal ? yearMonths : [curM]).includes(r.month));
+  // 증감 비교 기간 — KPI 카드와 같다 (연도 합계는 전년 동기, 달·일 기간은 전월·직전 같은 일수). 전체 기간은 비교하지 않는다
+  const statsPrev = allPeriod ? null : data.spend.filter((r) => (yearTotal ? lastYrMonths : [pv]).includes(r.month));
+  const statsCmp = yearTotal ? '전년 동기' : cmp;
+  const statsLabel = allPeriod ? '전체 기간' : yearTotal ? yearLabel : period ? period.label : `${curM.slice(0, 4)}년 ${mLabel(curM)}`;
 
   return (
     <View name="ads" title="매체 광고비">
@@ -226,7 +233,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={monthAvgDetail(yearKeys, allSpendMonths)}
             />
             <KpiCard label="전체 MDF 소진" value={`${fmt(mdfIn(yearKeys))}원`} sub="전체 기간 합계" detail={mdfShareOf(yearKeys)} />
-            <KpiCard label="전체 전환 1건당 광고비" value={`${fmt(cpaIn(yearKeys))}원`} sub="전체 기간 기준" detail={<KpiDetailItems items={[['전환수', convIn(yearKeys)]]} />} />
+            <KpiCard label="전체 전환 1건당 광고비" value={`${fmt(cpaIn(yearKeys))}원`} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
           </>
         ) : yearTotal ? (
           <>
@@ -265,7 +272,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               cur={cpaIn(yearMonths)}
               prev={cpaIn(lastYrMonths)}
               cmpLabel="전년 동기"
-              detail={<KpiDetailItems items={[['전환수', convIn(yearMonths)]]} />}
+              detail={<KpiDetailItems items={[['광고전환', convIn(yearMonths)]]} />}
             />
           </>
         ) : (
@@ -332,7 +339,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           cur={cpa(curM)}
           prev={cpa(pv)}
           cmpLabel={cmp}
-          detail={<KpiDetailItems items={[['전환수', curConv]]} />}
+          detail={<KpiDetailItems items={[['광고전환', curConv]]} />}
         />
           </>
         )}
@@ -386,6 +393,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           colLabel={colLabel}
         />
       )}
+      <MediaCompareTable rows={statsRows} prevRows={statsPrev} cmpLabel={statsCmp} periodLabel={statsLabel} />
+      <MediaStatsTabs rows={statsRows} prevRows={statsPrev} cmpLabel={statsCmp} periodLabel={statsLabel} />
       <SecSrc sources={ADS_SOURCES} />
     </View>
   );

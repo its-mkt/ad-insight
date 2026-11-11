@@ -151,7 +151,18 @@ export const KpiSection: React.FC<{ id?: string; children: React.ReactNode }> = 
   </div>
 );
 
-export const DeltaSpan: React.FC<{ a?: number | null; b?: number | null }> = ({ a, b }) => {
+export const DeltaSpan: React.FC<{
+  a?: number | null;
+  b?: number | null;
+  /** a·b 가 비율(%)일 때 증감률 대신 차이를 %p 로 보인다 (비중 등) */
+  points?: boolean;
+}> = ({ a, b, points }) => {
+  if (points) {
+    if (a == null || b == null) return <>–</>;
+    const d = Math.round((a - b) * 10) / 10;
+    if (!d) return <>–</>;
+    return <span className={`d ${d > 0 ? 'up' : 'down'}`}>{d > 0 ? '▲' : '▼'} {Math.abs(d)}%p</span>;
+  }
   const p = pct(a, b);
   if (!p) return <>–</>;
   return <span className={`d ${p.cls}`}>{p.txt}</span>;
