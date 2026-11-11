@@ -138,14 +138,21 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   // 추이 차트 — 전체 기간은 연도별 합계
   const years = [...new Set(chartMonths.map((m) => m.slice(0, 4)))];
   const axis = allPeriod ? years : chartMonths;
-  const axisLabels = axis.map((k) => (allPeriod ? `${k}년` : mLabel(k)));
   const inKey = (m: string, k: string) => (allPeriod ? m.startsWith(k) : m === k);
-  const trend = (pick: (m: Ga4DeviceMonth) => Partial<Record<DeviceKey, number>> | null | undefined) =>
-    KPI_DEVICES.map((d) => ({
-      k: DEVICE_LABELS[d],
-      c: DEVICE_COLORS[d],
-      v: axis.map((key) => sumBy(chartMonths.filter((m) => inKey(m, key) && g[m]), (m) => pick(g[m])?.[d] ?? 0)),
-    })).filter((s) => s.v.some((x) => x));
+  /** 그 항목이 수집된 달만 가로축에 둔다 — 수집 전 달을 0 으로 그리지 않으려고 (차트는 빈 값을 그리지 못한다) */
+  const trend = (pick: (m: Ga4DeviceMonth) => Partial<Record<DeviceKey, number>> | null | undefined) => {
+    const keys = axis.filter((key) => chartMonths.some((m) => inKey(m, key) && g[m] && pick(g[m])));
+    return {
+      labels: keys.map((k) => (allPeriod ? `${k}년` : mLabel(k))),
+      series: KPI_DEVICES.map((d) => ({
+        k: DEVICE_LABELS[d],
+        c: DEVICE_COLORS[d],
+        v: keys.map((key) => sumBy(chartMonths.filter((m) => inKey(m, key) && g[m]), (m) => pick(g[m])?.[d] ?? 0)),
+      })).filter((s) => s.v.some((x) => x)),
+    };
+  };
+  const visitTrend = trend((m) => (Object.keys(m.sessions).length ? m.sessions : null));
+  const estimateTrend = trend((m) => m.conv?.estimate);
 
   const loading = ga4 === null;
   const kpiValue = (n: number | undefined) => (loading ? '…' : visits.measured ? `${fmt(n ?? 0)}회` : PENDING);
@@ -201,16 +208,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         <MultiChart
           id="chDeviceVisits"
           title={allPeriod ? '연도별 기기별 방문' : '월별 기기별 방문'}
-          labels={axisLabels}
-          series={trend((m) => m.sessions)}
+          labels={visitTrend.labels}
+          series={visitTrend.series}
           unit="회"
           emptyMessage={loading ? '불러오는 중입니다…' : 'GA4 방문 값이 없습니다.'}
         />
         <MultiChart
           id="chDeviceEstimates"
           title={allPeriod ? '연도별 기기별 견적 완료' : '월별 기기별 견적 완료'}
-          labels={axisLabels}
-          series={trend((m) => m.conv?.estimate)}
+          labels={estimateTrend.labels}
+          series={estimateTrend.series}
           unit="회"
           emptyMessage={loading ? '불러오는 중입니다…' : `기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
         />
