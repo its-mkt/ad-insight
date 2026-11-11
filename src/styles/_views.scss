@@ -2437,3 +2437,41 @@ tr.kw-more-row td {
     white-space: nowrap;
   }
 }
+
+// 기기별 통계 — 숫자 칸은 공통 너비 토큰, 이름 칸은 남는 폭
+#tbDeviceChannels,
+#tbDeviceAds,
+#tbDeviceSales {
+  table-layout: fixed;
+  width: 100%;
+
+  .col-dev-count {
+    width: var(--col-count);
+  }
+
+  .col-dev-rate {
+    width: var(--col-rate);
+  }
+
+  .col-dev-unit {
+    width: var(--col-unit-price);
+  }
+
+  .col-dev-amount {
+    width: var(--col-amount);
+  }
+}
+
+// 기기 3종 × (방문·견적 완료·전환율) + 채널 이름 칸 최소 10rem
+#tbDeviceChannels {
+  min-width: calc(3 * (2 * var(--col-count) + var(--col-rate)) + 10rem);
+}
+
+// 금액 + 건수 3 + 비율 + 단가 + 이름 칸 최소 10rem
+#tbDeviceAds {
+  min-width: calc(var(--col-amount) + 3 * var(--col-count) + var(--col-rate) + var(--col-unit-price) + 10rem);
+}
+
+#tbDeviceSales {
+  min-width: calc(var(--col-count) + var(--col-rate) + var(--col-amount) + 10rem);
+}

@@ -1,4 +1,4 @@
-export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'search' | 'data' | 'admin';
+export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'devices' | 'search' | 'data' | 'admin';
 
 /** 사이드바에서 고르는 사이트 — 온코어는 데이터 연결 전이라 안내만 보여 준다 */
 export type SiteId = 'itket' | 'oncore';
@@ -383,6 +383,9 @@ export interface RawApiPayload {
   godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
   godo_goods_inflow_monthly?: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[];
   godo_order_lines?: Record<string, unknown>[];
+  /** 캠페인 × 기기 × 월 광고 실적 (Google Ads 스크립트 · 네이버 /stats pcMblTp) */
+  g_device_monthly?: Record<string, unknown>[];
+  n_device_monthly?: Record<string, unknown>[];
   /** 관리자 로그인 응답에만 있다 */
   godo_order_customers?: Record<string, unknown>[];
   manual_categories?: RawManualCategoryApiRow[];
