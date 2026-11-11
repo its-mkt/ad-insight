@@ -2475,3 +2475,24 @@ tr.kw-more-row td {
 #tbDeviceSales {
   min-width: calc(var(--col-count) + var(--col-rate) + var(--col-amount) + 10rem);
 }
+
+// 이용 현황 — 기간·기기 선택 줄과 화면별·일별 표
+.usage-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.usage-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 40rem;
+
+  .col-us-count {
+    width: var(--col-count);
+  }
+  .col-us-duration {
+    width: var(--col-duration);
+  }
+}

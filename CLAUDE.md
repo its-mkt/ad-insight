@@ -49,7 +49,7 @@
 | 일 선택·기간 선택 달력 | `DatePicker` (`PeriodNav` 의 `onSelectDayRange` 로 연결) |
 
 ### 표 열 너비
-- 숫자·날짜·유입 경로 칸은 `src/styles/_variables.scss` 의 공통 너비를 쓴다: `--col-date`(날짜) · `--col-count`(건수·수량·노출·클릭·전환) · `--col-rate`(비율) · `--col-unit-price`(CPC·CPA 단가) · `--col-amount`(금액) · `--col-source`(유입 경로)
+- 숫자·날짜·유입 경로 칸은 `src/styles/_variables.scss` 의 공통 너비를 쓴다: `--col-date`(날짜) · `--col-count`(건수·수량·노출·클릭·전환) · `--col-rate`(비율) · `--col-unit-price`(CPC·CPA 단가) · `--col-amount`(금액) · `--col-source`(유입 경로) · `--col-duration`(체류시간)
 - 이름 칸은 너비를 주지 않아 남는 폭을 쓰게 하고, 표 `min-width` 는 숫자 칸 합 + 이름 칸 최소 폭으로 잡는다
 - 새 종류가 필요하면 표마다 rem 을 적지 말고 토큰을 추가한다
 
