@@ -125,7 +125,7 @@ function main() {
     each_(`SELECT segments.month, segments.device, campaign.name, campaign.advertising_channel_type, ${M}
            FROM campaign WHERE ${range} AND metrics.impressions > 0`, (r) => {
       const m = r.segments.month.slice(0, 7), d = device_(r.segments.device), name = String(r.campaign.name || '').trim();
-      const k = [m, name, d].join('\u0001');
+      const k = JSON.stringify([m, name, d]);
       const cur = dev[k] || (dev[k] = [m, type_(r.campaign.advertisingChannelType), name, d, 0, 0, 0, 0]);
       met_(r).forEach((v, i) => (cur[i + 4] += v));
     });
