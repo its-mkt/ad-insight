@@ -1,3 +1,4 @@
+@use 'mixins';
 /* ── 화면별 스타일 · 반응형 미디어쿼리 ── */
 .view {
   display: none;
@@ -1172,18 +1173,14 @@ tr.kw-more-row td {
   }
 
 
-  // 이미지 받는 중: 공용 스켈레톤(.skel)과 같은 플랫 회색 면 + 깜빡임
+  // 이미지 받는 중: 공용 스켈레톤(.skel)과 같은 shimmer
   &.is-loading {
-    background: var(--line);
-    animation: skel-pulse 1.6s ease-in-out infinite;
+    @include mixins.skel-shimmer;
 
     img {
       opacity: 0;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-    }
   }
 
   small {

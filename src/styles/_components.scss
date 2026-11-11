@@ -1,3 +1,4 @@
+@use 'mixins';
 /* ── 공통 부품 (KPI · 카드 · 세그먼트 · 테이블 · 배지 · 툴팁) ── */
 .kpis {
   display: grid;
@@ -1646,22 +1647,21 @@ table.kv th {
 }
 
 /* ── 스켈레톤 (common/SkeletonView): 첫 데이터가 오기 전 자리표시 ──
-   플랫: 테두리·그림자·그라데이션 없이 회색 면만, 은은한 깜빡임 (index.html 첫 화면 스켈레톤과 같은 색·속도) */
+   회색 면 위로 밝은 띠가 왼쪽에서 오른쪽으로 지나간다 (shimmer). 크기·모양은 각 자리표시가 정한다.
+   띠는 화면 기준(background-attachment: fixed)이라 여러 막대에 한 줄로 이어져 지나간다 */
 .skel {
   display: block;
   width: 100%;
   height: 1rem;
-  background: var(--line);
-  animation: skel-pulse 1.6s ease-in-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+  @include mixins.skel-shimmer;
 }
 
-@keyframes skel-pulse {
-  50% {
-    opacity: 0.5;
+@keyframes skel-shimmer {
+  from {
+    background-position: -100vw 0;
+  }
+  to {
+    background-position: 100vw 0;
   }
 }
 

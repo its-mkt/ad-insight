@@ -1,0 +1,16 @@
+// 여러 스타일 파일이 함께 쓰는 믹스인 (CSS 를 직접 내보내지 않는다)
+
+/** 스켈레톤 shimmer — 회색 면 위로 밝은 띠가 지나간다. @keyframes skel-shimmer 는 _components.scss */
+@mixin skel-shimmer {
+  background-color: var(--line);
+  background-image: linear-gradient(90deg, var(--line) 0%, var(--skel-hi) 20%, var(--line) 40%, var(--line) 100%);
+  background-size: 200vw 100%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: skel-shimmer 2.2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-image: none;
+  }
+}
