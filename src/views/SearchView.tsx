@@ -16,7 +16,7 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
 import { TabButton } from '../components/common/TabButton';
-import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
+import { LIST_LIMIT, MoreButton, ShowMoreButton } from '../components/common/MoreButton';
 import { MediaPill } from '../components/common/MediaPill';
 import { useSort } from '../hooks/useSort';
 import { KeywordAccordionTable } from '../components/keywords/KeywordAccordionTable';
@@ -152,6 +152,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
+  // 견적 구성(카테고리·유입 매체·문의 유형·담당자)은 표의 더보기와 따로 펼친다
+  const [breakdownAll, setBreakdownAll] = useState(false);
 
   const { sortKey: kKey, sortOrder: kOrd, toggleSort: kSort } = useSort<KeywordSort>('cost');
   const { sortKey: qKey, sortOrder: qOrd, toggleSort: qSort } = useSort<'date'>('date');
@@ -230,6 +232,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const changeTab = (t: SearchTab) => {
     setTab(t);
     setShowAll(false);
+    setBreakdownAll(false);
     setCampTab(0);
   };
   const limit = showAll ? undefined : LIST_LIMIT;
@@ -302,6 +305,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     { title: '문의 유형', rows: breakdownOf(result.quotes, (r) => r.inquiryType || INQUIRY_WEB, '기타') },
     { title: '담당자', rows: breakdownOf(result.quotes, repKeyOf, '미지정') },
   ];
+  // 견적 구성에서 5개를 넘어 접혀 있는 항목 수 (모든 열 합계) — 있을 때만 더보기 버튼을 둔다
+  const breakdownHidden = breakdowns.reduce((sum, b) => sum + Math.max(0, b.rows.length - BREAKDOWN_LIMIT), 0);
 
   // 유입 매체 검색 전용 — 이 매체가 전체 유입(매체가 기록된 견적)에서 차지하는 비중. 종합 요약의 유입 매체 비중과 같은 원장·기준이다
   const sameSource = (s?: string) => !!sourceScope && (s || '').replace(/\s+/g, '').toLowerCase() === sourceScope.replace(/\s+/g, '').toLowerCase();
@@ -576,15 +581,25 @@ export const SearchView: React.FC<SearchViewProps> = ({
               {breakdowns.map((b) => (
                 <div key={b.title} className="search-breakdown-col">
                   <h4>{b.title}</h4>
-                  {b.rows.slice(0, showAll ? undefined : BREAKDOWN_LIMIT).map(([k, n]) => (
+                  {b.rows.slice(0, breakdownAll ? undefined : BREAKDOWN_LIMIT).map(([k, n]) => (
                     <p key={k}>
                       <span title={k}>{k}</span>
                       <b>{fmt(n)}건</b>
                     </p>
                   ))}
-                  {!showAll && b.rows.length > BREAKDOWN_LIMIT && <Muted small>외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</Muted>}
+                  {!breakdownAll && b.rows.length > BREAKDOWN_LIMIT && <Muted small>외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</Muted>}
                 </div>
               ))}
+              {breakdownHidden > 0 && (
+                <div className="search-breakdown-more">
+                  <MoreButton
+                    label={breakdownAll ? `상위 ${BREAKDOWN_LIMIT}개만 보기` : `더보기 (+${fmt(breakdownHidden)}개)`}
+                    open={breakdownAll}
+                    dataBtn="search-breakdown-more"
+                    onClick={() => setBreakdownAll((v) => !v)}
+                  />
+                </div>
+              )}
             </div>
 
             {isLoggedIn ? (

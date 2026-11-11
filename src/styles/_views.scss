@@ -2231,7 +2231,8 @@ tr.kw-more-row td {
 // 검색 결과 — 견적 구성
 .search-breakdown {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  // 열은 최대 4개(구성 항목 수) — 빈 열이 생기지 않아야 전체 폭 더보기(1 / -1)가 열 너비를 줄이지 않는다
+  grid-template-columns: repeat(auto-fit, minmax(max(11rem, calc((100% - 4.5rem) / 4)), 1fr));
   gap: 1rem 1.5rem;
   padding-bottom: 1rem;
   margin-bottom: 1rem;
@@ -2262,6 +2263,13 @@ tr.kw-more-row td {
       flex-shrink: 0;
     }
   }
+}
+
+// 견적 구성 더보기 — 열마다가 아니라 구성 전체에 하나, 모든 열 아래 가운데
+.search-breakdown-more {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
 }
 
 // 헤더 제목 오른쪽의 검색어 — 길면 말줄임
