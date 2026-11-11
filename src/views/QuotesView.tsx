@@ -17,7 +17,6 @@ import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteDetailsPending, quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
@@ -50,7 +49,6 @@ interface QuotesViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const QUOTES_SOURCES: SourceLinkItem[] = [
@@ -73,7 +71,7 @@ const ORIGIN_COLORS: Record<string, string> = {
   톡플러스: '--c-ka',
 };
 
-export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
+export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   const { isLoggedIn } = useAuth();
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useQuoteStats(data);
@@ -211,7 +209,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : '전월';
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');

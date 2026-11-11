@@ -9,7 +9,6 @@ import { catSum, catsOf, ctrText, fmt, fmtWon, mLabel, THIS_M } from '../utils/f
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
@@ -43,7 +42,6 @@ interface KeywordsViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const KEYWORDS_SOURCES: SourceLinkItem[] = [
@@ -62,7 +60,6 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   allPeriod = false,
   yearTotal = false,
   period,
-  sameDate,
 }) => {
   const [media, setMedia] = useState<'all' | 'Google' | 'Naver'>('all');
   const [type, setType] = useState<'SA' | 'DA'>('SA');
@@ -137,7 +134,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const pvClk  = pvRows.reduce((s, r) => s + r.clk, 0);
   const pvConv = pvRows.reduce((s, r) => s + r.conv, 0);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');

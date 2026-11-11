@@ -15,7 +15,6 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
@@ -42,7 +41,6 @@ interface AdsViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const ADS_SOURCES: SourceLinkItem[] = [
@@ -54,7 +52,7 @@ const ADS_SOURCES: SourceLinkItem[] = [
   { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
 ];
 
-export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
+export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   const [mode, setMode] = useState<ChartTableMode>('chart');
   const [chartSet, setChartSet] = useState<'media' | 'compare'>('media');
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
@@ -134,7 +132,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
       : monthsOfY[monthsOfY.length - 1];
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : '전월';
   // 전환이 없으면 0원이 아니라 '–' 로 보여 준다 (0원은 공짜 전환처럼 읽힌다)
   const cpaText = (v: number) => (v > 0 ? `${fmt(v)}원` : '–');
   const cpa = (mo: string) => {
@@ -194,9 +192,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 일평균: 진행 중인 달은 오늘까지의 날짜 수로 나눠, 다 끝난 전월과 같은 기준으로 비교한다
   const daysInMonth = (mo: string) => new Date(+mo.slice(0, 4), +mo.slice(5), 0).getDate();
   const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysInMonth(mo));
-  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : sameDate && mo === pv ? sameDate.days : elapsedDays(mo));
+  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : elapsedDays(mo));
   // 수동 입력 MDF 는 달 전체 금액이라, 같은 날짜 비교에서는 일수 비율만큼만 쓴다
-  const pvMdf = sameDate && man(pv, 'MDF') ? (man(pv, 'MDF') * sameDate.days) / daysInMonth(pv) : mdfCost(pv);
+  const pvMdf = mdfCost(pv);
   const missing = uncollectedMedia(data.spend, [curM]).map((m): [string, string] => [m, '미수집']);
   // 매체별 성과 표 — 위 KPI 와 같은 기간 (전체 / 연도 합계 / 선택한 달·일 기간)
   const statsRows = allPeriod ? data.spend : data.spend.filter((r) => (yearTotal ? yearMonths : [curM]).includes(r.month));

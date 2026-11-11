@@ -21,7 +21,6 @@ import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
@@ -54,7 +53,6 @@ interface OverviewViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const OVERVIEW_SOURCES: SourceLinkItem[] = [
@@ -74,7 +72,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSearchName,
   monthly,
   period,
-  sameDate,
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
   const stats = useQuoteStats(data);
@@ -113,8 +110,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     THIS_M;
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const pvCaption = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : mLabel(pv);
-  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const pvCaption = period ? period.cmpLabel : mLabel(pv);
+  const cmp = period ? period.cmpLabel : '전월';
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
   const months = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
@@ -452,7 +449,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             curLabel={yearTotal ? yearLabel : undefined}
             totalCur={sumBy(fullList, (c) => c.cur)}
             totalPrev={sumBy(fullList, (c) => c.prev)}
-            prevLabel={yearTotal ? '전년 동기' : period || sameDate ? cmp : undefined}
+            prevLabel={yearTotal ? '전년 동기' : period ? cmp : undefined}
             emptyMessage="취합된 카테고리 데이터가 없습니다."
             onSelect={onSearchName && ((k) => onSearchName(formatCategoryScope(k)))}
           />

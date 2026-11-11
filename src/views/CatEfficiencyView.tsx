@@ -16,7 +16,6 @@ import {
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
@@ -50,7 +49,6 @@ interface CatEfficiencyViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const CAT_EFF_SOURCES: SourceLinkItem[] = [
@@ -96,7 +94,6 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   allPeriod = false,
   yearTotal = false,
   period,
-  sameDate,
 }) => {
   const catState = useCategoryFilterState();
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
@@ -142,7 +139,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const curMonths = allPeriod ? efficiencyMonths : yearTotal ? monthsUpTo(curM) : [curM];
   const prevMonths = allPeriod ? [] : yearTotal ? sameMonthsLastYear(curMonths) : [pv];
   const periodLabel = allPeriod ? `${dotYm(cpaFrom)} 이후` : yearTotal ? yearRangeLabel(curM) : period ? period.label : mLabel(curM);
-  const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : mLabel(pv);
+  const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : mLabel(pv);
 
   const rowsCur = data.spend.filter(inMonths(curMonths));
   const rowsPrev = data.spend.filter(inMonths(prevMonths));
@@ -229,7 +226,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const avgCpa = totQuotes > 0 ? totSpend / totQuotes : 0;
 
   // KPI 비교 기준: 월 선택은 전월, 연도 전체는 전년 동기. 전체 기간은 비교하지 않는다
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
   const prevInputs = prevMonths.map((mo) => ({
     rows: quotesByMonth.get(mo) || [],
     spend: catSum(categoryMap, spendByMonth.get(mo) || [], (r) => r.cost),
@@ -341,12 +338,12 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
             curLabel={yearTotal ? periodLabel : undefined}
             totalCur={sumBy(fullList, (c) => c.cur)}
             totalPrev={sumBy(fullList, (c) => c.prev)}
-            prevLabel={yearTotal || period || sameDate ? prevLabel : undefined}
+            prevLabel={yearTotal || period ? prevLabel : undefined}
           />
           <CompareLegend
             unit="만원"
             curLabel={allPeriod || yearTotal || period ? periodLabel : '기준월'}
-            prevLabel={allPeriod ? undefined : yearTotal || period || sameDate ? prevLabel : '전월'}
+            prevLabel={allPeriod ? undefined : yearTotal || period ? prevLabel : '전월'}
           />
           <ShowMoreButton
             total={fullList.length}
