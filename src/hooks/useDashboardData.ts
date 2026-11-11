@@ -163,8 +163,10 @@ function applyRepTitles<T extends { salesRep?: string }>(rows: T[], latest: Map<
  * 건수뿐 아니라 CPA·견적전환율·카테고리 효율도 이 값으로 계산한다 (2026-11-06 사용자 결정).
  * data.quotes 는 아이티켓 원본이라 어드민·데이터 점검에서만 직접 쓴다.
  */
-export function quoteStatsOf(data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 'quotesExtra'>): { quotes: QuoteRow[]; quotesRaw: QuoteRawRow[] } {
-  const extra = data.quotesExtra || [];
+export function quoteStatsOf(
+  data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 'quotesExtra'> & Partial<Pick<DashboardData, 'quotesSites' | 'quotesPhone'>>
+): { quotes: QuoteRow[]; quotesRaw: QuoteRawRow[] } {
+  const extra = withExtraDetails(data.quotesExtra || [], data.quotesSites || [], data.quotesPhone || []);
   if (!extra.length) return { quotes: data.quotes, quotesRaw: data.quotesRaw };
   const agg = new Map<string, QuoteRow>();
   const add = (month: string, category: string, source: string, count: number) => {
@@ -179,6 +181,29 @@ export function quoteStatsOf(data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 
     quotes: [...agg.values()],
     quotesRaw: withLatestRepTitles([...data.quotesRaw, ...extra].sort((a, b) => a.date.localeCompare(b.date))),
   };
+}
+
+/**
+ * 건수 통계용 다른 사이트·전화문의 행(고객 정보 없음)에 원본 행의 SNO·제목·회사·작성자·연락처를 붙인다.
+ * 원본(quotes_raw_sites·quotes_phone)을 받은 경우에만 채워지고, 분류·유입 경로 등 집계 값은 통계 행 그대로 둔다.
+ * 같은 사이트·같은 날·같은 영업담당 행을 차례로 짝짓는다.
+ */
+function withExtraDetails(extra: QuoteRawRow[], sites: QuoteRawRow[], phone: QuoteRawRow[]): QuoteRawRow[] {
+  if (!sites.length && !phone.length) return extra;
+  const keyOf = (site: string, date: string, rep?: string) => [site, date.slice(0, 10), rep || ''].join('|');
+  const pool = new Map<string, QuoteRawRow[]>();
+  const put = (site: string, r: QuoteRawRow) => {
+    const k = keyOf(site, r.date, r.salesRep);
+    pool.set(k, [...(pool.get(k) || []), r]);
+  };
+  sites.forEach((r) => r.site && put(r.site, r));
+  phone.forEach((r) => put('phone', r));
+  return extra.map((r) => {
+    const src = pool.get(keyOf(r.site || '', r.date, r.salesRep))?.shift();
+    if (!src) return r;
+    const { sno, subject, company, name, email, phone: tel, receiver, sourceDetail } = src;
+    return { ...r, sno, subject, company, name, email, phone: tel, receiver, sourceDetail: r.sourceDetail || sourceDetail, autoCategory: src.autoCategory, manual: src.manual };
+  });
 }
 
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
