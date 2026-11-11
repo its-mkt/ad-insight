@@ -78,6 +78,24 @@ export function categoryFromAdNames(campaign: string, adgroup: string): string {
 }
 
 /**
+ * 고도몰 판매 제품명에만 먼저 적용하는 보정 규칙 — 공용 규칙(견적 제목·광고 이름, Apps Script 와 같은 표)은 그대로 두고,
+ * 제품명 표기 때문에 틀리게 잡히는 것만 바로잡는다 (예: RTX 그래픽이 든 데스크탑이 GPU/AI 서버로, 모니터를 끼운 ZBook 이 모니터로).
+ */
+const GOODS_CATEGORY_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/zbook/, '모바일 워크스테이션'],
+  [/엘리트\s?데스크|elite\s?desk|pro\s?tower|프로\s?타워|deskmini/, '데스크탑'],
+  [/\bhp\]?\s?\d{3}r?\s?g\d/, '노트북 > HP 노트북'],
+  [/win(dows)?\s?svr|sql\s?svr/, '소프트웨어 > 기타 소프트웨어'],
+];
+
+/** 고도몰 판매 제품명 → 카테고리. 보정 규칙을 먼저 보고, 없으면 공용 규칙(categoryFromText) */
+export function goodsCategoryOf(name: string): string {
+  const t = String(name || '').toLowerCase();
+  for (const [re, cat] of GOODS_CATEGORY_RULES) if (re.test(t)) return cat;
+  return categoryFromText(name);
+}
+
+/**
  * 견적 → 카테고리. 제목으로 먼저 찾고, "견적 요청"처럼 제품 정보가 없으면
  * 유입경로의 광고 꼬리표(예: "네이버(광고) - ROSEHA" 의 ROSEHA)로 한 번 더 찾는다.
  * 수집 스크립트 quoteCategory_ 와 같은 순서.

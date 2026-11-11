@@ -3,6 +3,8 @@ import { mergeKeywordMonths, periodStartsOf } from './allPeriod';
 import { adStatKey, type AdStat } from './creativeImage';
 import { catsOf, parseCatParts } from './format';
 import { inDayRange, type DayRange } from './dayRange';
+import { goodsCategoryOf } from './categoryText';
+import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
 
@@ -37,7 +39,37 @@ export interface SearchResult {
   cpaQuotes: number;
   /** 매체·유입 경로로 찾은 결과라 CPA 를 계산하지 않았다 (견적의 유입 추적이 광고비보다 늦게 시작해 기간이 맞지 않는다) */
   cpaHidden: boolean;
+  /** 일치한 고도몰 판매 건수 (주문 수) — 판매 자료가 없는 기간이면 null */
+  sales: number | null;
+  /** 일치한 판매 주문 줄 (주문 × 제품) */
+  salesLines: SearchSaleLine[];
 }
+
+/** 검색에 일치한 판매 주문 줄 — 제품명과, 제품명으로 찾은 카테고리를 함께 담는다 */
+export interface SearchSaleLine extends GodoOrderLine {
+  goodsName: string;
+  category: string;
+}
+
+/** 판매 주문 줄에 제품명·카테고리를 붙인다. 제품명은 그 달 판매 제품 목록의 이름, 없으면 다른 달의 이름 */
+function saleLinesWithGoods(): SearchSaleLine[] {
+  const byMonth = new Map<string, string>();
+  const byNo = new Map<string, string>();
+  Object.entries(GODOMALL_GOODS).forEach(([month, rows]) =>
+    rows.forEach((g) => {
+      byMonth.set(`${month}|${g.no}`, g.name);
+      byNo.set(g.no, g.name);
+    })
+  );
+  return GODOMALL_ORDER_LINES.map((line) => {
+    const goodsName = byMonth.get(`${line.month}|${line.goodsNo}`) ?? byNo.get(line.goodsNo) ?? '';
+    // 견적 제목과 같은 분류 규칙(categoryText)에 판매 제품 보정 규칙을 더해 제품명을 카테고리로 바꾼다
+    return { ...line, goodsName, category: goodsCategoryOf(goodsName) };
+  });
+}
+
+/** 고도몰 판매는 모두 아이티켓 쇼핑몰 주문이다 — "아이티켓"으로 찾으면 견적처럼 접수처로 일치시킨다 */
+const SALES_SITE = '아이티켓';
 
 /** 검색 결과를 광고그룹 표로 — 합계에 들어간 실적 그대로 묶어, 표의 합이 위쪽 광고비 카드와 같다. 펼치면 그 그룹의 키워드가 나온다 */
 export function resultAdGroups(result: SearchResult): KeywordGroup[] {
@@ -307,6 +339,31 @@ export function searchDashboard(
     .filter((r) => !range || inDayRange(r.date, range))
     .sort((a, b) => b.date.localeCompare(a.date));
 
+  // 판매 — 견적과 같은 규칙으로 고도몰 결제 주문을 거른다. 주문의 유입 경로·상세가 기록돼 있지 않으면(현재 전부 미수집)
+  // 캠페인·광고그룹·키워드와는 제품명·제품 카테고리에 그 이름이 들어 있을 때만 이어진다
+  const cutoff = salesCutoff();
+  const saleInPeriod = (l: GodoOrderLine) => (!cutoff || l.paid.slice(0, 10) <= cutoff) && (range ? inDayRange(l.paid, range) : inPeriod(l.month));
+  const salesLines = saleLinesWithGoods()
+    .filter((l) => {
+      if (!saleInPeriod(l)) return false;
+      if (scope?.source) return sameName(l.source, scope.source);
+      if (scope?.cat1) {
+        const p = parseCatParts(l.category);
+        return p.cat1 === scope.cat1 && (!scope.cat2 || p.cat2 === scope.cat2);
+      }
+      if (!quoteTokens.length) return false;
+      const plain = [l.goodsName, l.category, l.detail];
+      if (matches(quoteTokens, plain)) return true;
+      if (scope) return false;
+      return matches(tokens, [...plain, l.source === '미수집' ? '' : l.source, SALES_SITE]);
+    })
+    .sort((a, b) => b.paid.localeCompare(a.paid));
+  // 판매 건수는 주문 수 — 한 주문에 제품이 여럿이면 한 번만 센다 (월별 판매 건수와 같은 기준)
+  const salesCovered =
+    GODOMALL_ORDER_LINES.length > 0 &&
+    (range ? salesInRange(range.from, range.to) !== null : !months || months.some((m) => m in GODOMALL_ORDERS));
+  const sales = salesCovered ? new Set(salesLines.map((l) => l.key)).size : null;
+
   const sum = (f: (r: SpendRow) => number) => spendRows.reduce((a, r) => a + f(r), 0);
   const isItket = (r: QuoteRawRow) => !r.site && !r.inquiryType;
   const cpaFrom = periodStartsOf(data).cpaFrom;
@@ -330,5 +387,7 @@ export function searchDashboard(
     cpaCost,
     cpaQuotes,
     cpaHidden: channelSearch || (!!range && !exactSpend),
+    sales,
+    salesLines,
   };
 }

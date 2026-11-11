@@ -13,6 +13,31 @@ export const DEVICE_KEYS: DeviceKey[] = ['desktop', 'mobile', 'tablet', 'other']
 
 export const DEVICE_LABELS: Record<DeviceKey, string> = { desktop: 'PC', mobile: '모바일', tablet: '태블릿', other: '기타' };
 
+/** GA4 기본 채널 그룹 → 한글 이름 (목록에 없는 새 채널은 영문 그대로 둔다) */
+const CHANNEL_LABELS: Record<string, string> = {
+  'Paid Search': '검색 광고',
+  'Organic Search': '자연 검색',
+  Display: '배너 광고',
+  'Paid Video': '동영상 광고',
+  'Organic Video': '동영상 (광고 아님)',
+  Direct: '직접 방문',
+  Referral: '다른 사이트 링크',
+  'Cross-network': '구글 통합 광고 (PMax 등)',
+  'AI Assistant': 'AI 서비스',
+  'Organic Social': 'SNS (광고 아님)',
+  'Paid Social': 'SNS 광고',
+  'Paid Shopping': '쇼핑 광고',
+  'Organic Shopping': '쇼핑 (광고 아님)',
+  'Paid Other': '기타 광고',
+  Email: '이메일',
+  SMS: '문자',
+  Affiliates: '제휴',
+  Audio: '오디오 광고',
+  'Mobile Push Notifications': '앱 푸시',
+  Unassigned: '분류 안 됨',
+};
+export const channelLabelOf = (ch: string) => CHANNEL_LABELS[ch] ?? ch;
+
 /** 차트 색 (CSS 변수) */
 export const DEVICE_COLORS: Record<DeviceKey, string> = { desktop: '--acc', mobile: '--c-it', tablet: '--c-ka', other: '--c-rest' };
 

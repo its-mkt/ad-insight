@@ -20,6 +20,8 @@ interface PurchasesViewProps {
   selectedMonth: string;
   allPeriod?: boolean;
   yearTotal?: boolean;
+  /** 이 달까지만 보여 준다 — 로그인하지 않으면 진행 중인 달을 빼고 지난달까지 (빈 값이면 제한 없음) */
+  untilMonth?: string;
 }
 
 const TITLE = '구매 상세';
@@ -44,7 +46,7 @@ const peakCard = (months: string[]) => {
 };
 
 /** 고도몰 주문통계의 구매건수 (결제완료일 기준) */
-export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false }) => {
+export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth }) => {
   // 최신 GA4 값을 받으면 다시 그린다
   const [, setGa4Loaded] = useState(0);
   useEffect(() => {
@@ -58,7 +60,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   }, []);
 
   // 시트 값을 받으면 달·기준일이 바뀌므로 그릴 때마다 읽는다
-  const ALL_MONTHS = Object.keys(GODOMALL_ORDERS).sort();
+  const ALL_MONTHS = Object.keys(GODOMALL_ORDERS).filter((m) => !untilMonth || m <= untilMonth).sort();
   const YEARS = [...new Set(ALL_MONTHS.map((m) => m.slice(0, 4)))];
   const AS_OF_MONTH = GODOMALL_ORDERS_AS_OF.slice(0, 7);
   const AS_OF_DAY = +GODOMALL_ORDERS_AS_OF.slice(8, 10);
@@ -80,7 +82,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
 
   // 표는 항상 12칸으로 그려 기간을 바꿔도 월 칸 너비가 같다
   const monthKeys = Array.from({ length: 12 }, (_, i) => i + 1);
-  const tableSeries = (allPeriod ? [...YEARS].reverse() : [yr]).map((y) => ({ k: `${y}년`, c: '--acc', v: monthKeys.map((m) => countOf(ym(y, m))) }));
+  const tableSeries = (allPeriod ? [...YEARS].reverse() : [yr]).map((y) => ({ k: `${y}년`, c: '--acc', v: monthKeys.map((m) => (untilMonth && ym(y, m) > untilMonth ? 0 : countOf(ym(y, m)))) }));
 
   // 월 보기 — 쇼핑몰에서 결제된 주문의 값만 쓴다 (견적·광고비와 섞지 않는다)
   const monthName = mLabel(selectedMonth);

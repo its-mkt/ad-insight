@@ -11,13 +11,12 @@ import { ViewNote } from '../components/common/Note';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
-import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
 import { TabButton } from '../components/common/TabButton';
-import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
+import { LIST_LIMIT, MoreButton, ShowMoreButton } from '../components/common/MoreButton';
 import { MediaPill } from '../components/common/MediaPill';
 import { useSort } from '../hooks/useSort';
 import { KeywordAccordionTable } from '../components/keywords/KeywordAccordionTable';
@@ -53,6 +52,10 @@ const TITLE = '검색 결과';
 const DESCRIPTION = '검색어와 관련된 광고와 견적을 한 화면에 요약합니다';
 const CUSTOMER_FALLBACK = '–';
 const SEARCH_HINT = '화면 위쪽 돋보기 버튼이나 Ctrl+K로 검색할 수 있습니다.';
+
+/** 견적 카드의 판매 건수 기준 — 판매 주문은 유입 경로가 기록되지 않아 제품으로만 검색어와 이어진다 */
+const SALES_NOTE =
+  '판매는 제품명이나 제품명으로 분류한 카테고리가 일치한 고도몰 결제 주문 수입니다(캠페인·키워드는 제품명에 그 이름이 들어 있을 때만 일치).';
 
 const BREAKDOWN_LIMIT = 5;
 const INQUIRY_WEB = '견적문의';
@@ -149,6 +152,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
+  // 견적 구성(카테고리·유입 매체·문의 유형·담당자)은 표의 더보기와 따로 펼친다
+  const [breakdownAll, setBreakdownAll] = useState(false);
 
   const { sortKey: kKey, sortOrder: kOrd, toggleSort: kSort } = useSort<KeywordSort>('cost');
   const { sortKey: qKey, sortOrder: qOrd, toggleSort: qSort } = useSort<'date'>('date');
@@ -227,6 +232,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const changeTab = (t: SearchTab) => {
     setTab(t);
     setShowAll(false);
+    setBreakdownAll(false);
     setCampTab(0);
   };
   const limit = showAll ? undefined : LIST_LIMIT;
@@ -277,10 +283,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   // 카드 제목용 짧은 기간 (예: 11월, 전체 기간)
   const kpiPeriod = dayRange || allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
   const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : '전월') : undefined;
-  // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 검색어로 거를 수 없어 같은 기간의 전체 판매 건수다
-  const periodSales = dayRange
-    ? salesInRange(dayRange.from, dayRange.to)
-    : salesInMonths(allPeriod ? Object.keys(GODOMALL_ORDERS) : yearTotal ? monthsUpTo(selectedMonth) : [selectedMonth]);
+  // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 견적과 같은 규칙으로 제품명·제품 카테고리가 일치한 주문 수
+  const periodSales = result.sales;
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
   // 광고비 카드 하단: 매체별 금액
   const mediaCost = (['Naver', 'Google', 'Meta'] as const)
@@ -301,6 +305,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     { title: '문의 유형', rows: breakdownOf(result.quotes, (r) => r.inquiryType || INQUIRY_WEB, '기타') },
     { title: '담당자', rows: breakdownOf(result.quotes, repKeyOf, '미지정') },
   ];
+  // 견적 구성에서 5개를 넘어 접혀 있는 항목 수 (모든 열 합계) — 있을 때만 더보기 버튼을 둔다
+  const breakdownHidden = breakdowns.reduce((sum, b) => sum + Math.max(0, b.rows.length - BREAKDOWN_LIMIT), 0);
 
   // 유입 매체 검색 전용 — 이 매체가 전체 유입(매체가 기록된 견적)에서 차지하는 비중. 종합 요약의 유입 매체 비중과 같은 원장·기준이다
   const sameSource = (s?: string) => !!sourceScope && (s || '').replace(/\s+/g, '').toLowerCase() === sourceScope.replace(/\s+/g, '').toLowerCase();
@@ -342,11 +348,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준. 유입 매체가 "{sourceScope}"인 견적만 집계합니다(매체 추적은 2026년 10월부터). 매체는 광고비와 직접 연결되지 않아 광고비·CPA는 표시하지 않습니다.
+          ※ {periodLabel} 기준. 유입 매체가 "{sourceScope}"인 견적만 집계합니다(매체 추적은 2026년 10월부터). 매체는 광고비와 직접 연결되지 않아 광고비·CPA는 표시하지 않습니다. {SALES_NOTE}
         </ViewNote>
       ) : (
       <ViewNote>
-          ※ {periodLabel} 기준. 광고비는 이름·카테고리·매체가 일치한 광고그룹·키워드 합계, 견적은 제목·카테고리·유입 매체 일치 건입니다(매체 추적은 2026년 10월부터). 둘은 직접 연결되지 않아 CPA는 추정치({cpaLabel})이고, 전환당 비용은 같은 광고 실적 기준이라 정확합니다.
+          ※ {periodLabel} 기준. 광고비는 이름·카테고리·매체가 일치한 광고그룹·키워드 합계, 견적은 제목·카테고리·유입 매체 일치 건입니다(매체 추적은 2026년 10월부터). 둘은 직접 연결되지 않아 CPA는 추정치({cpaLabel})이고, 전환당 비용은 같은 광고 실적 기준이라 정확합니다. {SALES_NOTE}
       </ViewNote>
       )}
 
@@ -575,15 +581,25 @@ export const SearchView: React.FC<SearchViewProps> = ({
               {breakdowns.map((b) => (
                 <div key={b.title} className="search-breakdown-col">
                   <h4>{b.title}</h4>
-                  {b.rows.slice(0, showAll ? undefined : BREAKDOWN_LIMIT).map(([k, n]) => (
+                  {b.rows.slice(0, breakdownAll ? undefined : BREAKDOWN_LIMIT).map(([k, n]) => (
                     <p key={k}>
                       <span title={k}>{k}</span>
                       <b>{fmt(n)}건</b>
                     </p>
                   ))}
-                  {!showAll && b.rows.length > BREAKDOWN_LIMIT && <Muted small>외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</Muted>}
+                  {!breakdownAll && b.rows.length > BREAKDOWN_LIMIT && <Muted small>외 {fmt(b.rows.length - BREAKDOWN_LIMIT)}개</Muted>}
                 </div>
               ))}
+              {breakdownHidden > 0 && (
+                <div className="search-breakdown-more">
+                  <MoreButton
+                    label={breakdownAll ? `상위 ${BREAKDOWN_LIMIT}개만 보기` : `더보기 (+${fmt(breakdownHidden)}개)`}
+                    open={breakdownAll}
+                    dataBtn="search-breakdown-more"
+                    onClick={() => setBreakdownAll((v) => !v)}
+                  />
+                </div>
+              )}
             </div>
 
             {isLoggedIn ? (
