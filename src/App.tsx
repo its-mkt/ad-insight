@@ -305,10 +305,16 @@ export const App: React.FC = () => {
       handleNavigate('overview');
       if (!wasLoggedIn.current) setLoginOpen(true);
     }
+    // 온코어는 로그인한 관리자만 — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
+    if (site === 'oncore' && !isLoggedIn) {
+      setSite('itket');
+      window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
+      if (!wasLoggedIn.current) setLoginOpen(true);
+    }
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
     if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
     wasLoggedIn.current = isLoggedIn;
-  }, [authLoading, isLoggedIn, currentView]);
+  }, [authLoading, isLoggedIn, currentView, site]);
 
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
