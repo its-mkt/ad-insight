@@ -17,6 +17,7 @@ import {
   AD_DEVICE_FROM,
   AD_DEVICE_MONTHS,
   AD_DEVICE_ROWS,
+  channelLabelOf,
   DEVICE_COLORS,
   DEVICE_KEYS,
   DEVICE_LABELS,
@@ -36,6 +37,8 @@ interface DevicesViewProps {
   selectedMonth: string;
   allPeriod?: boolean;
   yearTotal?: boolean;
+  /** 이 달까지만 보여 준다 — 로그인하지 않으면 진행 중인 달을 빼고 지난달까지 (빈 값이면 제한 없음) */
+  untilMonth?: string;
 }
 
 const TITLE = '기기별 통계';
@@ -63,14 +66,14 @@ const addDevices = (acc: Map<string, number>, v: Partial<Record<DeviceKey, numbe
 /** 표 제목 옆 보조 글자 — 고른 기간 중 일부 달만 수집됐으면 몇 달인지 밝힌다 */
 const coverText = (measured: number, total: number) => (measured === 0 ? PENDING : measured < total ? `${total}개월 중 ${measured}개월 수집` : '');
 
-export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false }) => {
+export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth }) => {
   const yr = selectedMonth.slice(0, 4);
   // GA4 수집 첫 달부터 이번 달까지
   const allMonths = useMemo(() => {
     const out: string[] = [];
     for (let y = +GA4_FIRST_MONTH.slice(0, 4); y <= +THIS_M.slice(0, 4); y++) for (let m = 1; m <= 12; m++) out.push(ym(y, m));
-    return out.filter((mo) => mo >= GA4_FIRST_MONTH && mo <= THIS_M);
-  }, []);
+    return out.filter((mo) => mo >= GA4_FIRST_MONTH && mo <= (untilMonth || THIS_M));
+  }, [untilMonth]);
   const scope = useMemo(() => (allPeriod ? allMonths : yearTotal ? monthsUpTo(selectedMonth) : [selectedMonth]), [allPeriod, yearTotal, selectedMonth, allMonths]);
   const prevScope = useMemo(() => (allPeriod ? [] : yearTotal ? sameMonthsLastYear(scope) : [prevM(selectedMonth)]), [allPeriod, yearTotal, scope, selectedMonth]);
   // 추이 차트: 전체 기간은 수집된 모든 달, 그 밖에는 그 해 1월~기준월
@@ -256,7 +259,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             <tbody>
               {channelNames.map((ch) => (
                 <tr key={ch}>
-                  <td>{ch}</td>
+                  <td title={`GA4 채널: ${ch}`}>{channelLabelOf(ch)}</td>
                   {tableDevices.map((d) => {
                     const v = chVisits.acc.get(`${d}|${ch}`) ?? 0;
                     const e = chEst.measured ? chEst.acc.get(`${d}|${ch}`) ?? 0 : null;
