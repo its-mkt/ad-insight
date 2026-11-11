@@ -4,7 +4,7 @@ import { EXTERNAL_LINKS } from '../../utils/constants';
 import { fmt, parseCatParts, quoteKey, sourceColorVar } from '../../utils/format';
 import type { DayRange } from '../../utils/dayRange';
 import { CATEGORY_HIERARCHY, QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
-import { SkelRows } from '../common/SkeletonView';
+import { SkelBar, SkelRows } from '../common/SkeletonView';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { FilterReset } from '../common/FilterReset';
 import { Tooltip } from '../common/Tooltip';
@@ -34,6 +34,8 @@ interface QuotesRawAdminTableProps {
   phoneQuotes?: QuoteRawRow[];
   /** 실데이터를 받는 중 — 아직 없는 광고 꼬리표는 스켈레톤으로 보여 준다 */
   loading?: boolean;
+  /** 관리자 원본을 받는 중 — 비어 있는 고객 정보 칸을 '–' 대신 로딩으로 보여 준다 */
+  detailsPending?: boolean;
   /** 저장 전 변경의 원래 값 (quoteKey → 바꾸기 전 카테고리) */
   originals?: Map<string, string>;
   onUpdateQuoteCategory?: (quoteIdOrIndex: string | number, newCategory: string) => void;
@@ -140,6 +142,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   dayRange = null,
   phoneQuotes = [],
   loading = false,
+  detailsPending = false,
   originals,
   onUpdateQuoteCategory,
   changedCount = 0,
@@ -559,26 +562,26 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
                 return (
                   <tr key={rowKey}>
                     {showSiteCol && <td className="qr-site">{siteLabelOf(q)}</td>}
-                    <td className="qr-sno">{q.sno || '–'}</td>
+                    <td className="qr-sno">{q.sno || (detailsPending ? <SkelBar w="2.5rem" /> : '–')}</td>
                     <td className="qr-date">
                       {q.date || '–'}
                     </td>
                     <Tooltip content={q.subject}>
                       <td className="qr-subject">
-                        {q.subject || '–'}
+                        {q.subject || (detailsPending ? <SkelBar w="70%" /> : '–')}
                       </td>
                     </Tooltip>
                     <td>
                       <Tooltip content={q.company}>
-                        <span className="cell-truncate">{q.company || '–'}</span>
+                        <span className="cell-truncate">{q.company || (detailsPending ? <SkelBar w="4rem" /> : '–')}</span>
                       </Tooltip>
                     </td>
                     <td>
                       <Tooltip content={q.name}>
-                        <span className="cell-wrap">{q.name || '–'}</span>
+                        <span className="cell-wrap">{q.name || (detailsPending ? <SkelBar w="3rem" /> : '–')}</span>
                       </Tooltip>
                     </td>
-                    <td className="qr-email" title={(isPhone ? q.phone : q.email) || undefined}>{(isPhone ? q.phone : q.email) || '–'}</td>
+                    <td className="qr-email" title={(isPhone ? q.phone : q.email) || undefined}>{(isPhone ? q.phone : q.email) || (detailsPending ? <SkelBar w="6rem" /> : '–')}</td>
                     {!isPhone && (
                       <td>
                         <Tooltip content={q.salesRep}>

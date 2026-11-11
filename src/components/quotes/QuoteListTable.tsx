@@ -13,6 +13,7 @@ import { Muted } from '../common/Muted';
 import { Pagination } from '../common/Pagination';
 import { SortableTh } from '../common/SortableTh';
 import { TableFootnote } from '../common/TableFootnote';
+import { SkelBar } from '../common/SkeletonView';
 
 interface QuoteListTableProps {
   /** 선택한 기간의 접수 건 (실제 접수 날짜 그대로) */
@@ -21,6 +22,8 @@ interface QuoteListTableProps {
   periodLabel: string;
   /** 기간이 바뀌면 달라지는 값 — 바뀌면 첫 페이지로 돌아간다 */
   resetKey: string;
+  /** 관리자 원본을 받는 중 — 비어 있는 상세 칸(SNO·제목·회사·작성자·연락처)을 '–' 대신 로딩으로 보여 준다 */
+  detailsPending?: boolean;
 }
 
 type SortKey = 'date' | 'origin' | 'sno' | 'subject' | 'company' | 'name' | 'email' | 'category' | 'source' | 'rep';
@@ -71,8 +74,9 @@ const inHierarchyOrder = (used: string[], known: string[]): string[] => [
  * 이 화면은 로그인 없이도 열리므로 제목·회사명·작성자·이메일은 로그인했을 때만 보여 준다
  * (이름·회사·이메일은 서버가 관리자에게만 내려 준다). 카테고리 지정은 어드민에서만 한다.
  */
-export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabel, resetKey }) => {
+export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabel, resetKey, detailsPending = false }) => {
   const { isLoggedIn } = useAuth();
+  const detail = (v: React.ReactNode, w: string) => v || (detailsPending ? <SkelBar w={w} /> : '–');
   const [origin, setOrigin] = useState(ALL);
   const [cat1, setCat1] = useState(ALL);
   const [cat2, setCat2] = useState(ALL);
@@ -207,16 +211,16 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
                   return (
                     <tr key={`${r.id ?? r.sno ?? ''}-${r.date}-${i}`}>
                       <td className="ql-nowrap">{siteLabelOf(r)}</td>
-                      <td className="ql-nowrap">{r.sno || '–'}</td>
+                      <td className="ql-nowrap">{detail(r.sno, '2.5rem')}</td>
                       <td className="ql-nowrap">{r.date.slice(0, 10)}</td>
                       {isLoggedIn && (
                         <>
                           <td className="ql-subject" title={r.subject}>
-                            {r.subject || '–'}
+                            {detail(r.subject, '70%')}
                           </td>
-                          <td className="ql-nowrap" title={r.company || undefined}>{r.company || '–'}</td>
-                          <td className="ql-nowrap" title={r.name || undefined}>{r.name || '–'}</td>
-                          <td className="ql-nowrap" title={contactOf(r) || undefined}>{contactOf(r) || '–'}</td>
+                          <td className="ql-nowrap" title={r.company || undefined}>{detail(r.company, '4rem')}</td>
+                          <td className="ql-nowrap" title={r.name || undefined}>{detail(r.name, '3rem')}</td>
+                          <td className="ql-nowrap" title={contactOf(r) || undefined}>{detail(contactOf(r), '6rem')}</td>
                         </>
                       )}
                       <td className="ql-nowrap" title={repOf(r)}>{repOf(r)}</td>
