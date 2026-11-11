@@ -74,7 +74,7 @@ const ORIGIN_COLORS: Record<string, string> = {
 
 export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
-  const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra]);
+  const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
   const [mode, setMode] = useState<'chart' | 'table'>('chart');
   const trendQuotes = trend?.quotes ?? quotes;

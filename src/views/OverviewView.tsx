@@ -76,7 +76,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   sameDate,
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
-  const stats = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra]);
+  const stats = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
   const trendStats = useMemo(() => (monthly ? quoteStatsOf(monthly) : stats), [monthly, stats]);
   const hasSpend = data.spend.length > 0;
   const hasQuotes = data.quotes.length > 0;
