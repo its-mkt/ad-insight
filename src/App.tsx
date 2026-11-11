@@ -27,6 +27,8 @@ import { OncoreView } from './views/OncoreView';
 import { SearchView } from './views/SearchView';
 import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
+import { UsageView } from './views/UsageView';
+import { trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
@@ -80,13 +82,15 @@ export const App: React.FC = () => {
     setSite(next);
     window.history.pushState(null, '', routePath(next, currentView, searchQuery));
   };
-  // 온코어는 데이터 연결 전이라 아이티켓 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민은 사이트와 상관없다)
-  const oncorePending = site === 'oncore' && currentView !== 'data' && currentView !== 'admin';
+  // 로그인한 관리자만 보는 설정·운영 화면 (데이터 연결·어드민·이용 현황)
+  const loginOnlyView = currentView === 'data' || currentView === 'admin' || currentView === 'usage';
+  // 온코어는 데이터 연결 전이라 아이티켓 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민·이용 현황은 사이트와 상관없다)
+  const oncorePending = site === 'oncore' && !loginOnlyView;
 
   // 캐시가 없어 보여 줄 데이터가 하나도 없는 첫 동기화 동안만 스켈레톤 (캐시가 있으면 이전 데이터를 그대로 보여 준다)
   const hasData = data.spend.length > 0 || data.quotes.length > 0;
   // 데이터 연결 화면은 연결 설정을 봐야 하므로 스켈레톤 없이 바로 보여 준다
-  const isLoading = !hasData && (status === 'init' || isSyncing) && currentView !== 'data' && currentView !== 'admin';
+  const isLoading = !hasData && (status === 'init' || isSyncing) && !loginOnlyView;
 
   const allMonths = useMemo(() => {
     return [
@@ -234,10 +238,15 @@ export const App: React.FC = () => {
     document.title = `${currentView === 'search' && searchQuery ? `"${searchQuery}" ` : ''}${VIEW_TITLES[currentView]} · ${APP_TITLE}`;
   }, [currentView, searchQuery]);
 
-  // 설정·연동(데이터 연결·어드민 관리)은 로그인한 관리자만. 로그아웃하면 종합 요약으로, 로그인 없이 주소(#data·#admin)로 들어오면 종합 요약 + 로그인 모달
+  // 이용 현황 기록 — 화면(검색은 검색어)이 바뀔 때마다 페이지뷰 1회. 방문은 서버에서 기기당 하루 1회로 센다
+  useEffect(() => {
+    trackPageview(currentView);
+  }, [currentView, currentView === 'search' ? searchQuery : '']);
+
+  // 설정·연동(데이터 연결·어드민 관리·이용 현황)은 로그인한 관리자만. 로그아웃하면 종합 요약으로, 로그인 없이 주소(#data·#admin)로 들어오면 종합 요약 + 로그인 모달
   useEffect(() => {
     if (authLoading) return;
-    if ((currentView === 'data' || currentView === 'admin') && !isLoggedIn) {
+    if (loginOnlyView && !isLoggedIn) {
       handleNavigate('overview');
       if (!wasLoggedIn.current) setLoginOpen(true);
     }
@@ -354,7 +363,7 @@ export const App: React.FC = () => {
             onLogin={() => setLoginOpen(true)}
             onSearch={() => setSearchOpen(true)}
           />
-          {currentView !== 'data' && !oncorePending && (
+          {currentView !== 'data' && currentView !== 'usage' && !oncorePending && (
             <PeriodNav
               years={availableYears}
               selectedYear={selectedYear}
@@ -538,6 +547,8 @@ export const App: React.FC = () => {
               {currentView === 'admin' && isLoggedIn && (
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
+              {currentView === 'usage' && authLoading && <SkeletonView title={VIEW_TITLES.usage} variant="table" />}
+              {currentView === 'usage' && isLoggedIn && <UsageView />}
             </main>
           </div>
         </div>

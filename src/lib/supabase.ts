@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { DashboardData } from '../types/dashboard';
 
-const SUPABASE_URL =
+export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://tqxljgmygvanysqnhiar.supabase.co';
-const SUPABASE_ANON_KEY =
+export const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   'sb_publishable__Oq9NpOHnxEqRSZ02qJDaw_n-FIAGC2';
 

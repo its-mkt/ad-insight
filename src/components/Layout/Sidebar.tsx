@@ -3,7 +3,7 @@ import type { DashboardData, SiteId, SyncStatus, ViewId } from '../../types/dash
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { SITE_ENABLED } from '../../utils/route';
 import { useAuth } from '../../context/AuthContext';
-import { ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, X } from 'lucide-react';
+import { Activity, ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, X } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 
@@ -197,6 +197,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Lock />
                 <span>어드민 관리</span>
+              </button>
+              <button
+                className={`nv nv-usage${currentView === 'usage' ? ' on' : ''}`}
+                id="nav-usage"
+                data-v="usage"
+                data-btn="usage"
+                aria-current={currentView === 'usage' ? 'page' : undefined}
+                onClick={() => onNavigate('usage')}
+              >
+                <Activity />
+                <span>이용 현황</span>
               </button>
             </nav>
           </div>
