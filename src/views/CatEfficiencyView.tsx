@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import type { CategoryMap, DashboardData, SyncStatus } from '../types/dashboard';
+import type { CategoryMap, DashboardData, SiteId, SyncStatus } from '../types/dashboard';
 import {
   buildCategoryBarItems,
   catSum,
@@ -60,6 +60,10 @@ const CAT_EFF_SOURCES: SourceLinkItem[] = [
   { label: '광고비·클릭·전환 + 고도몰 견적 시트 교차 집계' },
 ];
 
+/** 화면 설명 — 아이티켓은 zbyhp·cadkorea·전화문의 견적을 합산하고, 다른 사이트는 그 사이트 견적만 */
+const catEffDescription = (site?: SiteId) =>
+  `카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 ${site === 'oncore' ? '온코어' : '아이티켓·zbyhp·cadkorea·전화문의 합산'})`;
+
 export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   data,
   categoryMap,
@@ -79,7 +83,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
       <View name="cat-efficiency" title="카테고리 효율">
         <ViewHeader
           title="카테고리 효율 분석"
-          description="카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 아이티켓·zbyhp·cadkorea·전화문의 합산)"
+          description={catEffDescription(data.site)}
           status={status}
         />
         <KpiSection id="kpiCatEff">
@@ -235,7 +239,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
     <View name="cat-efficiency" title="카테고리 효율">
       <ViewHeader
         title="카테고리 효율 분석"
-        description="카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 아이티켓·zbyhp·cadkorea·전화문의 합산)"
+        description={catEffDescription(data.site)}
         status={status}
       />
 

@@ -22,7 +22,7 @@ import type {
 } from '../types/dashboard';
 import { buildCategoryMap, LEGACY_ONLY_CATS, quoteKey, THIS_M } from '../utils/format';
 import { SITE_DEFAULT_CATEGORY } from '../utils/constants';
-import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
+import { setSalesSite, applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
 import { applyAdDevices } from '../data/deviceStats';
 import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
@@ -39,8 +39,10 @@ export const DEFAULT_KEY = '2d3b0cc2b04a4873a835583968ca7a0b';
  */
 export const SITE_SOURCES: Record<Exclude<SiteId, 'itket'>, { url: string; key: string }> = {
   oncore: {
-    url: import.meta.env?.VITE_ONCORE_URL || '',
-    key: import.meta.env?.VITE_ONCORE_KEY || '',
+    url:
+      import.meta.env?.VITE_ONCORE_URL ||
+      'https://script.google.com/macros/s/AKfycbzG-C3hj6HF_JuKzzjUGOvtRIzM5KLqGrJCBeDfNsQnzw7dHqw60T5Wm3yUunmBUrbT/exec',
+    key: import.meta.env?.VITE_ONCORE_KEY || 'b3be208f75a04416914854086cfb72e5',
   },
 };
 
@@ -505,6 +507,13 @@ function toQuoteRawRow(r: RawQuoteRawApiRow, id: string): QuoteRawRow {
   };
 }
 
+/** 아이티켓이 아닌 사이트의 데이터에 사이트를 표시한다 (견적 원장에는 사이트 열이 없다) */
+function withSite(d: DashboardData, site: SiteId): DashboardData {
+  setSalesSite(site);
+  if (site === 'itket') return d;
+  return { ...d, site, quotesRaw: d.quotesRaw.map((r) => ({ ...r, site })) };
+}
+
 // 아이티켓은 견적 원장까지 있어야 쓴다 (원장 없는 옛 캐시 제외). 다른 사이트는 광고·견적 중 하나라도 있으면 쓴다
 const isUsableCache = (j: RawApiPayload | null, site: SiteId): j is RawApiPayload =>
   !!j &&
@@ -563,7 +572,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       if (j.error) throw new Error(j.error);
       if (siteRef.current !== site) return;
       liveLoaded.current = true;
-      setData(fromApi(j));
+      setData(withSite(fromApi(j), site));
       setStatus('live');
       writeCachedPayload(j, site);
     } catch (e) {
@@ -587,7 +596,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     readCachedPayload(site).then(async (cached) => {
       if (liveLoaded.current || siteRef.current !== site) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
       if (isUsableCache(cached, site)) {
-        setData(fromApi(cached));
+        setData(withSite(fromApi(cached), site));
         setStatus('live');
       } else {
         await tryLoadStaticFallback();

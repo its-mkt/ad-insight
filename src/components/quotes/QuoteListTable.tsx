@@ -142,7 +142,7 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
           value={origin}
           options={[
             { value: ALL, label: '사이트 전체' },
-            ...[...new Set([...ORIGINS, ...rows.map(originOf)])].map((v) => ({ value: v, label: QUOTE_SITES.find((s) => s.id === v)?.label ?? v })),
+            ...[...new Set([...(rows.some((r) => originOf(r) === 'oncore') ? [] : ORIGINS), ...rows.map(originOf)])].map((v) => ({ value: v, label: QUOTE_SITES.find((s) => s.id === v)?.label ?? v })),
           ]}
           onChange={setOrigin}
         />

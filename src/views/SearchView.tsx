@@ -288,7 +288,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     .filter(([k, v]) => v > 0 || k !== '메타') // 집행이 없어도 구글·네이버는 0 으로 보여 준다
     .map(([k, v]): [string, string] => [k, fmtWon(v)]);
   // 견적 카드 하단: 접수처별 건수
-  const siteDetail = <KpiDetailItems items={originGroupCounts(result.quotes)} />;
+  const siteDetail = <KpiDetailItems items={originGroupCounts(result.quotes, data.site)} />;
   // 견적 카드의 추정 CPA 기준 — 매체·유입 경로 검색은 추적 기간이 달라 계산하지 않는다
   const cpaLabel = dayRange && !dayCovered ? '일별 광고비 수집 전 기간은 계산하지 않음' : result.cpaHidden ? '매체·유입 경로 검색은 계산하지 않음' : `${dotYm(cpaFrom)} 이후 기준`;
 

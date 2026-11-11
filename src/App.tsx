@@ -523,8 +523,12 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
-              {!isLoading && !oncorePending && currentView === 'devices' && <DevicesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
+              {/* 구매 상세·기기별 통계는 아이티켓 고도몰 주문·GA4 기준이라 다른 사이트에서는 연결 전 안내 */}
+              {!isLoading && !oncorePending && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
+                <OncoreView status={status} viewTitle={VIEW_TITLES[currentView]} />
+              )}
+              {!isLoading && !oncorePending && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
+              {!isLoading && !oncorePending && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
               {!isLoading && !oncorePending && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}
