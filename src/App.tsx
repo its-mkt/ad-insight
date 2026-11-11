@@ -5,7 +5,7 @@ import { parseRoute, routePath } from './utils/route';
 
 /** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
 const APP_TITLE = '아이티스 광고 인사이트';
-import { THIS_M, THIS_Y } from './utils/format';
+import { prevM, THIS_M, THIS_Y } from './utils/format';
 import { fetchDailyHist, siteConnected, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Header } from './components/Layout/Header';
@@ -35,6 +35,9 @@ import { useAuth } from './context/AuthContext';
 import { dayPeriodOf, toDayKey, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withSameDatePrev } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
+import { clipForGuest, guestLastDay } from './utils/guestCutoff';
+import { setSalesCutoff } from './data/godomallOrders';
+import { LoginGate } from './components/common/LoginGate';
 
 function getInitialDark(): boolean {
   try {
@@ -90,18 +93,25 @@ export const App: React.FC = () => {
   // 캐시가 없어 보여 줄 데이터가 하나도 없는 첫 동기화 동안만 스켈레톤 (캐시가 있으면 이전 데이터를 그대로 보여 준다)
   const hasData = data.spend.length > 0 || data.quotes.length > 0;
   // 데이터 연결 화면은 연결 설정을 봐야 하므로 스켈레톤 없이 바로 보여 준다
+  // 로그인하지 않으면 진행 중인 달은 어제까지만 보여 준다 — 매체마다 수집 시각이 달라 생기는 오늘 값의 시간차를 오해하지 않게 (사용자 요청 2026-11-11)
+  const guest = !isLoggedIn;
+  const guestClip = useMemo(() => {
+    setSalesCutoff(guest ? guestLastDay() : '');
+    return guest ? clipForGuest(data) : null;
+  }, [data, guest]);
+  const baseData = guestClip ? guestClip.data : data;
   const isLoading = !hasData && (status === 'init' || isSyncing) && !loginOnlyView;
 
   const allMonths = useMemo(() => {
     return [
       ...new Set([
-        ...(data.spend || []).map((r) => r.month),
-        ...(data.quotes || []).map((r) => r.month),
+        ...(baseData.spend || []).map((r) => r.month),
+        ...(baseData.quotes || []).map((r) => r.month),
       ]),
     ]
       .filter(Boolean)
       .sort();
-  }, [data.spend, data.quotes]);
+  }, [baseData.spend, baseData.quotes]);
 
   const maxAvailableMonth = useMemo(() => {
     return (
@@ -147,7 +157,7 @@ export const App: React.FC = () => {
   const [dailyHist, setDailyHist] = useState<{ rows: SpendDailyRow[]; months: string[] }>({ rows: [], months: [] });
   const [dailyLoading, setDailyLoading] = useState(false);
   const dailyFailed = useRef(new Set<string>());
-  const fullData = useMemo(() => withDailyHist(data, dailyHist.rows, dailyHist.months), [data, dailyHist]);
+  const fullData = useMemo(() => withDailyHist(baseData, dailyHist.rows, dailyHist.months), [baseData, dailyHist]);
   // 사이트가 바뀌면 받아 둔 일별 과거분도 버린다
   useEffect(() => {
     setDailyHist({ rows: [], months: [] });
@@ -185,8 +195,8 @@ export const App: React.FC = () => {
   );
   const sameDate = sameDatePrev?.compare;
   const viewData = useMemo(
-    () => sameDatePrev?.data ?? (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : data),
-    [data, fullData, searchDay, currentView, sameDatePrev]
+    () => sameDatePrev?.data ?? (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : baseData),
+    [baseData, fullData, searchDay, currentView, sameDatePrev]
   );
   const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
   const searchMonth = searchPeriod.month || maxAvailableMonth;
@@ -197,6 +207,46 @@ export const App: React.FC = () => {
       setSelectedMonth((prev) => prev || maxAvailableMonth);
     }
   }, [maxAvailableMonth]);
+  // 고른 달이 볼 수 있는 마지막 달보다 뒤면 (비로그인 매월 1일 등) 마지막 달로 옮긴다.
+  // 오래된 캐시를 먼저 보여 주는 동안 옮기면 최신 자료가 와도 지난달에 머물므로, 동기화가 끝난 뒤에만 옮긴다
+  useEffect(() => {
+    if (!isSyncing && status === 'live' && maxAvailableMonth && selectedMonth > maxAvailableMonth) {
+      setSelectedYear(maxAvailableMonth.slice(0, 4));
+      setSelectedMonth(maxAvailableMonth);
+    }
+  }, [isSyncing, status, maxAvailableMonth, selectedMonth]);
+
+  // 비로그인 — 월 합계로만 받는 화면(키워드·구매·기기)은 진행 중인 달을 가리고, 합계는 지난달까지만 센다
+  const guestUntil = guest ? prevM(THIS_M) : undefined;
+  const monthlyOnlyView = currentView === 'keywords' || currentView === 'purchases' || currentView === 'devices';
+  // 연도 합계는 지난달이 같은 해일 때만 지난달까지로 줄여 보여 준다 (1월이면 가린다)
+  const guestYearMonth = guestUntil && yearTotal && viewMonth === THIS_M && guestUntil.slice(0, 4) === THIS_M.slice(0, 4) ? guestUntil : undefined;
+  // 키워드 연도 합계는 당월 키워드가 이미 빠져 있어 그대로 보여 준다
+  const guestLocked = guest && monthlyOnlyView && !allPeriod && viewMonth === THIS_M && (!yearTotal || (currentView !== 'keywords' && !guestYearMonth));
+  const monthlyViewMonth = currentView !== 'keywords' && guestYearMonth ? guestYearMonth : viewMonth;
+  const showPrevMonth = () => {
+    const pm = prevM(THIS_M);
+    setSearchDay(null);
+    setAllPeriodOn(false);
+    setYearTotalOn(false);
+    setSelectedYear(pm.slice(0, 4));
+    setSelectedMonth(pm);
+  };
+  const guestNote = (() => {
+    if (!guestClip?.range || oncorePending) return undefined;
+    if (!(allPeriod || viewMonth === THIS_M)) return undefined;
+    const to = guestClip.range.to;
+    const m = +to.slice(5, 7);
+    const dropped = guestClip.droppedMedia.length ? ` (${guestClip.droppedMedia.join('·')} 당월 금액 제외)` : '';
+    // 키워드 화면의 합계는 광고비(어제까지)와 함께 보지만 키워드 성과 자체는 당월이 빠진다
+    const head =
+      monthlyOnlyView && currentView !== 'keywords'
+        ? `${m}월은 마감 후 반영`
+        : currentView === 'keywords'
+          ? `키워드·소재 성과의 ${m}월은 마감 후 반영`
+          : `${m}월은 ${+to.slice(8, 10)}일(어제)까지 반영${dropped}`;
+    return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
+  })();
 
   const closeDrawer = () => {
     setDrawerOpen(false);
@@ -421,6 +471,8 @@ export const App: React.FC = () => {
               }
               yearTotal={isSearchView ? searchPeriod.mode === 'year' : yearTotal}
               dayRange={searchDay}
+              note={guestNote}
+              maxDay={guest ? guestLastDay() : undefined}
               dayNote={
                 searchDay && (currentView === 'purchases' || currentView === 'devices')
                   ? `${VIEW_TITLES[currentView]}는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
@@ -473,7 +525,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'overview' && (
-                <OverviewView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
+                <OverviewView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -484,7 +536,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'ads' && (
-                <AdsView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
+                <AdsView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -502,7 +554,25 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'keywords' && (
+              {guestLocked && !isLoading && !oncorePending && (
+                <LoginGate
+                  name={currentView}
+                  title={currentView === 'keywords' ? '키워드 · 소재 성과' : VIEW_TITLES[currentView]}
+                  description={
+                    currentView === 'keywords'
+                      ? '광고그룹별 검색 키워드 입찰/품질/전환 지표 및 배너·확장 소재 현황'
+                      : currentView === 'purchases'
+                        ? '고도몰 기준 판매 건수'
+                        : 'PC·모바일·태블릿별 방문, 견적·주문 전환, 광고 성과와 판매를 한 화면에 봅니다'
+                  }
+                  status={status}
+                  message={`진행 중인 ${+THIS_M.slice(5, 7)}월 값은 로그인 후 볼 수 있습니다`}
+                  subMessage="매체마다 수집 시각이 달라 진행 중인 달의 월 합계는 서로 맞지 않을 수 있어, 마감된 달만 공개합니다"
+                  onLogin={() => setLoginOpen(true)}
+                  alt={{ label: `${+prevM(THIS_M).slice(5, 7)}월 보기`, onClick: showPrevMonth }}
+                />
+              )}
+              {!guestLocked && !isLoading && !oncorePending && currentView === 'keywords' && (
                 <KeywordsView period={period} sameDate={sameDate}
                   data={viewData}
                   categoryMap={categoryMap}
@@ -514,7 +584,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'quotes' && (
-                <QuotesView monthly={period || sameDate ? data : undefined} period={period} sameDate={sameDate}
+                <QuotesView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}
@@ -527,8 +597,8 @@ export const App: React.FC = () => {
               {!isLoading && !oncorePending && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
                 <OncoreView status={status} viewTitle={VIEW_TITLES[currentView]} />
               )}
-              {!isLoading && !oncorePending && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
-              {!isLoading && !oncorePending && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} />}
+              {!guestLocked && !isLoading && !oncorePending && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
+              {!guestLocked && !isLoading && !oncorePending && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
               {!isLoading && !oncorePending && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}

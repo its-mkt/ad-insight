@@ -4,7 +4,7 @@ import { adStatKey, type AdStat } from './creativeImage';
 import { catsOf, parseCatParts } from './format';
 import { inDayRange, type DayRange } from './dayRange';
 import { goodsCategoryOf } from './categoryText';
-import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
+import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
 
@@ -341,7 +341,8 @@ export function searchDashboard(
 
   // 판매 — 견적과 같은 규칙으로 고도몰 결제 주문을 거른다. 주문의 유입 경로·상세가 기록돼 있지 않으면(현재 전부 미수집)
   // 캠페인·광고그룹·키워드와는 제품명·제품 카테고리에 그 이름이 들어 있을 때만 이어진다
-  const saleInPeriod = (l: GodoOrderLine) => (range ? inDayRange(l.paid, range) : inPeriod(l.month));
+  const cutoff = salesCutoff();
+  const saleInPeriod = (l: GodoOrderLine) => (!cutoff || l.paid.slice(0, 10) <= cutoff) && (range ? inDayRange(l.paid, range) : inPeriod(l.month));
   const salesLines = saleLinesWithGoods()
     .filter((l) => {
       if (!saleInPeriod(l)) return false;

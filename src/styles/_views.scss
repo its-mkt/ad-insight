@@ -2504,3 +2504,11 @@ tr.kw-more-row td {
     width: var(--col-duration);
   }
 }
+
+/* 로그인해야 볼 수 있는 기간 안내 (LoginGate) */
+.login-gate-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-bottom: 1.5rem;
+}

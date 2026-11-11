@@ -68,6 +68,10 @@ interface PeriodNavProps {
   onSelectDayRange?: (range: DayRange | null) => void;
   /** 일·기간을 골랐을 때 달력 옆에 붙이는 한 줄 안내 (기준·한계) */
   dayNote?: string;
+  /** 일·기간을 고르지 않았을 때 붙이는 한 줄 안내 (예: 비로그인 당월 기준일) */
+  note?: string;
+  /** 달력에서 고를 수 있는 마지막 날을 더 앞당긴다 (예: 비로그인은 어제까지) */
+  maxDay?: string;
   /** 기간이 처음 상태에서 바뀌었는가 */
   periodChanged?: boolean;
   /** 기간을 처음 상태로 되돌린다 */
@@ -89,6 +93,8 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
   dayRange,
   onSelectDayRange,
   dayNote,
+  note,
+  maxDay: maxDayLimit,
   periodChanged = false,
   onResetPeriod,
 }) => {
@@ -98,7 +104,7 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
   // 달력에서 고를 수 있는 마지막 날 — 데이터가 있는 최신 달의 끝, 아직 안 지난 날은 뺀다
   const today = toDayKey(new Date());
   const lastDay = lastDayOf(maxAvailableMonth);
-  const maxDay = today < lastDay ? today : lastDay;
+  const maxDay = [today, lastDay, maxDayLimit].filter((d): d is string => !!d).sort()[0];
   const minDay = `${minAvailableMonth || `${minYear}-01`}-01`;
 
   const selectMonth = (m: string) => {
@@ -137,6 +143,7 @@ export const PeriodNav: React.FC<PeriodNavProps> = ({
           />
         )}
         {dayRange && dayNote && <span className="period-nav-note">{dayNote}</span>}
+        {!dayRange && note && <span className="period-nav-note">{note}</span>}
         <div className="period-nav-filters" id={SLOT_ID} />
       </div>
     </div>
