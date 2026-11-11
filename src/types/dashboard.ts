@@ -17,6 +17,8 @@ export interface SpendRow {
   imp: number;
   clk: number;
   conv: number;
+  /** 네이버 캠페인 유형 (WEB_SITE 파워링크 · SHOPPING 쇼핑검색 · PLACE 플레이스). 구글·예전 자료는 없음 */
+  campaignTp?: string;
 }
 
 /** 광고그룹 × 일 광고비 — 일·기간 선택이 쓴다. 최근 수십 일만 수집한다 */
@@ -31,6 +33,8 @@ export interface SpendDailyRow {
   imp: number;
   clk: number;
   conv: number;
+  /** 네이버 캠페인 유형 (SpendRow.campaignTp 와 같음) */
+  campaignTp?: string;
 }
 
 export interface ManualRow {
@@ -244,6 +248,8 @@ export interface RawSpendApiRow {
   type?: string;
   campaign?: unknown;
   ad_group?: unknown;
+  /** 네이버 캠페인 유형 (n_adgroup_monthly·n_adgroup_daily) */
+  campaign_tp?: unknown;
   cost?: unknown;
   impressions?: unknown;
   clicks?: unknown;

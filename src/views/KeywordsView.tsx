@@ -27,7 +27,7 @@ import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCar
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, inMonths, mergeKeywordMonths, monthsUpTo, uncollectedItems, yearRangeLabel } from '../utils/allPeriod';
-import { campaignBuckets, groupKeywordRows } from '../utils/keywordGroups';
+import { campaignBuckets, groupKeywordRows, withGroupTotals } from '../utils/keywordGroups';
 
 interface KeywordsViewProps {
   data: DashboardData;
@@ -159,7 +159,9 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     .filter(pass)
     .map((k) => k.month)
     .sort()[0];
-  const allGroups = groupKeywordRows(ks);
+  // 그룹 줄은 광고그룹 전체 실적(위 KPI 와 같은 값)으로 — 네이버는 키워드 확장·중지·삭제 키워드 실적이 키워드 목록에 없어 키워드 합이 더 작다.
+  // 일·기간 보기는 광고비만 그 기간으로 바뀌고 키워드는 월 단위라 맞지 않으므로 키워드 합을 그대로 쓴다
+  const allGroups = period || !ks.length ? groupKeywordRows(ks) : withGroupTotals(groupKeywordRows(ks), rows, true);
 
   // 카테고리 필터 — 광고그룹의 매핑 카테고리로 판단해 키워드 그룹과 주요 · 확장 소재에 똑같이 적용
   const inCategory = (g: { media: string; campaign: string; adgroup: string }) =>
@@ -224,8 +226,8 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           cmpLabel={cmpLabel}
           sub={`클릭 ${fmt(totalClk)} · 전환 ${fmt(totalConv)}`}
           detail={cmpLabel
-            ? <KpiDetailItems items={[['클릭', totalClk], ['전환', totalConv]]} />
-            : mediaDetail ?? <KpiDetailItems items={[['클릭', totalClk], ['전환', totalConv]]} />}
+            ? <KpiDetailItems items={[['클릭', totalClk], ['광고전환', totalConv]]} />
+            : mediaDetail ?? <KpiDetailItems items={[['클릭', totalClk], ['광고전환', totalConv]]} />}
         />
         <KpiCard
           label="클릭수"
@@ -246,7 +248,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           detail={cpcDetail ?? <KpiDetailItems items={[['네이버', '0원'], ['구글', '0원']]} />}
         />
         <KpiCard
-          label="광고 전환수"
+          label="광고전환"
           value={fmt(totalConv)}
           cur={totalConv || null}
           prev={hasPvData ? pvConv : null}

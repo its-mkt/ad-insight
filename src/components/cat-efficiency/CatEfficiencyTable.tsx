@@ -119,22 +119,22 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
       <table className="stk" id="tbCatEfficiency">
         <colgroup>
           <col className="col-eff-name" />
-          <col className="col-eff-cost" />
           <col className="col-eff-clk" />
           <col className="col-eff-conv" />
           <col className="col-eff-rate" />
           <col className="col-eff-quotes" />
           <col className="col-eff-cpa" />
+          <col className="col-eff-cost" />
         </colgroup>
         <thead>
           <tr>
             {th('카테고리', 'k', '')}
-            {th('광고비', 'cost')}
-            {th('클릭수', 'clk')}
+            {th('클릭', 'clk')}
             {th('광고전환', 'conv')}
             {th('견적전환율', 'convRate')}
             {th('총 접수 견적', 'quotes')}
             {th('CPA', 'cpa')}
+            {th('광고비', 'cost')}
           </tr>
         </thead>
         <tbody>
@@ -150,34 +150,34 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
                   open={isOpen}
                   onToggle={() => toggleParent(parentKey)}
                 >
-                  <NumTd value={cost} unit="원" />
                   <NumTd value={clk} />
                   <NumTd value={conv} />
                   <NumTd>{convRateStr(quotes, clk)}</NumTd>
                   <NumTd value={quotes || null} unit="건" bold />
                   <NumTd bold>{cpaStr(cpa)}</NumTd>
+                  <NumTd value={cost} unit="원" />
                 </TreeParentRow>
 
                 {hasChildren && isOpen && items.map((item) => (
                   <TreeChildRow key={item.k} label={childLabelOf(item.k, parentKey)}>
-                    <NumTd value={item.cost} unit="원" />
                     <NumTd value={item.clk} />
                     <NumTd value={item.conv} />
                     <NumTd>{convRateStr(item.quotes, item.clk)}</NumTd>
                     <NumTd value={item.quotes || null} unit="건" />
                     <NumTd>{cpaStr(item.cpa)}</NumTd>
+                    <NumTd value={item.cost} unit="원" />
                   </TreeChildRow>
                 ))}
               </React.Fragment>
             );
           })}
           <TotalRow>
-            <NumTd value={totSpend} unit="원" />
             <NumTd value={totClk} />
             <NumTd value={totConv} />
             <NumTd>{convRateStr(totQuotes, totClk)}</NumTd>
             <NumTd value={totQuotes} unit="건" bold />
             <NumTd bold>{cpaStr(avgCpa || null)}</NumTd>
+            <NumTd value={totSpend} unit="원" />
           </TotalRow>
         </tbody>
       </table>

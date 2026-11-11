@@ -306,6 +306,31 @@ p.small {
   }
 }
 
+// 매체 광고비 — 네이버·구글 매체별 광고 성과 표
+.media-stats-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 72rem;
+
+  // 광고비 증감 칸이 붙은 표
+  &.with-delta {
+    min-width: 78rem;
+  }
+
+  .col-ms-count {
+    width: var(--col-count);
+  }
+  .col-ms-rate {
+    width: var(--col-rate);
+  }
+  .col-ms-unit {
+    width: var(--col-unit-price);
+  }
+  .col-ms-amount {
+    width: var(--col-amount);
+  }
+}
+
 .quotes-group-table,
 #tbSpendDetail {
   table-layout: fixed;
@@ -657,7 +682,7 @@ tr.kw-more-row td {
   }
 }
 
-// 주요 · 확장 소재: 표 한 줄에 광고그룹 하나 + 기준월 성과 5개 열, 소재별 문구·이미지는 줄 아래 행으로 펼쳐 본다
+// 주요 · 확장 소재: 표 한 줄에 광고그룹 하나 + 기준월 성과 6개 열, 소재별 문구·이미지는 줄 아래 행으로 펼쳐 본다
 .cr-scroll {
   // 숨김 머리글(.sr-only, absolute)이 스크롤 상자 밖으로 빠져 페이지가 가로로 늘어나지 않게 기준을 잡는다
   position: relative;
@@ -668,7 +693,7 @@ tr.kw-more-row td {
   // 펼친 행 바탕: 머리 줄(회색)과 구분되게 강조 바탕색을 깐다 (펼쳤을 때만)
   --cr-open-bg: var(--accbg);
 
-  min-width: 60rem;
+  min-width: 67rem;
   table-layout: fixed;
 
   .col-cr-img {
@@ -676,7 +701,8 @@ tr.kw-more-row td {
   }
 
   .col-cr-imp,
-  .col-cr-clk {
+  .col-cr-clk,
+  .col-cr-conv {
     width: var(--col-count);
   }
 
@@ -917,7 +943,7 @@ tr.kw-more-row td {
 // 소재 카드 머리의 성과: 이름표 위·값 아래, 칸 너비를 고정해 소재끼리 같은 자리에 숫자가 온다
 .cr-metrics {
   display: grid;
-  grid-template-columns: repeat(5, 7.5rem);
+  grid-template-columns: repeat(6, 7.5rem);
   margin: 0;
   padding: 0.5rem 0;
   background: var(--bg);
@@ -2033,7 +2059,7 @@ tr.kw-more-row td {
 #tbSearchKeywords {
   table-layout: fixed;
   width: 100%;
-  min-width: 52rem;
+  min-width: 59rem;
 
   .col-skw-count {
     width: var(--col-count);

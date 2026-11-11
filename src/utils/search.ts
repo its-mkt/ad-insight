@@ -74,7 +74,9 @@ const SALES_SITE = '아이티켓';
 /** 검색 결과를 광고그룹 표로 — 합계에 들어간 실적 그대로 묶어, 표의 합이 위쪽 광고비 카드와 같다. 펼치면 그 그룹의 키워드가 나온다 */
 export function resultAdGroups(result: SearchResult): KeywordGroup[] {
   const map = new Map<string, KeywordGroup & { totals: { imp: number; clk: number; conv: number } }>();
-  const keyOf = (r: { media: string; campaign: string; adgroup: string }) => [r.media, r.campaign, r.adgroup].join('\u0001');
+  // 이름은 대소문자·공백을 무시해 잇는다 — 네이버 캠페인 이름이 바뀌면("DELL서버" → "Dell 서버") 지난달 광고그룹 실적은 옛 이름,
+  // 나중에 채운 키워드 실적은 새 이름으로 남아 같은 광고그룹이 둘로 갈리고 키워드가 붙지 않는다
+  const keyOf = (r: { media: string; campaign: string; adgroup: string }) => [r.media, compact(r.campaign), compact(r.adgroup)].join('\u0001');
   result.spendRows.forEach((r) => {
     const k = keyOf(r);
     let g = map.get(k);

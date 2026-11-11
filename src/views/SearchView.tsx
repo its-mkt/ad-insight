@@ -71,17 +71,18 @@ function breakdownOf(rows: QuoteRawRow[], keyOf: (r: QuoteRawRow) => string, emp
 }
 
 
-type KeywordSort = 'bid' | 'quality' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cost';
+type KeywordSort = 'bid' | 'quality' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cpc' | 'cost';
 const KEYWORD_COLS: { key: KeywordSort; label: string }[] = [
   { key: 'bid', label: '입찰가' },
   { key: 'quality', label: '품질지수' },
   { key: 'imp', label: '노출' },
   { key: 'clk', label: '클릭' },
   { key: 'ctr', label: 'CTR' },
-  { key: 'conv', label: '전환' },
+  { key: 'conv', label: '광고전환' },
+  { key: 'cpc', label: '평균 CPC' },
   { key: 'cost', label: '광고비' },
 ];
-/** 열 종류별 공통 너비 클래스 — 입찰가는 단가, CTR 은 비율, 광고비는 금액, 나머지는 건수 폭 */
+/** 열 종류별 공통 너비 클래스 — 입찰가·평균 CPC 는 단가, CTR 은 비율, 광고비는 금액, 나머지는 건수 폭 */
 const SKW_COL_CLASS: Record<KeywordSort, string> = {
   bid: 'col-skw-unit',
   quality: 'col-skw-count',
@@ -89,10 +90,11 @@ const SKW_COL_CLASS: Record<KeywordSort, string> = {
   clk: 'col-skw-count',
   ctr: 'col-skw-rate',
   conv: 'col-skw-count',
+  cpc: 'col-skw-unit',
   cost: 'col-skw-cost',
 };
 const keywordMetric = (k: KeywordRow, key: KeywordSort): number =>
-  key === 'ctr' ? (k.imp > 0 ? k.clk / k.imp : 0) : k[key];
+  key === 'ctr' ? (k.imp > 0 ? k.clk / k.imp : 0) : key === 'cpc' ? (k.clk > 0 ? k.cost / k.clk : -1) : k[key];
 
 /** 견적 상세 머리말의 칩으로 올릴 짧은 항목, 그리고 한 줄 전체 폭을 쓰는 긴 항목 */
 const QUOTE_CHIP_LABELS = ['번호', '사이트', '문의 유형'];
@@ -446,7 +448,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           prev={prevResult ? convCost(prevResult) : null}
           cmpLabel={cmpLabel}
           sub={result.conv > 0 ? `광고비 ÷ 광고전환 ${fmt(result.conv)}건` : '광고전환이 없어 계산하지 않습니다'}
-          detail={<KpiDetailItems items={[['클릭', result.clk], ['전환', result.conv], ['CTR', ctrText(result.clk, result.imp)]]} />}
+          detail={<KpiDetailItems items={[['클릭', result.clk], ['광고전환', result.conv], ['CTR', ctrText(result.clk, result.imp)]]} />}
         />
       </KpiSection>
       )}
@@ -560,6 +562,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                         <NumTd value={k.clk} />
                         <NumTd>{ctrText(k.clk, k.imp)}</NumTd>
                         <NumTd value={k.conv} />
+                        <NumTd value={k.clk > 0 ? Math.round(k.cost / k.clk) : null} unit="원" />
                         <NumTd value={k.cost} unit="원" />
                       </tr>
                     ))}
@@ -569,7 +572,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             <ShowMoreButton noun="키워드" total={counts.keywords} expanded={showAll} onToggle={() => setShowAll((v) => !v)} />
             <TableFootnote
               unit="원·회"
-              basis={`산출 근거: ${periodLabel} 실적 합계 · 입찰가·품질지수는 최근 달 값 · CTR = 클릭 ÷ 노출`}
+              basis={`산출 근거: ${periodLabel} 실적 합계 · 입찰가·품질지수는 최근 달 값 · CTR = 클릭 ÷ 노출 · 평균 CPC = 광고비 ÷ 클릭`}
               sources={[<AdApiSource key="src" prefix="출처:" suffix="API" />]}
             />
           </>

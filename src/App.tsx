@@ -32,8 +32,8 @@ import { trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import { dayPeriodOf, toDayKey, type DayRange } from './utils/dayRange';
-import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withSameDatePrev } from './utils/dayData';
+import { dayPeriodOf, type DayRange } from './utils/dayRange';
+import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
@@ -141,16 +141,16 @@ export const App: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>(THIS_M);
   // 기간 선택의 '전체' — 지원하는 화면에서만 켜지고, 달을 고르면 풀린다. 고른 달은 그대로 남겨 다른 화면에서 쓴다
   const [allPeriodOn, setAllPeriodOn] = useState(false);
-  const supportsTotal = TOTAL_PERIOD_VIEWS.includes(currentView);
+  // 검색 결과도 전체·연도 합계를 고를 수 있다
+  const supportsTotal = TOTAL_PERIOD_VIEWS.includes(currentView) || currentView === 'search';
   const allPeriod = allPeriodOn && supportsTotal;
   // 월 선택의 '전체' — 선택 연도의 1월~최신 달 합계. 화면에는 그 마지막 달을 기준월로 넘긴다
   const [yearTotalOn, setYearTotalOn] = useState(false);
   const yearTotal = yearTotalOn && supportsTotal && !allPeriod;
   const viewMonth = yearTotal ? lastMonthOfYear(selectedMonth, maxAvailableMonth) : selectedMonth;
-  // 검색 결과의 기간 — 보던 화면의 기간과 분리한다. 새 검색은 당월(가장 최근 수집 달)에서 시작하고, 여기서 넓혀도 다른 화면은 그대로다
+  // 기간 선택은 모든 화면·검색 결과가 함께 쓴다 — 검색하거나 메뉴를 옮겨도 고른 기간이 그대로 남는다 (사용자 요청 2026-11-11)
   const isSearchView = currentView === 'search';
-  const [searchPeriod, setSearchPeriod] = useState<{ mode: 'all' | 'year' | 'month'; month: string }>({ mode: 'month', month: '' });
-  // 검색 결과의 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
+  // 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
   const [searchDay, setSearchDay] = useState<DayRange | null>(null);
   // 일·기간 — 일별 광고비 구간 안이면 그 기간의 광고비·견적으로 다시 모은 자료를 화면에 준다 (구간 밖이면 월 단위)
   // 최근 구간보다 앞선 날짜를 고르면 그 달의 일별 광고비를 추가로 받아 합친다
@@ -185,21 +185,12 @@ export const App: React.FC = () => {
     };
   }, [searchDay, fullData]);
   const dayCovered = !!searchDay && rangeCovered(fullData, searchDay);
-  // 진행 중인 달을 월로 볼 때는 전달을 같은 날짜까지만 비교한다 (월별 추이는 monthly 원본으로 그린다)
-  const sameDatePrev = useMemo(
-    () =>
-      !searchDay && !allPeriod && !yearTotal && viewMonth === THIS_M && !['admin', 'data', 'search'].includes(currentView)
-        ? withSameDatePrev(fullData, toDayKey(new Date()))
-        : null,
-    [fullData, searchDay, allPeriod, yearTotal, viewMonth, currentView]
-  );
-  const sameDate = sameDatePrev?.compare;
+  // 진행 중인 달도 전월 전체와 비교한다 (전월 같은 날짜까지만 자르는 '전월 동기간' 비교는 2026-11-11 사용자 요청으로 끔)
   const viewData = useMemo(
-    () => sameDatePrev?.data ?? (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : baseData),
-    [baseData, fullData, searchDay, currentView, sameDatePrev]
+    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : baseData),
+    [baseData, fullData, searchDay, currentView]
   );
   const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
-  const searchMonth = searchPeriod.month || maxAvailableMonth;
 
   useEffect(() => {
     if (maxAvailableMonth) {
@@ -248,13 +239,30 @@ export const App: React.FC = () => {
     return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
   })();
 
+  // 일·기간 선택 — 기간 선택 바의 달력과 이용 현황의 '최근 N일' 이 함께 쓴다
+  const selectDayRange = (r: DayRange | null) => {
+    setSearchDay(r);
+    if (!r) return;
+    const month = r.to.slice(0, 7);
+    // 광고 데이터는 월 단위라, 종료일이 속한 달을 기준월로 본다
+    setAllPeriodOn(false);
+    setYearTotalOn(false);
+    setSelectedYear(month.slice(0, 4));
+    setSelectedMonth(month);
+  };
+
+  const selectAllPeriod = () => {
+    setSearchDay(null);
+    setAllPeriodOn(true);
+    setYearTotalOn(false);
+  };
+
   const closeDrawer = () => {
     setDrawerOpen(false);
     document.body.classList.remove('lock');
   };
 
   const handleNavigate = (view: ViewId) => {
-    setSearchDay(null);
     const target = VALID_VIEWS.includes(view) ? view : 'overview';
     setCurrentView(target);
     closeDrawer();
@@ -266,28 +274,20 @@ export const App: React.FC = () => {
   const goSearch = (
     query: string,
     tab?: SearchTab,
-    opts?: { period?: { mode: 'all' | 'year' | 'month'; month: string }; record?: boolean }
+    opts?: { record?: boolean }
   ) => {
     if (opts?.record !== false) addRecentSearch(query, isLoggedIn);
     setSearchQuery(query);
     setSearchTab(tab);
     setSearchOpen(false);
-    setSearchPeriod(opts?.period ?? { mode: 'month', month: '' });
-    setSearchDay(null);
     setCurrentView('search');
     closeDrawer();
     window.history.pushState(null, '', routePath(site, 'search', query));
     window.scrollTo({ top: 0 });
   };
 
-  // 표의 이름(카테고리·유입 매체)을 눌러 검색 결과로 — 보던 기간을 그대로 쓰고, 최근 검색 기록에는 남기지 않는다
-  const searchFromName = (query: string) =>
-    goSearch(query, undefined, {
-      record: false,
-      period: allPeriod
-        ? { mode: 'all', month: '' }
-        : { mode: yearTotal ? 'year' : 'month', month: yearTotal ? selectedMonth : viewMonth },
-    });
+  // 표의 이름(카테고리·유입 매체)을 눌러 검색 결과로 — 기간은 공용이라 그대로 이어지고, 최근 검색 기록에는 남기지 않는다
+  const searchFromName = (query: string) => goSearch(query, undefined, { record: false });
 
   useEffect(() => {
     document.title = `${currentView === 'search' && searchQuery ? `"${searchQuery}" ` : ''}${VIEW_TITLES[currentView]} · ${APP_TITLE}`;
@@ -325,11 +325,7 @@ export const App: React.FC = () => {
       if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
       setSite(nextSite);
       setCurrentView(view);
-      if (view === 'search') {
-        setSearchQuery(query);
-        setSearchPeriod({ mode: 'month', month: '' });
-        setSearchDay(null);
-      }
+      if (view === 'search') setSearchQuery(query);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeDrawer();
@@ -424,65 +420,38 @@ export const App: React.FC = () => {
             onLogin={() => setLoginOpen(true)}
             onSearch={() => setSearchOpen(true)}
           />
-          {currentView !== 'data' && currentView !== 'usage' && !oncorePending && (
+          {currentView !== 'data' && !oncorePending && (
             <PeriodNav
               years={availableYears}
               selectedYear={selectedYear}
-              selectedMonth={isSearchView ? searchMonth : selectedMonth}
+              selectedMonth={selectedMonth}
               minAvailableMonth={minAvailableMonth}
               maxAvailableMonth={maxAvailableMonth}
               onSelectYear={setSelectedYear}
-              periodChanged={
-                !!searchDay ||
-                (isSearchView
-                  ? searchPeriod.mode !== 'month' || (!!searchPeriod.month && searchPeriod.month !== maxAvailableMonth)
-                  : allPeriod || yearTotal || selectedMonth !== THIS_M)
-              }
+              periodChanged={!!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
               onResetPeriod={() => {
                 setSearchDay(null);
-                if (isSearchView) {
-                  setSearchPeriod({ mode: 'month', month: '' });
-                  return;
-                }
                 setAllPeriodOn(false);
                 setYearTotalOn(false);
                 setSelectedYear(String(THIS_Y));
                 setSelectedMonth(THIS_M);
               }}
               onSelectMonth={(m) => {
-                if (isSearchView) {
-                  setSearchDay(null);
-                  setSearchPeriod({ mode: 'month', month: m });
-                  return;
-                }
                 setSearchDay(null);
                 setAllPeriodOn(false);
                 setYearTotalOn(false);
                 setSelectedMonth(m);
               }}
-              allPeriod={isSearchView ? searchPeriod.mode === 'all' : allPeriod}
-              onSelectAll={
-                isSearchView
-                  ? () => {
-                      setSearchDay(null);
-                      setSearchPeriod((p) => ({ ...p, mode: 'all' }));
-                    }
-                  : supportsTotal
-                    ? () => {
-                        setSearchDay(null);
-                        setAllPeriodOn(true);
-                        setYearTotalOn(false);
-                      }
-                    : undefined
-              }
-              yearTotal={isSearchView ? searchPeriod.mode === 'year' : yearTotal}
+              allPeriod={allPeriod}
+              onSelectAll={supportsTotal ? selectAllPeriod : undefined}
+              yearTotal={yearTotal}
               dayRange={searchDay}
               note={guestNote}
               maxDay={guest ? guestLastDay() : undefined}
               dayNote={
                 searchDay && (currentView === 'purchases' || currentView === 'devices')
                   ? `${VIEW_TITLES[currentView]}는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
-                  : searchDay && !isSearchView && currentView !== 'admin'
+                  : searchDay && !isSearchView && currentView !== 'admin' && currentView !== 'usage'
                   ? dayCovered
                     ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
                     : dailyLoading
@@ -490,34 +459,16 @@ export const App: React.FC = () => {
                       : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
-              onSelectDayRange={(r) => {
-                setSearchDay(r);
-                if (!r) return;
-                const month = r.to.slice(0, 7);
-                if (isSearchView) {
-                  setSearchPeriod({ mode: 'month', month });
-                  return;
-                }
-                // 광고 데이터는 월 단위라, 종료일이 속한 달을 기준월로 본다
-                setAllPeriodOn(false);
-                setYearTotalOn(false);
-                setSelectedYear(month.slice(0, 4));
-                setSelectedMonth(month);
-              }}
+              onSelectDayRange={selectDayRange}
               onSelectYearTotal={
-                isSearchView
+                supportsTotal
                   ? (m) => {
                       setSearchDay(null);
-                      setSearchPeriod({ mode: 'year', month: m });
+                      setAllPeriodOn(false);
+                      setYearTotalOn(true);
+                      setSelectedMonth(m);
                     }
-                  : supportsTotal
-                    ? (m) => {
-                        setSearchDay(null);
-                        setAllPeriodOn(false);
-                        setYearTotalOn(true);
-                        setSelectedMonth(m);
-                      }
-                    : undefined
+                  : undefined
               }
             />
           )}
@@ -531,7 +482,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'overview' && (
-                <OverviewView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
+                <OverviewView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -542,7 +493,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'ads' && (
-                <AdsView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
+                <AdsView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -551,7 +502,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'cat-efficiency' && (
-                <CatEfficiencyView period={period} sameDate={sameDate}
+                <CatEfficiencyView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -579,7 +530,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!guestLocked && !isLoading && !oncorePending && currentView === 'keywords' && (
-                <KeywordsView period={period} sameDate={sameDate}
+                <KeywordsView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -590,7 +541,7 @@ export const App: React.FC = () => {
                 />
               )}
               {!isLoading && !oncorePending && currentView === 'quotes' && (
-                <QuotesView monthly={period || sameDate ? baseData : undefined} period={period} sameDate={sameDate}
+                <QuotesView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}
@@ -613,14 +564,14 @@ export const App: React.FC = () => {
                   status={status}
                   query={searchQuery}
                   initialTab={searchTab}
-                  selectedMonth={searchPeriod.mode === 'year' ? lastMonthOfYear(searchMonth, maxAvailableMonth) : searchMonth}
-                  allPeriod={searchPeriod.mode === 'all'}
-                  yearTotal={searchPeriod.mode === 'year'}
+                  selectedMonth={viewMonth}
+                  allPeriod={allPeriod}
+                  yearTotal={yearTotal}
                   dayRange={searchDay}
                   dayCovered={dayCovered}
                   isLoggedIn={isLoggedIn}
                   onLogin={() => setLoginOpen(true)}
-                  onSelectAllPeriod={() => setSearchPeriod((p) => ({ ...p, mode: 'all' }))}
+                  onSelectAllPeriod={selectAllPeriod}
                 />
               )}
               {currentView === 'data' && authLoading && <SkeletonView title={VIEW_TITLES.data} variant="table" />}
@@ -633,7 +584,7 @@ export const App: React.FC = () => {
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
               {currentView === 'usage' && authLoading && <SkeletonView title={VIEW_TITLES.usage} variant="table" />}
-              {currentView === 'usage' && isLoggedIn && <UsageView />}
+              {currentView === 'usage' && isLoggedIn && <UsageView selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onSelectDayRange={selectDayRange} />}
             </main>
           </div>
         </div>

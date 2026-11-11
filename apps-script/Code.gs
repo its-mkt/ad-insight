@@ -163,7 +163,8 @@ function collectNaver() {
   read_(ss, 'n_adgroup_monthly').filter((r) => fresh.includes(r.month)).forEach((r) => { recent[r.ad_group_id] = (recent[r.ad_group_id] || 0) + (Number(r.cost) || 0) + (Number(r.impressions) || 0) / 1e6; });
   const rank = (g) => (recent[g.id] ? 2e9 + recent[g.id] : g.on ? 1 : 0);
   const ordered = groups.slice().sort((a, b) => rank(b) - rank(a));
-  const kHead = ['id', 'ad_group_id', 'campaign', 'ad_group', 'keyword', 'bid', 'quality', 'ad_relevance', 'expected_click'];
+  // on: 키워드·광고그룹이 켜져 있으면 1. 중지된 키워드도 색인해 지난 실적을 받는다 (빼면 광고그룹 실적과 키워드 합이 어긋난다)
+  const kHead = ['id', 'ad_group_id', 'campaign', 'ad_group', 'keyword', 'bid', 'quality', 'ad_relevance', 'expected_click', 'on'];
   // image: 대표 이미지 1장 (이전 화면 호환) · images: 모든 이미지를 줄바꿈으로 이은 목록
   // title: 대표 제목 (이전 화면 호환) · titles·descs: 반응형 소재의 제목·설명 전체를 줄바꿈으로 이은 목록
   const kIdx = [], ads = [['type', 'campaign', 'ad_group', 'ad_id', 'ad_type', 'title', 'url', 'image', 'images', 'titles', 'descs']];
@@ -174,14 +175,14 @@ function collectNaver() {
   for (const g of ordered) {
     if (Date.now() - t0 > CFG.BUDGET_MS - CFG.KW_STATS_RESERVE_MS) break; // 못 읽은 그룹은 아래에서 지난 값을 남긴다
     visited.add(g.campaign + '\u0001' + g.name);
-    api_('GET', '/ncc/keywords', { nccAdgroupId: g.id }).filter((k) => !k.userLock)
+    api_('GET', '/ncc/keywords', { nccAdgroupId: g.id })
       .forEach((k) => {
         const rel = Number(k.adRelevanceScore) || 0;
         const exp = Number(k.expectedClickScore) || 0;
         const rawQi = k.nccQi && k.nccQi.qiGrade;
         // 파워링크(WEB_SITE) 기존 nccQi.qiGrade는 2026-07-29부로 고정 기본값(4)만 반환하므로 신규 최적화 지표 우선 사용
         const qi = rel && exp ? Math.round((rel + exp) / 2) : (rel || exp || (g.ctype !== 'WEB_SITE' && rawQi ? rawQi : ''));
-        kIdx.push([k.nccKeywordId, g.id, g.campaign, g.name, String(k.keyword || '').trim(), (k.useGroupBidAmt ? g.bid : k.bidAmt) || 0, qi, rel || '', exp || '']);
+        kIdx.push([k.nccKeywordId, g.id, g.campaign, g.name, String(k.keyword || '').trim(), (k.useGroupBidAmt ? g.bid : k.bidAmt) || 0, qi, rel || '', exp || '', g.on && !k.userLock ? 1 : 0]);
       });
     api_('GET', '/ncc/ads', { nccAdgroupId: g.id }).filter((a) => !a.userLock).forEach((a) => {
       const ad = parseJson_(a.ad) || {};
@@ -267,8 +268,8 @@ function collectNaverStats_(ss, t0, withKeywords) {
     const before = kRows.length;
     kws.forEach((k) => {
       const s = ks[String(k.id)] || {};
-      // 당월은 노출 0건 대기 키워드도 남기고, 지난달은 실적이 있는 키워드만 쌓는다
-      if (m === thisM || s.salesAmt || s.impCnt) kRows.push([m, 'SA', k.campaign, k.ad_group, k.keyword, '', Number(k.bid) || 0, k.quality, s.salesAmt || 0, s.impCnt || 0, s.clkCnt || 0, s.ccnt || 0, k.ad_relevance, k.expected_click]);
+      // 당월은 노출 0건 대기 키워드도 남기고(켜진 것만), 지난달은 실적이 있는 키워드만 쌓는다. on 열이 없는 예전 색인 행은 켜진 것으로 본다
+      if ((m === thisM && String(k.on) !== '0') || s.salesAmt || s.impCnt) kRows.push([m, 'SA', k.campaign, k.ad_group, k.keyword, '', Number(k.bid) || 0, k.quality, s.salesAmt || 0, s.impCnt || 0, s.clkCnt || 0, s.ccnt || 0, k.ad_relevance, k.expected_click]);
     });
     if (m < fresh[1] && kRows.length === before) {
       kEmpty.add(m);
@@ -772,6 +773,9 @@ function syncMapping_(ss) {
 
 /* ── 네이버 성과형 DA(GFA) 이메일 보고서 자동 수집 ──
  * 네이버 GFA 관리자에서 매일 새벽 발송되는 맞춤 보고서 CSV 이메일을 읽어 n_adgroup_monthly 에 type='DA' 로 적재한다.
+ * 보고서 행은 먼저 n_gfa_daily(일자 × 캠페인 × 광고그룹)에 같은 키를 덮어쓰며 쌓고, 월 합계는 그 전체로 다시 만든다.
+ * (예전에는 메일에 든 날짜만으로 그 달 합계를 바꿔, '어제' 보고서가 오면 같은 달의 이전 날짜 실적이 사라졌다)
+ * 지난 기간을 채우려면 그 기간의 맞춤 보고서 CSV 를 같은 검색 조건(제목·첨부)의 메일로 받으면 된다.
  * 사용자가 엑셀을 내려받거나 업로드할 필요가 없다.
  * 스크립트 속성: GFA_EMAIL_QUERY (옵션, 기본값: 'subject:(성과형 OR GFA OR "디스플레이 광고") has:attachment filename:csv') */
 function collectGfaEmail() {
@@ -785,7 +789,8 @@ function collectGfaEmail() {
   let label = GmailApp.getUserLabelByName('GFA_PROCESSED');
   if (!label) label = GmailApp.createLabel('GFA_PROCESSED');
 
-  const rowsDA = [];
+  // 키(일자·캠페인·광고그룹)가 같으면 먼저 읽은 행을 쓴다 — 검색 결과가 최신 메일부터라 최신 보고서 값이 남는다
+  const fresh = new Map();
   threads.forEach((th) => {
     const labels = th.getLabels().map((l) => l.getName());
     if (labels.includes('GFA_PROCESSED')) return;
@@ -811,6 +816,8 @@ function collectGfaEmail() {
         parsed.forEach((r) => {
           const rawDate = iDate >= 0 ? r[iDate] : '';
           const m = quoteMonth_(rawDate) || Utilities.formatDate(msg.getDate(), 'Asia/Seoul', 'yyyy-MM');
+          // 일자 열이 없는 보고서는 월 단위 행으로 둔다 (date 비움)
+          const day = rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Seoul', 'yyyy-MM-dd') : quoteDayText_(rawDate);
           const camp = iCamp >= 0 && r[iCamp] ? String(r[iCamp]).trim() : 'GFA_캠페인';
           const grp = iGrp >= 0 && r[iGrp] ? String(r[iGrp]).trim() : 'GFA_그룹';
           const cost = iCost >= 0 ? Number(String(r[iCost]).replace(/[^0-9.-]/g, '')) || 0 : 0;
@@ -818,26 +825,42 @@ function collectGfaEmail() {
           const clk = iClk >= 0 ? Number(String(r[iClk]).replace(/[^0-9.-]/g, '')) || 0 : 0;
           const conv = iConv >= 0 ? Number(String(r[iConv]).replace(/[^0-9.-]/g, '')) || 0 : 0;
 
-          if (cost > 0 || imp > 0 || clk > 0) {
-            rowsDA.push({ month: m, type: 'DA', campaign: camp, campaign_tp: 'GFA', ad_group: grp, ad_group_id: '', cost, impressions: imp, clicks: clk, conversions: conv });
-          }
+          const key = [day || m, camp, grp].join('\u0001');
+          if (!fresh.has(key)) fresh.set(key, { date: day, month: m, campaign: camp, ad_group: grp, cost, impressions: imp, clicks: clk, conversions: conv });
         });
       });
     });
     th.addLabel(label);
   });
 
-  if (!rowsDA.length) return;
+  if (!fresh.size) return;
 
+  // 1) 일별 원장 — 같은 키는 새 값으로 바꾸고 나머지 날짜는 그대로 둔다
+  const dHead = ['month', 'date', 'campaign', 'ad_group', 'cost', 'impressions', 'clicks', 'conversions'];
+  const ledger = new Map();
+  read_(ss, 'n_gfa_daily').forEach((r) => ledger.set([r.date || r.month, r.campaign, r.ad_group].join('\u0001'), r));
+  fresh.forEach((r, k) => ledger.set(k, r));
+  const daily = [...ledger.values()].sort((a, b) => String(a.date || a.month).localeCompare(String(b.date || b.month)));
+  put_(ss, 'n_gfa_daily', [dHead].concat(daily.map((r) => dHead.map((h) => (r[h] == null ? '' : r[h])))));
+
+  // 2) 월 합계 — 원장 전체로 다시 만들어 n_adgroup_monthly 의 DA 행을 통째로 바꾼다 (DA 행은 이 수집기만 쓴다)
+  const sums = new Map();
+  daily.forEach((r) => {
+    const k = [r.month, r.campaign, r.ad_group].join('\u0001');
+    const cur = sums.get(k) || { month: r.month, type: 'DA', campaign: r.campaign, campaign_tp: 'GFA', ad_group: r.ad_group, ad_group_id: '', cost: 0, impressions: 0, clicks: 0, conversions: 0 };
+    cur.cost += Number(r.cost) || 0;
+    cur.impressions += Number(r.impressions) || 0;
+    cur.clicks += Number(r.clicks) || 0;
+    cur.conversions += Number(r.conversions) || 0;
+    sums.set(k, cur);
+  });
   const head = ['month', 'type', 'campaign', 'campaign_tp', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
-  const old = read_(ss, 'n_adgroup_monthly');
-  const newKeys = new Set(rowsDA.map((r) => [r.month, r.campaign, r.ad_group].join('\u0001')));
-  const keep = old.filter((r) => r.type === 'SA' || !newKeys.has([r.month, r.campaign, r.ad_group].join('\u0001'))).map((r) => head.map((h) => r[h]));
-  const toAdd = rowsDA.map((r) => head.map((h) => r[h]));
+  const keep = read_(ss, 'n_adgroup_monthly').filter((r) => r.type !== 'DA').map((r) => head.map((h) => r[h]));
+  const toAdd = [...sums.values()].filter((r) => r.cost > 0 || r.impressions > 0 || r.clicks > 0).map((r) => head.map((h) => r[h]));
 
   put_(ss, 'n_adgroup_monthly', [head].concat(keep.concat(toAdd).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
   syncMapping_(ss);
-  console.log('GFA 리포트 이메일 자동 파싱 완료: ' + rowsDA.length + '행 반영');
+  console.log('GFA 리포트 이메일 자동 파싱 완료: 새 행 ' + fresh.size + ' · 일별 원장 ' + daily.length + '행 · DA 월 합계 ' + toAdd.length + '행');
 }
 
 /* ── 구글 광고(Google Ads) 이메일 보고서 자동 수집 ──
