@@ -402,7 +402,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
   applyGodoGoodsInflow(j.godo_goods_inflow_monthly || []);
   applyGodoOrderLines(j.godo_order_lines || []);
   applyGodoOrderCustomers(j.godo_order_customers || []);
-  applyAdDevices(j.g_device_monthly || [], j.n_device_monthly || []);
+  applyAdDevices(j.g_device_monthly || [], j.n_device_daily || []);
   const marks = new Map<string, QuoteManualMark>();
   (j.manual_categories || []).forEach((r) => {
     const sno = String(r.sno ?? '').trim();

@@ -383,9 +383,9 @@ export interface RawApiPayload {
   godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
   godo_goods_inflow_monthly?: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[];
   godo_order_lines?: Record<string, unknown>[];
-  /** 캠페인 × 기기 × 월 광고 실적 (Google Ads 스크립트 · 네이버 /stats pcMblTp) */
+  /** 캠페인 × 기기 광고 실적 — 구글은 월, 네이버는 일 (/stats pcMblTp 는 최근 7일만 조회돼 날마다 쌓는다) */
   g_device_monthly?: Record<string, unknown>[];
-  n_device_monthly?: Record<string, unknown>[];
+  n_device_daily?: Record<string, unknown>[];
   /** 관리자 로그인 응답에만 있다 */
   godo_order_customers?: Record<string, unknown>[];
   manual_categories?: RawManualCategoryApiRow[];

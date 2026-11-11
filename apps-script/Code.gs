@@ -30,7 +30,7 @@ const CFG = {
   NAVER_DAILY_CAP: 6000,
   RUN_LIMIT_MS: 5 * 60 * 1000,               // syncAll 전체가 이 시간을 넘기면 남은 수집은 다음 실행으로 (6분 강제 종료 방지)
   SHEETS: ['g_campaign_monthly', 'g_adgroup_monthly', 'g_adgroup_daily', 'g_keywords', 'g_ads', 'g_ad_stats', 'g_meta',
-    'n_adgroup_monthly', 'n_adgroup_daily', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'godo_orders_monthly', 'godo_goods_monthly', 'godo_order_inflow_monthly', 'godo_orders_daily', 'godo_meta', 'godo_goods_inflow_monthly', 'godo_order_lines', 'godo_order_customers', 'g_device_monthly', 'n_device_monthly', 'q_meta', 'mapping', 'manual', 'manual_categories'],
+    'n_adgroup_monthly', 'n_adgroup_daily', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'godo_orders_monthly', 'godo_goods_monthly', 'godo_order_inflow_monthly', 'godo_orders_daily', 'godo_meta', 'godo_goods_inflow_monthly', 'godo_order_lines', 'godo_order_customers', 'g_device_monthly', 'n_device_daily', 'q_meta', 'mapping', 'manual', 'manual_categories'],
   // 대시보드 주소와 키는 공개 번들에 들어 있다. 고객 정보는 관리자 로그인이 확인될 때만 내려준다 (doGet)
   SUPABASE_URL: 'https://tqxljgmygvanysqnhiar.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable__Oq9NpOHnxEqRSZ02qJDaw_n-FIAGC2',
@@ -233,7 +233,7 @@ function collectNaverStats_(ss, t0, withKeywords) {
   put_(ss, 'n_adgroup_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 
   collectNaverDaily_(ss, t0, groups, gById);
-  try { collectNaverDevice_(ss, t0, groups, gById, fresh, back, keep.concat(rows)); } catch (e) { fail_('collectNaverDevice_', e); } // 기기별 실패가 광고비 수집을 막지 않게 한다
+  try { collectNaverDevice_(ss, t0, groups, gById); } catch (e) { fail_('collectNaverDevice_', e); } // 기기별 실패가 광고비 수집을 막지 않게 한다
 
   // 키워드 × 월 (당월은 1일~어제). 월 열이 없는 예전 행은 버린다.
   const kws = read_(ss, 'n_idx_keywords');
@@ -278,25 +278,26 @@ function collectNaverStats_(ss, t0, withKeywords) {
   pendingNaverHist_ = { groups, gById };
 }
 /**
- * 캠페인 × 기기(PC·모바일) × 월 → n_device_monthly. /stats 의 breakdown=pcMblTp 로 받는다 (네이버는 태블릿을 모바일에 넣는다).
- * 당월·전월은 매번, 그 이전은 비어 있는 달을 CFG.BACKFILL_MONTHS 개씩 채운다.
- * 기기 합계가 같은 달 광고그룹 합계(n_adgroup_monthly)와 1% 넘게 다르면 그 달은 쓰지 않는다 — 응답을 잘못 읽은 값을 내보내지 않으려고.
+ * 캠페인 × 기기(PC·모바일) × 일 → n_device_daily. 네이버 /stats 의 기기 구분(breakdown=pcMblTp)은 최근 7일 안의 기간만 받을 수 있어
+ * (그보다 앞은 400 "상세 데이터는 최근 7일 이내 기간에서만 사용 가능") 하루 한 번 7일 전~어제를 날마다 받아 쌓는다. 지난 기간은 채울 수 없다.
+ * 네이버는 태블릿을 모바일에 넣는다. 그날 기기 합계가 광고그룹 일별 합계(n_adgroup_daily)와 1% 넘게 다르면 그날은 쓰지 않는다 — 응답을 잘못 읽은 값을 내보내지 않으려고.
  */
-function collectNaverDevice_(ss, t0, groups, gById, fresh, back, monthlyRows) {
-  const head = ['month', 'type', 'campaign', 'device', 'cost', 'impressions', 'clicks', 'conversions'];
-  const old = read_(ss, 'n_device_monthly');
-  const have = new Set(old.map((r) => String(r.month).slice(0, 7)));
+function collectNaverDevice_(ss, t0, groups, gById) {
+  const kst = (ms) => Utilities.formatDate(new Date(ms), 'Asia/Seoul', 'yyyy-MM-dd');
+  const today = kst(Date.now());
+  if (PROPS.getProperty('NAVER_DEVICE_DAY') === today) return;
+  const head = ['date', 'type', 'campaign', 'device', 'cost', 'impressions', 'clicks', 'conversions'];
   const spent = {};
-  monthlyRows.filter((r) => r[1] === 'SA').forEach((r) => { spent[r[0]] = (spent[r[0]] || 0) + (Number(r[6]) || 0); });
-  const missing = Object.keys(spent).filter((m) => m < fresh[1] && !have.has(m));
-  const deviceOf = (tp) => (/^p/i.test(String(tp)) ? 'desktop' : /^m/i.test(String(tp)) ? 'mobile' : '');
+  read_(ss, 'n_adgroup_daily').forEach((r) => { const d = String(r.date).slice(0, 10); spent[d] = (spent[d] || 0) + (Number(r.cost) || 0); });
+  const deviceOf = (tp) => { const v = String(tp).trim(); return /^p/i.test(v) ? 'desktop' : v === '모바일' || /^m/i.test(v) ? 'mobile' : ''; }; // 응답 값은 'PC' · '모바일'
+  const ids = groups.map((g) => String(g.id));
   const rows = [], done = [];
-  for (const m of fresh.concat(back(missing))) {
-    if (Date.now() - t0 > CFG.BUDGET_MS) break;
-    const ids = groups.map((g) => String(g.id)), acc = {};
+  for (let back = 7; back >= 1; back--) {
+    if (Date.now() - t0 > CFG.BUDGET_MS) return; // 시간이 모자라면 다음 실행에서 다시 (그날 표시를 남기지 않는다)
+    const d = kst(Date.now() - back * 864e5), acc = {};
     let total = 0, unknown = 0;
     for (let i = 0; i < ids.length; i += CFG.CHUNK) {
-      const r = api_('GET', '/stats', { ids: ids.slice(i, i + CFG.CHUNK), fields: STAT_FIELDS, timeRange: JSON.stringify({ since: m + '-01', until: lastDay_(m) }), breakdown: 'pcMblTp' });
+      const r = api_('GET', '/stats', { ids: ids.slice(i, i + CFG.CHUNK), fields: STAT_FIELDS, timeRange: JSON.stringify({ since: d, until: d }), breakdown: 'pcMblTp' });
       (r.data || []).forEach((s) => {
         const g = gById[s.id];
         if (!g) return;
@@ -307,23 +308,24 @@ function collectNaverDevice_(ss, t0, groups, gById, fresh, back, monthlyRows) {
           const cost = Number(p.salesAmt) || 0;
           total += cost;
           if (!dev) { unknown += cost; return; }
-          const k = g.campaign + '\u0001' + dev;
-          const row = acc[k] = acc[k] || [m, 'SA', g.campaign, dev, 0, 0, 0, 0];
+          const k = JSON.stringify([g.campaign, dev]);
+          const row = acc[k] = acc[k] || [d, 'SA', g.campaign, dev, 0, 0, 0, 0];
           row[4] += cost; row[5] += Number(p.impCnt) || 0; row[6] += Number(p.clkCnt) || 0; row[7] += Number(p.ccnt) || 0;
         });
       });
     }
-    const expect = spent[m] || 0;
-    if (unknown > 0 || (expect > 0 && Math.abs(total - expect) > expect * 0.01)) {
-      console.warn('collectNaverDevice_: ' + m + ' 기기 합계 ' + total + '원(구분 못 한 금액 ' + unknown + '원)이 광고그룹 합계 ' + expect + '원과 달라 저장하지 않음');
+    const expect = spent[d] || 0;
+    if (unknown > 0 || Math.abs(total - expect) > Math.max(expect * 0.01, 1)) {
+      console.warn('collectNaverDevice_: ' + d + ' 기기 합계 ' + total + '원(구분 못 한 금액 ' + unknown + '원)이 광고그룹 일별 합계 ' + expect + '원과 달라 저장하지 않음');
       continue;
     }
     Object.keys(acc).forEach((k) => { if (acc[k][4] || acc[k][5]) rows.push(acc[k]); });
-    done.push(m);
+    done.push(d);
   }
+  PROPS.setProperty('NAVER_DEVICE_DAY', today);
   if (!done.length) return;
-  const keep = old.filter((r) => !done.includes(String(r.month).slice(0, 7))).map((r) => head.map((h) => (h === 'month' ? String(r.month).slice(0, 7) : r[h])));
-  put_(ss, 'n_device_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
+  const keep = read_(ss, 'n_device_daily').filter((r) => !done.includes(String(r.date).slice(0, 10))).map((r) => head.map((h) => (h === 'date' ? String(r.date).slice(0, 10) : r[h])));
+  put_(ss, 'n_device_daily', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 }
 /**
  * 광고그룹 × 일 (최근 CFG.DAILY_DAYS 일) → n_adgroup_daily. 일·기간 선택이 쓴다.
@@ -513,6 +515,27 @@ function collectNaverAdStats_(ss, t0, fresh, back) {
   return fresh.every((m) => done.includes(m));
 }
 
+/** 수동 실행용: 오늘 네이버 기기별 수집 표시를 지우고 7일 전~어제를 다시 받는다 */
+function retryNaverDevice() {
+  checkNaverKeys_();
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
+  const groups = read_(ss, 'n_idx_groups');
+  PROPS.deleteProperty('NAVER_DEVICE_DAY');
+  try { collectNaverDevice_(ss, Date.now(), groups, Object.fromEntries(groups.map((g) => [String(g.id), g]))); } finally { saveApiCount_(); }
+}
+/** 수동 실행용: 네이버 기기별 /stats 응답 모양을 로그로 본다 (어제, 광고그룹 앞 50개). 기기 코드가 바뀌었을 때 확인한다 */
+function debugNaverDevice() {
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
+  const ids = read_(ss, 'n_idx_groups').map((g) => String(g.id)).slice(0, CFG.CHUNK);
+  const d = Utilities.formatDate(new Date(Date.now() - 864e5), 'Asia/Seoul', 'yyyy-MM-dd');
+  const r = api_('GET', '/stats', { ids: ids, fields: STAT_FIELDS, timeRange: JSON.stringify({ since: d, until: d }), breakdown: 'pcMblTp' });
+  const rows = r.data || [];
+  const codes = {};
+  rows.forEach((s) => (Array.isArray(s.breakdowns) ? s.breakdowns : [s]).forEach((p) => { const k = String(p.pcMblTp || p.name || p.key); codes[k] = (codes[k] || 0) + (Number(p.salesAmt) || 0); }));
+  console.log('rows ' + rows.length + ' keys ' + JSON.stringify(Object.keys(rows[0] || {})) + ' codes ' + JSON.stringify(codes));
+  console.log(JSON.stringify(rows.slice(0, 4)).slice(0, 1500));
+  saveApiCount_();
+}
 /** 진단용 (편집기에서 직접 실행): 월마다 광고그룹 성과와 키워드 성과를 비교하고, 현재 키워드의 등록 시점을 로그로 남긴다.
  * 과거 달 키워드 성과가 비는 원인(키워드 재등록 / 조회 기간 제한)을 가린다. API 약 50회. */
 function debugKeywordHistory() {

@@ -1,6 +1,6 @@
 /**
  * 기기별(PC·모바일·태블릿) 통계 자료. 모두 실제로 수집한 값만 담고, 수집되지 않은 달·항목은 비워 둔다 (추정·배분 없음).
- *  - 광고: 시트 g_device_monthly(Google Ads 스크립트) · n_device_monthly(네이버 /stats pcMblTp) — applyAdDevices
+ *  - 광고: 시트 g_device_monthly(Google Ads 스크립트, 월) · n_device_daily(네이버 /stats pcMblTp, 일 — 최근 7일만 조회돼 날마다 쌓는다) — applyAdDevices
  *  - 방문·전환: itket-analytics GA4 월별 파일의 devices · deviceChannels · conv.byDevice · conv.byDeviceChannel — loadGa4Devices
  *  - 판매: 고도몰 주문 줄(godo_order_lines)의 device(주문 형태) — godomallOrders.ts
  */
@@ -41,19 +41,25 @@ export interface AdDeviceRow {
 export const AD_DEVICE_ROWS: AdDeviceRow[] = [];
 /** 매체별로 기기 자료가 있는 달 — 없는 달은 '수집 전'이고 0 이 아니다 */
 export const AD_DEVICE_MONTHS: Record<'Google' | 'Naver', Set<string>> = { Google: new Set(), Naver: new Set() };
+/** 일별로 쌓는 매체(네이버)의 첫 수집일 'YYYY-MM-DD' — 그 달은 이날부터의 값이다 */
+export const AD_DEVICE_FROM: Partial<Record<'Google' | 'Naver', string>> = {};
 
 type RawRow = Record<string, unknown>;
 
-/** 수집 시트의 기기별 광고 행을 반영한다 */
+/** 수집 시트의 기기별 광고 행을 반영한다. 구글은 월(month) 행, 네이버는 일(date) 행을 달로 묶는다 */
 export function applyAdDevices(google: RawRow[], naver: RawRow[]): void {
   AD_DEVICE_ROWS.length = 0;
   AD_DEVICE_MONTHS.Google.clear();
   AD_DEVICE_MONTHS.Naver.clear();
+  delete AD_DEVICE_FROM.Google;
+  delete AD_DEVICE_FROM.Naver;
   const push = (media: 'Google' | 'Naver', rows: RawRow[]) =>
     rows.forEach((r) => {
-      const month = String(r.month ?? '').slice(0, 7);
+      const date = String(r.date ?? '').slice(0, 10);
+      const month = String(r.month ?? date).slice(0, 7);
       if (!/^\d{4}-\d{2}$/.test(month)) return;
       AD_DEVICE_MONTHS[media].add(month);
+      if (date && (!AD_DEVICE_FROM[media] || date < AD_DEVICE_FROM[media]!)) AD_DEVICE_FROM[media] = date;
       AD_DEVICE_ROWS.push({
         media,
         month,

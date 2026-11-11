@@ -14,6 +14,7 @@ import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { AdApiSource } from '../components/common/ExtLink';
 import {
+  AD_DEVICE_FROM,
   AD_DEVICE_MONTHS,
   AD_DEVICE_ROWS,
   DEVICE_COLORS,
@@ -115,7 +116,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     }).filter((r) => r.n > 0);
   });
   const adTotal = { cost: sumBy(adRows, (r) => r.cost), imp: sumBy(adRows, (r) => r.imp), clk: sumBy(adRows, (r) => r.clk), conv: sumBy(adRows, (r) => r.conv) };
-  const adCover = [`구글 ${coverText(adMonths('Google').length, scope.length) || '수집됨'}`, `네이버 ${coverText(adMonths('Naver').length, scope.length) || '수집됨'}`].join(' · ');
+  // 네이버는 날마다 쌓아 첫 수집일이 고른 기간 안이면 그날부터의 값이다
+  const naverFrom = AD_DEVICE_FROM.Naver && scope.includes(AD_DEVICE_FROM.Naver.slice(0, 7)) ? ` (${+AD_DEVICE_FROM.Naver.slice(5, 7)}/${+AD_DEVICE_FROM.Naver.slice(8, 10)}부터)` : '';
+  const adCover = [`구글 ${coverText(adMonths('Google').length, scope.length) || '수집됨'}`, `네이버 ${coverText(adMonths('Naver').length, scope.length) || '수집됨'}${adMonths('Naver').length ? naverFrom : ''}`].join(' · ');
 
   // 판매 — 고도몰 주문 형태별 주문 수·금액 (주문 키로 한 번만 센다)
   const scopeSet = new Set(scope);
@@ -336,7 +339,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         )}
         <TableFootnote
           unit="원·회"
-          basis="산출 근거: 매체 API 기기별 실적 · 네이버는 태블릿을 모바일에 포함 · 광고전환은 매체가 집계한 전환"
+          basis="산출 근거: 매체 API 기기별 실적 · 네이버는 태블릿을 모바일에 포함하고, 기기 구분을 최근 7일만 조회할 수 있어 2026-11 부터 날마다 쌓은 값 · 광고전환은 매체가 집계한 전환"
           sources={[<AdApiSource key="src" prefix="출처:" suffix="API" />]}
         />
       </Card>
