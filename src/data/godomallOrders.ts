@@ -84,6 +84,8 @@ export interface GodoOrderLine {
   basis: string;
   /** 유입 상세 (검색어·광고 종류·첫 페이지) — 기록이 있는 주문만 */
   detail: string;
+  /** 고도몰 주문 형태 (pc · mobile · write …). 수집 전 줄은 빈 값 */
+  device: string;
 }
 
 export const GODOMALL_ORDER_LINES: GodoOrderLine[] = [];
@@ -96,7 +98,7 @@ export function applyGodoOrderLines(rows: Record<string, unknown>[]): void {
     if (!/^\d{4}-\d{2}$/.test(month)) return;
     GODOMALL_ORDER_LINES.push({
       month, key: s(r.key), goodsNo: s(r.goods_no), placed: s(r.placed), paid: s(r.paid), status: s(r.status), settle: s(r.settle), member: s(r.member),
-      qty: Number(r.qty) || 0, amount: Number(r.amount) || 0, source: s(r.source) || '미수집', basis: s(r.basis), detail: s(r.detail),
+      qty: Number(r.qty) || 0, amount: Number(r.amount) || 0, source: s(r.source) || '미수집', basis: s(r.basis), detail: s(r.detail), device: s(r.device),
     });
   });
 }

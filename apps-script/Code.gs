@@ -30,7 +30,7 @@ const CFG = {
   NAVER_DAILY_CAP: 6000,
   RUN_LIMIT_MS: 5 * 60 * 1000,               // syncAll 전체가 이 시간을 넘기면 남은 수집은 다음 실행으로 (6분 강제 종료 방지)
   SHEETS: ['g_campaign_monthly', 'g_adgroup_monthly', 'g_adgroup_daily', 'g_keywords', 'g_ads', 'g_ad_stats', 'g_meta',
-    'n_adgroup_monthly', 'n_adgroup_daily', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'godo_orders_monthly', 'godo_goods_monthly', 'godo_order_inflow_monthly', 'godo_orders_daily', 'godo_meta', 'godo_goods_inflow_monthly', 'godo_order_lines', 'godo_order_customers', 'q_meta', 'mapping', 'manual', 'manual_categories'],
+    'n_adgroup_monthly', 'n_adgroup_daily', 'n_keywords', 'n_ads', 'n_ad_stats', 'n_meta', 'quotes_monthly', 'quotes_raw', 'quotes_raw_sites', 'quotes_phone', 'quotes_stats_extra', 'godo_orders_monthly', 'godo_goods_monthly', 'godo_order_inflow_monthly', 'godo_orders_daily', 'godo_meta', 'godo_goods_inflow_monthly', 'godo_order_lines', 'godo_order_customers', 'g_device_monthly', 'n_device_monthly', 'q_meta', 'mapping', 'manual', 'manual_categories'],
   // 대시보드 주소와 키는 공개 번들에 들어 있다. 고객 정보는 관리자 로그인이 확인될 때만 내려준다 (doGet)
   SUPABASE_URL: 'https://tqxljgmygvanysqnhiar.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable__Oq9NpOHnxEqRSZ02qJDaw_n-FIAGC2',
@@ -233,6 +233,7 @@ function collectNaverStats_(ss, t0, withKeywords) {
   put_(ss, 'n_adgroup_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 
   collectNaverDaily_(ss, t0, groups, gById);
+  try { collectNaverDevice_(ss, t0, groups, gById, fresh, back, keep.concat(rows)); } catch (e) { fail_('collectNaverDevice_', e); } // 기기별 실패가 광고비 수집을 막지 않게 한다
 
   // 키워드 × 월 (당월은 1일~어제). 월 열이 없는 예전 행은 버린다.
   const kws = read_(ss, 'n_idx_keywords');
@@ -275,6 +276,54 @@ function collectNaverStats_(ss, t0, withKeywords) {
     ['structure', PROPS.getProperty('NAVER_STRUCT_AT') || ''], ['api_calls', apiCalls_]]);
   syncMapping_(ss);
   pendingNaverHist_ = { groups, gById };
+}
+/**
+ * 캠페인 × 기기(PC·모바일) × 월 → n_device_monthly. /stats 의 breakdown=pcMblTp 로 받는다 (네이버는 태블릿을 모바일에 넣는다).
+ * 당월·전월은 매번, 그 이전은 비어 있는 달을 CFG.BACKFILL_MONTHS 개씩 채운다.
+ * 기기 합계가 같은 달 광고그룹 합계(n_adgroup_monthly)와 1% 넘게 다르면 그 달은 쓰지 않는다 — 응답을 잘못 읽은 값을 내보내지 않으려고.
+ */
+function collectNaverDevice_(ss, t0, groups, gById, fresh, back, monthlyRows) {
+  const head = ['month', 'type', 'campaign', 'device', 'cost', 'impressions', 'clicks', 'conversions'];
+  const old = read_(ss, 'n_device_monthly');
+  const have = new Set(old.map((r) => String(r.month).slice(0, 7)));
+  const spent = {};
+  monthlyRows.filter((r) => r[1] === 'SA').forEach((r) => { spent[r[0]] = (spent[r[0]] || 0) + (Number(r[6]) || 0); });
+  const missing = Object.keys(spent).filter((m) => m < fresh[1] && !have.has(m));
+  const deviceOf = (tp) => (/^p/i.test(String(tp)) ? 'desktop' : /^m/i.test(String(tp)) ? 'mobile' : '');
+  const rows = [], done = [];
+  for (const m of fresh.concat(back(missing))) {
+    if (Date.now() - t0 > CFG.BUDGET_MS) break;
+    const ids = groups.map((g) => String(g.id)), acc = {};
+    let total = 0, unknown = 0;
+    for (let i = 0; i < ids.length; i += CFG.CHUNK) {
+      const r = api_('GET', '/stats', { ids: ids.slice(i, i + CFG.CHUNK), fields: STAT_FIELDS, timeRange: JSON.stringify({ since: m + '-01', until: lastDay_(m) }), breakdown: 'pcMblTp' });
+      (r.data || []).forEach((s) => {
+        const g = gById[s.id];
+        if (!g) return;
+        // 응답이 기기별 줄을 breakdowns 배열로 주거나, 줄마다 pcMblTp 를 달아 준다 — 둘 다 받는다
+        const parts = Array.isArray(s.breakdowns) ? s.breakdowns : [s];
+        parts.forEach((p) => {
+          const dev = deviceOf(p.pcMblTp || p.name || p.key);
+          const cost = Number(p.salesAmt) || 0;
+          total += cost;
+          if (!dev) { unknown += cost; return; }
+          const k = g.campaign + '\u0001' + dev;
+          const row = acc[k] = acc[k] || [m, 'SA', g.campaign, dev, 0, 0, 0, 0];
+          row[4] += cost; row[5] += Number(p.impCnt) || 0; row[6] += Number(p.clkCnt) || 0; row[7] += Number(p.ccnt) || 0;
+        });
+      });
+    }
+    const expect = spent[m] || 0;
+    if (unknown > 0 || (expect > 0 && Math.abs(total - expect) > expect * 0.01)) {
+      console.warn('collectNaverDevice_: ' + m + ' 기기 합계 ' + total + '원(구분 못 한 금액 ' + unknown + '원)이 광고그룹 합계 ' + expect + '원과 달라 저장하지 않음');
+      continue;
+    }
+    Object.keys(acc).forEach((k) => { if (acc[k][4] || acc[k][5]) rows.push(acc[k]); });
+    done.push(m);
+  }
+  if (!done.length) return;
+  const keep = old.filter((r) => !done.includes(String(r.month).slice(0, 7))).map((r) => head.map((h) => (h === 'month' ? String(r.month).slice(0, 7) : r[h])));
+  put_(ss, 'n_device_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 }
 /**
  * 광고그룹 × 일 (최근 CFG.DAILY_DAYS 일) → n_adgroup_daily. 일·기간 선택이 쓴다.
@@ -1759,7 +1808,7 @@ function godoOrders_(start, end) {
     if (code !== '000') throw new Error('고도몰 API 오류 ' + code + ': ' + (header ? header.getChildText('msg') : root.getName()));
     const ret = root.getChild('return');
     const list = ret ? ret.getChildren('order_data') : [];
-    list.forEach((o) => out.push({ no: o.getChildText('orderNo'), paid: o.getChildText('paymentDt') || '', status: o.getChildText('orderStatus') || '', placed: o.getChildText('orderDate') || '', channel: o.getChildText('orderChannelFl') || '', settle: o.getChildText('settleKind') || '', memNo: Number(o.getChildText('memNo')) || 0, memGroup: o.getChildText('memGroupNm') || '', info: godoOrderInfo_(o), goods: godoGoodsLines_(o) }));
+    list.forEach((o) => out.push({ no: o.getChildText('orderNo'), paid: o.getChildText('paymentDt') || '', status: o.getChildText('orderStatus') || '', placed: o.getChildText('orderDate') || '', device: o.getChildText('orderTypeFl') || '', channel: o.getChildText('orderChannelFl') || '', settle: o.getChildText('settleKind') || '', memNo: Number(o.getChildText('memNo')) || 0, memGroup: o.getChildText('memGroupNm') || '', info: godoOrderInfo_(o), goods: godoGoodsLines_(o) }));
     if (!list.length || !header.getChildText('lastOrder') && !(ret && ret.getChildText('lastOrder'))) break;
     const more = header.getChildText('lastOrder') || ret.getChildText('lastOrder');
     if (String(more) !== 'true') break;
@@ -1863,8 +1912,8 @@ function collectGodoOrders() {
   // 구매 제품 펼침용 주문 줄 (공개) 과 회원 등급·이메일 도메인 (관리자 전용). 처음에는 전체 기간, 이후에는 최근 석 달만 다시 쓴다
   const linesFrom = oldLines.length ? keepFrom : '2022-01';
   const orderRows = godoOrderLineRows_(orders, inflowRows, linesFrom);
-  const keptLines = oldLines.filter((r) => String(r.month).slice(0, 7) < linesFrom).map((r) => [String(r.month).slice(0, 7), String(r.key), String(r.goods_no), String(r.placed), String(r.paid), r.status, r.settle, r.member, Number(r.qty) || 0, Number(r.amount) || 0, r.source, r.basis, r.detail]);
-  put_(ss, 'godo_order_lines', [['month', 'key', 'goods_no', 'placed', 'paid', 'status', 'settle', 'member', 'qty', 'amount', 'source', 'basis', 'detail']].concat(keptLines, orderRows.lines));
+  const keptLines = oldLines.filter((r) => String(r.month).slice(0, 7) < linesFrom).map((r) => [String(r.month).slice(0, 7), String(r.key), String(r.goods_no), String(r.placed), String(r.paid), r.status, r.settle, r.member, Number(r.qty) || 0, Number(r.amount) || 0, r.source, r.basis, r.detail, r.device || '']);
+  put_(ss, 'godo_order_lines', [['month', 'key', 'goods_no', 'placed', 'paid', 'status', 'settle', 'member', 'qty', 'amount', 'source', 'basis', 'detail', 'device']].concat(keptLines, orderRows.lines));
   const keptCustomers = read_(ss, 'godo_order_customers').filter((r) => String(r.month).slice(0, 7) < linesFrom).map((r) => [String(r.month).slice(0, 7), String(r.key), r.member_group, r.email_domain || '']);
   put_(ss, 'godo_order_customers', [['month', 'key', 'member_group', 'email_domain']].concat(keptCustomers, orderRows.customers));
   try {
@@ -2015,7 +2064,7 @@ function godoOrderLineRows_(orders, inflowRows, fromMonth) {
     const key = keyOf(o.no), src = map[o.no] || { source: '미수집', basis: '', detail: '' };
     const byGoods = {};
     o.goods.forEach((g) => { const r = byGoods[g.no] = byGoods[g.no] || { qty: 0, amount: 0 }; r.qty += g.cnt; r.amount += g.amount; });
-    Object.keys(byGoods).forEach((no) => lines.push([m, key, no, o.placed.slice(0, 16), o.paid.slice(0, 16), o.status, o.settle, o.memNo > 0 ? '회원' : '비회원', byGoods[no].qty, byGoods[no].amount, src.source, src.basis, src.detail]));
+    Object.keys(byGoods).forEach((no) => lines.push([m, key, no, o.placed.slice(0, 16), o.paid.slice(0, 16), o.status, o.settle, o.memNo > 0 ? '회원' : '비회원', byGoods[no].qty, byGoods[no].amount, src.source, src.basis, src.detail, o.device]));
     customers.push([m, key, o.memGroup, (o.info || {}).emailDomain || '']);
   });
   return { lines, customers };
@@ -2025,7 +2074,7 @@ function rebuildOrderLines() {
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
   const orders = godoOrdersBetween_('2022-01-01', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'));
   const rows = godoOrderLineRows_(orders, read_(ss, 'order_inflow'), '2022-01');
-  put_(ss, 'godo_order_lines', [['month', 'key', 'goods_no', 'placed', 'paid', 'status', 'settle', 'member', 'qty', 'amount', 'source', 'basis', 'detail']].concat(rows.lines));
+  put_(ss, 'godo_order_lines', [['month', 'key', 'goods_no', 'placed', 'paid', 'status', 'settle', 'member', 'qty', 'amount', 'source', 'basis', 'detail', 'device']].concat(rows.lines));
   put_(ss, 'godo_order_customers', [['month', 'key', 'member_group', 'email_domain']].concat(rows.customers));
 }
 /** 구매 제품별 유입 경로 시트를 2025-01 부터 다시 만든다 (추정값을 바꿨을 때 한 번 실행). 평소에는 collectGodoOrders 가 최근 석 달만 고친다 */
