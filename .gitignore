@@ -10,3 +10,6 @@ scripts/gfa-*.json
 .env
 .env.local
 .env.*.local
+
+# 임시 빌드 산출물
+tmp/
