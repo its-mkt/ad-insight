@@ -1,4 +1,4 @@
-export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'search' | 'data' | 'admin';
+export type ViewId = 'overview' | 'ads' | 'cat-efficiency' | 'keywords' | 'quotes' | 'purchases' | 'devices' | 'search' | 'data' | 'admin' | 'usage';
 
 /** 사이드바에서 고르는 사이트 — 온코어는 데이터 연결 전이라 안내만 보여 준다 */
 export type SiteId = 'itket' | 'oncore';
@@ -17,6 +17,8 @@ export interface SpendRow {
   imp: number;
   clk: number;
   conv: number;
+  /** 네이버 캠페인 유형 (WEB_SITE 파워링크 · SHOPPING 쇼핑검색 · PLACE 플레이스). 구글·예전 자료는 없음 */
+  campaignTp?: string;
 }
 
 /** 광고그룹 × 일 광고비 — 일·기간 선택이 쓴다. 최근 수십 일만 수집한다 */
@@ -31,6 +33,8 @@ export interface SpendDailyRow {
   imp: number;
   clk: number;
   conv: number;
+  /** 네이버 캠페인 유형 (SpendRow.campaignTp 와 같음) */
+  campaignTp?: string;
 }
 
 export interface ManualRow {
@@ -242,6 +246,8 @@ export interface RawSpendApiRow {
   type?: string;
   campaign?: unknown;
   ad_group?: unknown;
+  /** 네이버 캠페인 유형 (n_adgroup_monthly·n_adgroup_daily) */
+  campaign_tp?: unknown;
   cost?: unknown;
   impressions?: unknown;
   clicks?: unknown;
@@ -383,6 +389,9 @@ export interface RawApiPayload {
   godo_orders_daily?: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[];
   godo_goods_inflow_monthly?: { month?: unknown; goods_no?: unknown; source?: unknown; orders?: unknown }[];
   godo_order_lines?: Record<string, unknown>[];
+  /** 캠페인 × 기기 광고 실적 — 구글은 월, 네이버는 일 (/stats pcMblTp 는 최근 7일만 조회돼 날마다 쌓는다) */
+  g_device_monthly?: Record<string, unknown>[];
+  n_device_daily?: Record<string, unknown>[];
   /** 관리자 로그인 응답에만 있다 */
   godo_order_customers?: Record<string, unknown>[];
   manual_categories?: RawManualCategoryApiRow[];

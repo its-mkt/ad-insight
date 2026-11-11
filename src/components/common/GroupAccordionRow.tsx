@@ -1,5 +1,6 @@
 import React from 'react';
 import { AccordionChevron } from './AccordionChevron';
+import { IconLabel } from './IconLabel';
 
 interface GroupAccordionRowProps {
   /** 줄 이름 (굵은 제목) */
@@ -44,12 +45,7 @@ export const GroupAccordionRow: React.FC<GroupAccordionRowProps> = ({
   >
     <td>
       <div className="grp-acc-cell">
-        <span className="grp-acc-main">
-          <AccordionChevron open={open} placeholder={!canOpen} />
-          {icon}
-          <span className="grp-acc-title">{title}</span>
-          {count != null && <small className="grp-acc-cnt">{count}</small>}
-        </span>
+        <IconLabel lead={<AccordionChevron open={open} placeholder={!canOpen} />} icon={icon} title={title} sub={count} />
       </div>
     </td>
     {children}

@@ -33,21 +33,22 @@ const cleanTitle = (t: string) => (t && !/^[A-Z0-9_]+$/.test(t) ? displayAdTitle
 
 const adTitle = (c: AdRow) => cleanTitle(c.title) || `${c.campaign} · ${c.adgroup}` || '파워링크 검색광고';
 
-// CTR = 클릭 ÷ 노출 × 100, 평균 CPC = 비용 ÷ 클릭 (분모 0 이면 –)
+// CTR = 클릭 ÷ 노출 × 100, 평균 CPC = 광고비 ÷ 클릭 (분모 0 이면 –)
 const METRICS: { key: string; label: string; value: (s: AdStat) => string }[] = [
   { key: 'imp', label: '노출', value: (s) => fmt(s.imp) },
   { key: 'clk', label: '클릭', value: (s) => fmt(s.clk) },
   {
     key: 'ctr',
-    label: '클릭률',
+    label: 'CTR',
     value: (s) => ctrText(s.clk, s.imp),
   },
+  { key: 'conv', label: '광고전환', value: (s) => fmt(Math.round(s.conv * 10) / 10) },
   {
     key: 'cpc',
     label: '평균 CPC',
     value: (s) => (s.clk ? `${fmt(s.cost / s.clk)}원` : '–'),
   },
-  { key: 'cost', label: '비용', value: (s) => `${fmt(s.cost)}원` },
+  { key: 'cost', label: '광고비', value: (s) => `${fmt(s.cost)}원` },
 ];
 
 /** 수집된 실제 이미지만 보여 주고, 없거나 주소가 깨지면 텍스트 광고 표시로 바꾼다 */
@@ -111,8 +112,8 @@ const CreativeImage: React.FC<{ ad: AdRow; src: string; title: string }> = ({ ad
   );
 };
 
-// 표 열 수: 광고그룹 + 이미지 + 성과 5
-const COLS = 7;
+// 표 열 수: 광고그룹 + 이미지 + 성과 6
+const COLS = 8;
 
 const UNAVAILABLE_NOTE = 'Google 스톡 이미지는 미리보기를 제공하지 않아 여기에 표시되지 않습니다. 전체 이미지는 Google Ads에서 확인해 주세요.';
 
@@ -282,7 +283,7 @@ const Metrics: React.FC<{ stat?: AdStat; loading: boolean }> = ({ stat, loading 
   );
 };
 
-/** 표 한 줄의 성과 5칸 */
+/** 표 한 줄의 성과 6칸 */
 const MetricCells: React.FC<{ stat?: AdStat; loading: boolean }> = ({ stat, loading }) => {
   const pending = !stat && loading;
   return (
@@ -306,7 +307,7 @@ const singleHasDetail = (ad: AdRow) => {
   return !!ad.url || titles.length > 0 || descs.length > 0 || getCreativeImages(ad).length > 0;
 };
 
-type SortKey = 'name' | 'img' | 'imp' | 'clk' | 'ctr' | 'cpc' | 'cost';
+type SortKey = 'name' | 'img' | 'imp' | 'clk' | 'ctr' | 'conv' | 'cpc' | 'cost';
 
 interface GroupRow {
   group: AdGroupCreatives;
@@ -324,6 +325,7 @@ const SORT_VALUE: Record<Exclude<SortKey, 'name'>, (r: GroupRow) => number> = {
   imp: (r) => (r.stat ? r.stat.imp : -1),
   clk: (r) => (r.stat ? r.stat.clk : -1),
   ctr: (r) => (r.stat?.imp ? r.stat.clk / r.stat.imp : -1),
+  conv: (r) => (r.stat ? r.stat.conv : -1),
   cpc: (r) => (r.stat?.clk ? r.stat.cost / r.stat.clk : -1),
   cost: (r) => (r.stat ? r.stat.cost : -1),
 };
@@ -572,7 +574,7 @@ export const AdCreativesList: React.FC<AdCreativesListProps> = ({
           )}
           <TableFootnote
             unit="원·회"
-            basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고그룹별 소재 합계 · 클릭률 = 클릭 ÷ 노출 · CPC = 비용 ÷ 클릭`}
+            basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지) · 광고그룹별 소재 합계 · CTR = 클릭 ÷ 노출 · 평균 CPC = 광고비 ÷ 클릭`}
             sources={[
               <AdApiSource key="src" prefix="출처:" suffix="(하루 1회 갱신)" />,
             ]}

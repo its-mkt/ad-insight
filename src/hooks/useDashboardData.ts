@@ -22,6 +22,7 @@ import type {
 import { buildCategoryMap, LEGACY_ONLY_CATS, quoteKey, THIS_M } from '../utils/format';
 import { SITE_DEFAULT_CATEGORY } from '../utils/constants';
 import { applyGodoDaily, applyGodoGoods, applyGodoGoodsInflow, applyGodoOrderCustomers, applyGodoOrderInflow, applyGodoOrderLines, applyGodoOrders } from '../data/godomallOrders';
+import { applyAdDevices } from '../data/deviceStats';
 import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
@@ -182,6 +183,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
     imp: n(r.impressions),
     clk: n(r.clicks),
     conv: n(r.conversions),
+    ...(r.campaign_tp ? { campaignTp: String(r.campaign_tp).trim() } : {}),
   });
 
   const spend: SpendRow[] = (j.g_adgroup_monthly || []).map((r) => toSpendRow('Google', r));
@@ -401,6 +403,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
   applyGodoGoodsInflow(j.godo_goods_inflow_monthly || []);
   applyGodoOrderLines(j.godo_order_lines || []);
   applyGodoOrderCustomers(j.godo_order_customers || []);
+  applyAdDevices(j.g_device_monthly || [], j.n_device_daily || []);
   const marks = new Map<string, QuoteManualMark>();
   (j.manual_categories || []).forEach((r) => {
     const sno = String(r.sno ?? '').trim();

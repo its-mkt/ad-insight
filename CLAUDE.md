@@ -19,9 +19,9 @@
 | 화면 바깥 틀 (`view on`) | `View` (`name`, `title`) |
 | 화면 제목·설명 | `ViewHeader`, 출처 줄 `SecSrc` |
 | 화면 위 "※ 기준·집계 방식" 안내 | `ViewNote` |
-| 박스 + 제목(+보조 제목) | `Card` (`name`, `title`, `subtitle`, `tableWrap`) |
+| 박스 + 제목(+보조 제목) | `Card` (`name`, `title`, `subtitle`, `tableWrap`, 제목 줄 오른쪽 끝 도구 `tools`) |
 | KPI 카드 / 묶음 / 데이터 없음 | `KpiCard`, `KpiSection`, `KpiPlaceholder` |
-| 증감(▲▼) 표시 | `DeltaSpan`, 카드는 `KpiCard` |
+| 증감(▲▼) 표시 | `DeltaSpan` (비중처럼 %p 차이는 `points`), 카드는 `KpiCard` |
 | 막대 목록(카테고리·유입 경로) 증감 칸 | `BarDelta` |
 | 견적 접수처 판별·KPI 접수처 건수 / CTR 표기 | `originOf`·`originGroupCounts` (`utils/quoteOrigin`), `ctrText` (`utils/format`) |
 | KPI 큰 값 + 작고 흐린 보조 값 / 견적·판매 함께 | `KpiSubValue`, `QuoteSalesValue` (`charts/KpiCard`, 판매 건수는 `salesInMonths`·`salesInRange`) |
@@ -39,6 +39,7 @@
 | 표 합계 줄 | `TotalRow` |
 | 1차 > 2차 펼침 줄 | `TreeParentRow`, `TreeChildRow`, `childLabelOf` |
 | 강조색 그룹 펼침 줄 (키워드 표 광고그룹·구매 제품) | `GroupAccordionRow` (`title`, `icon`, `count`, `open`, `canOpen`, `tone`, `plain`), 하위 줄 `GroupChildRow` |
+| 아이콘 + 굵은 이름 + 흐린 보조 글자 한 줄 (매체 이름 칸 등) | `IconLabel` (`icon`, `title`, `sub`, `lead`) — 펼침 줄이면 `GroupAccordionRow` |
 | 표 펼침 줄 앞 화살표(›) | `AccordionChevron` (`open`, `variant`, `placeholder`) — `ChevronRight` 를 직접 쓰지 않는다 |
 | 월별 표 한 줄 / 월 머리글 | `MonthRow`, `MonthHeadCells` |
 | 빈 상태 | `EmptyState` (`message`, `subMessage`) |
@@ -49,7 +50,7 @@
 | 일 선택·기간 선택 달력 | `DatePicker` (`PeriodNav` 의 `onSelectDayRange` 로 연결) |
 
 ### 표 열 너비
-- 숫자·날짜·유입 경로 칸은 `src/styles/_variables.scss` 의 공통 너비를 쓴다: `--col-date`(날짜) · `--col-count`(건수·수량·노출·클릭·전환) · `--col-rate`(비율) · `--col-unit-price`(CPC·CPA 단가) · `--col-amount`(금액) · `--col-source`(유입 경로)
+- 숫자·날짜·유입 경로 칸은 `src/styles/_variables.scss` 의 공통 너비를 쓴다: `--col-date`(날짜) · `--col-count`(건수·수량·노출·클릭·전환) · `--col-rate`(비율) · `--col-unit-price`(CPC·CPA 단가) · `--col-amount`(금액) · `--col-source`(유입 경로) · `--col-duration`(체류시간)
 - 이름 칸은 너비를 주지 않아 남는 폭을 쓰게 하고, 표 `min-width` 는 숫자 칸 합 + 이름 칸 최소 폭으로 잡는다
 - 새 종류가 필요하면 표마다 rem 을 적지 말고 토큰을 추가한다
 

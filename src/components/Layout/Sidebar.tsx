@@ -3,7 +3,7 @@ import type { DashboardData, SiteId, SyncStatus, ViewId } from '../../types/dash
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { SITE_ENABLED } from '../../utils/route';
 import { useAuth } from '../../context/AuthContext';
-import { ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, Search, ShoppingCart, X } from 'lucide-react';
+import { Activity, ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, X } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 
@@ -42,7 +42,7 @@ const SITE_OPTIONS: SegmentOption<SiteId>[] = [
   { value: 'oncore', label: '온코어', title: SITE_ENABLED.oncore ? undefined : '온코어 데이터 연결 준비 중', disabled: !SITE_ENABLED.oncore },
 ];
 
-// 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세는 맨 아래
+// 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세·기기별 통계는 맨 아래
 const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
   {
     id: 'overview',
@@ -84,6 +84,13 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
     label: '구매 상세',
     icon: (
       <ShoppingCart />
+    ),
+  },
+  {
+    id: 'devices',
+    label: '기기별 통계',
+    icon: (
+      <MonitorSmartphone />
     ),
   },
 ];
@@ -190,6 +197,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Lock />
                 <span>어드민 관리</span>
+              </button>
+              <button
+                className={`nv nv-usage${currentView === 'usage' ? ' on' : ''}`}
+                id="nav-usage"
+                data-v="usage"
+                data-btn="usage"
+                aria-current={currentView === 'usage' ? 'page' : undefined}
+                onClick={() => onNavigate('usage')}
+              >
+                <Activity />
+                <span>이용 현황</span>
               </button>
             </nav>
           </div>

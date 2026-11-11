@@ -226,7 +226,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const spendIn = (list: string[]) => catSum(categoryMap, data.spend.filter(inMonths(list)), (r) => r.cost);
   const catSpendCur = allPeriod ? catSum(categoryMap, data.spend, (r) => r.cost) : yearTotal ? spendIn(months) : catsMap(curM);
 
-  // 광고 전환수 KPI — 키워드·소재 화면의 기본 보기(전체 매체 · 검색광고 SA)와 같은 기준이라 눌러서 가면 같은 숫자가 보인다
+  // 광고전환 KPI — 키워드·소재 화면의 기본 보기(전체 매체 · 검색광고 SA)와 같은 기준이라 눌러서 가면 같은 숫자가 보인다
   const convOf = (pred: (mo: string) => boolean) => {
     const rows = data.spend.filter((r) => r.type === 'SA' && pred(r.month));
     const conv = sumBy(rows, (r) => r.conv);
@@ -332,7 +332,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
               detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotes)}건</b></p></>}
             />
-            {convCard('전체 광고 전환수')}
+            {convCard('전체 광고전환')}
           </>
         ) : yearTotal ? (
           <>
@@ -371,7 +371,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               cmpLabel="전년 동기"
               detail={<><p>광고비 <b>{fmtWon(ytdCpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(ytdAdQuotes)}건</b></p></>}
             />
-            {convCard(`${yearLabel} 광고 전환수`, '전년 동기')}
+            {convCard(`${yearLabel} 광고전환`, '전년 동기')}
           </>
         ) : (
           <>
@@ -410,7 +410,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           cmpLabel={cmp}
           detail={<><p>광고비 <b>{fmtWon(curSpendTot)}</b></p><i>|</i><p>견적 <b>{fmt(curAdQuotes)}건</b></p></>}
         />
-        {convCard(`${curCaption} 광고 전환수`, cmp)}
+        {convCard(`${curCaption} 광고전환`, cmp)}
           </>
         )}
       </KpiSection>

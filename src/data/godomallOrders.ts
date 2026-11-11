@@ -84,6 +84,8 @@ export interface GodoOrderLine {
   basis: string;
   /** 유입 상세 (검색어·광고 종류·첫 페이지) — 기록이 있는 주문만 */
   detail: string;
+  /** 고도몰 주문 형태 (pc · mobile · write …). 수집 전 줄은 빈 값 */
+  device: string;
 }
 
 export const GODOMALL_ORDER_LINES: GodoOrderLine[] = [];
@@ -96,7 +98,7 @@ export function applyGodoOrderLines(rows: Record<string, unknown>[]): void {
     if (!/^\d{4}-\d{2}$/.test(month)) return;
     GODOMALL_ORDER_LINES.push({
       month, key: s(r.key), goodsNo: s(r.goods_no), placed: s(r.placed), paid: s(r.paid), status: s(r.status), settle: s(r.settle), member: s(r.member),
-      qty: Number(r.qty) || 0, amount: Number(r.amount) || 0, source: s(r.source) || '미수집', basis: s(r.basis), detail: s(r.detail),
+      qty: Number(r.qty) || 0, amount: Number(r.amount) || 0, source: s(r.source) || '미수집', basis: s(r.basis), detail: s(r.detail), device: s(r.device),
     });
   });
 }
@@ -159,7 +161,20 @@ export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?:
 }
 
 /** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
+/** 판매를 세는 마지막 날 — 로그인하지 않으면 어제까지만 센다 (App 이 정한다, 빈 값이면 제한 없음) */
+let SALES_CUTOFF = '';
+export const setSalesCutoff = (day: string) => {
+  SALES_CUTOFF = day;
+};
+export const salesCutoff = () => SALES_CUTOFF;
+
 export function salesInMonths(months: string[]): number | null {
+  if (SALES_CUTOFF) {
+    // 마지막 날이 든 달은 일별 판매로 1일~마지막 날만, 그 뒤 달은 세지 않는다
+    const cm = SALES_CUTOFF.slice(0, 7);
+    const parts = months.filter((m) => m <= cm).map((m) => (m === cm ? salesInRange(`${m}-01`, SALES_CUTOFF) : m in GODOMALL_ORDERS ? GODOMALL_ORDERS[m] : null));
+    return parts.some((n) => n !== null) ? parts.reduce<number>((sum, n) => sum + (n ?? 0), 0) : null;
+  }
   return months.some((m) => m in GODOMALL_ORDERS) ? months.reduce((sum, m) => sum + (GODOMALL_ORDERS[m] ?? 0), 0) : null;
 }
 
@@ -167,7 +182,8 @@ export function salesInMonths(months: string[]): number | null {
 export function salesInRange(from: string, to: string): number | null {
   const first = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
   if (!first || to < first) return null;
-  return GODOMALL_DAILY.reduce((sum, r) => (r.date >= from && r.date <= to ? sum + r.paid : sum), 0);
+  const end = SALES_CUTOFF && SALES_CUTOFF < to ? SALES_CUTOFF : to;
+  return GODOMALL_DAILY.reduce((sum, r) => (r.date >= from && r.date <= end ? sum + r.paid : sum), 0);
 }
 
 /** 주문번호로 실제 결제 주문과 맞춘 달별·매체별 판매 건수. 유입 경로를 기록하기 시작한 달부터만 있다 */

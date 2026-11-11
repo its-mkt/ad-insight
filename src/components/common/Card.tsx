@@ -10,10 +10,12 @@ export interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 't
   subtitle?: React.ReactNode;
   /** 넓은 표를 가로 스크롤로 감싼다 (tw) */
   tableWrap?: boolean;
+  /** 제목 줄 오른쪽 끝에 놓을 도구 (구분 전환 등) — 차트 카드의 .h3-tools 와 같은 자리 */
+  tools?: React.ReactNode;
 }
 
 /** 화면의 기본 박스. 제목이 있으면 맨 위에 h3 로 둔다 */
-export const Card: React.FC<CardProps> = ({ name, title, titleId, subtitle, tableWrap, className, children, ...rest }) => (
+export const Card: React.FC<CardProps> = ({ name, title, titleId, subtitle, tableWrap, tools, className, children, ...rest }) => (
   <div
     {...rest}
     className={`card card-${name}${tableWrap ? ' tw' : ''}${className ? ` ${className}` : ''}`}
@@ -23,6 +25,7 @@ export const Card: React.FC<CardProps> = ({ name, title, titleId, subtitle, tabl
       <h3 id={titleId}>
         {title}
         {subtitle != null && <span className="muted">{subtitle}</span>}
+        {tools != null && <div className="h3-tools">{tools}</div>}
       </h3>
     )}
     {children}

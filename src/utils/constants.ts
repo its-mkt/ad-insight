@@ -43,11 +43,13 @@ export const VALID_VIEWS: ViewId[] = [
   'ads',
   'quotes',
   'purchases',
+  'devices',
   'cat-efficiency',
   'keywords',
   'search',
   'data',
   'admin',
+  'usage',
 ];
 
 export const VIEW_TITLES: Record<ViewId, string> = {
@@ -55,11 +57,13 @@ export const VIEW_TITLES: Record<ViewId, string> = {
   ads: '매체 광고비',
   quotes: '견적 상세',
   purchases: '구매 상세',
+  devices: '기기별 통계',
   'cat-efficiency': '카테고리 효율',
   keywords: '키워드 · 소재',
   search: '검색 결과',
   data: '데이터 연결',
   admin: '어드민 관리',
+  usage: '이용 현황',
 };
 
 /** 어드민 견적 리스트의 사이트 탭. 아이티켓 외 사이트는 수집 스크립트 CFG.QUOTE_SITES 와 id 를 맞춘다 */

@@ -11,6 +11,7 @@
  *  - g_keywords         : 사용 중 키워드의 현재 입찰가·품질점수 + 월별 성과 (2023년 1월부터)
  *  - g_ads              : 사용 중 광고 소재 (제목·설명·연결 URL·이미지)
  *  - g_ad_stats         : 소재 × 월 비용·노출·클릭·전환 (2023년 1월부터)
+ *  - g_device_monthly   : 캠페인 × 기기(desktop·mobile·tablet·other) × 월 비용·노출·클릭·전환 (2023년 1월부터)
  *  - g_meta             : 마지막 수집 시각
  */
 const CFG = {
@@ -118,6 +119,20 @@ function main() {
   put_(ss, 'g_ad_stats', [['month', 'ad_id', 'cost', 'impressions', 'clicks', 'conversions']]
     .concat(Object.values(adStat).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
 
+  // 캠페인 × 기기 × 월 (2023년 1월부터). 기기별 합계는 캠페인 × 월 합계(g_campaign_monthly)와 같다
+  try {
+    const dev = {};
+    each_(`SELECT segments.month, segments.device, campaign.name, campaign.advertising_channel_type, ${M}
+           FROM campaign WHERE ${range} AND metrics.impressions > 0`, (r) => {
+      const m = r.segments.month.slice(0, 7), d = device_(r.segments.device), name = String(r.campaign.name || '').trim();
+      const k = JSON.stringify([m, name, d]);
+      const cur = dev[k] || (dev[k] = [m, type_(r.campaign.advertisingChannelType), name, d, 0, 0, 0, 0]);
+      met_(r).forEach((v, i) => (cur[i + 4] += v));
+    });
+    put_(ss, 'g_device_monthly', [['month', 'type', 'campaign', 'device', 'cost', 'impressions', 'clicks', 'conversions']]
+      .concat(Object.values(dev).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
+  } catch (e) { console.log(`기기별 수집 실패: ${e && e.message}`); } // 기기별 실패가 다른 시트 수집을 막지 않게 한다
+
   put_(ss, 'g_meta', [['key', 'value'], ['updated', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm')],
     ['account', AdsApp.currentAccount().getName()], ['customer_id', AdsApp.currentAccount().getCustomerId()]]);
 
@@ -163,6 +178,8 @@ function collectDailyHist_(ss, tz, M, camp) {
 
 /** 검색 캠페인은 SA, 나머지(디스플레이·P-Max·디맨드젠·동영상)는 DA 로 본다. */
 function type_(t) { return t === 'SEARCH' ? 'SA' : 'DA'; }
+/** Google Ads 기기 값(DESKTOP·MOBILE·TABLET·CONNECTED_TV …) → GA4 와 같은 이름(desktop·mobile·tablet), 그 밖은 other */
+function device_(d) { const v = String(d || '').toLowerCase(); return v === 'desktop' || v === 'mobile' || v === 'tablet' ? v : 'other'; }
 function met_(r) {
   const m = r.metrics;
   return [Math.round(Number(m.costMicros || 0) / 1e6), Number(m.impressions || 0), Number(m.clicks || 0), Math.round(Number(m.conversions || 0) * 100) / 100];
