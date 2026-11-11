@@ -36,10 +36,15 @@ const goDashboard = (id: DashboardId) => {
   if (d) window.location.href = import.meta.env.DEV ? d.local : d.live;
 };
 
-const SITE_OPTIONS: SegmentOption<SiteId>[] = [
+/** 사이트 선택 — 막아 둔 사이트(route.ts SITE_ENABLED)와, 로그인 전의 온코어는 고를 수 없게 둔다 */
+const siteOptions = (isLoggedIn: boolean): SegmentOption<SiteId>[] => [
   { value: 'itket', label: '아이티켓' },
-  // 막아 둔 사이트는 고를 수 없게 둔다 (route.ts SITE_ENABLED)
-  { value: 'oncore', label: '온코어', title: SITE_ENABLED.oncore ? undefined : '온코어 데이터 연결 준비 중', disabled: !SITE_ENABLED.oncore },
+  {
+    value: 'oncore',
+    label: '온코어',
+    title: !SITE_ENABLED.oncore ? '온코어 데이터 연결 준비 중' : isLoggedIn ? undefined : '로그인하면 온코어 데이터를 볼 수 있습니다',
+    disabled: !SITE_ENABLED.oncore || !isLoggedIn,
+  },
 ];
 
 // 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세·기기별 통계는 맨 아래
@@ -147,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Dropdown<DashboardId> className="brand-dd" id="dd-dashboard" ariaLabel="대시보드 선택" options={DASHBOARD_OPTIONS} value="ad-insight" onChange={goDashboard} />
         </div>
         <div className="site-switch">
-          <SegmentedControl<SiteId> id="seg-site" options={SITE_OPTIONS} value={site} onChange={onSiteChange} />
+          <SegmentedControl<SiteId> id="seg-site" options={siteOptions(isLoggedIn)} value={site} onChange={onSiteChange} />
         </div>
         <div className="sm">
           <div className="lbl">대시보드</div>
