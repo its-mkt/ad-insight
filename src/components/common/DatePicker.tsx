@@ -47,7 +47,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, min, max, onChang
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || rootRef.current?.querySelector('.dd.open')) return; // 연·월 목록이 열려 있으면 목록만 닫는다
+      // 연·월 목록이 열려 있으면 목록만 닫는다 — 목록이 Esc 를 먼저 처리해 이미 닫혔으면 defaultPrevented 로 안다
+      if (e.key !== 'Escape' || e.defaultPrevented || rootRef.current?.querySelector('.dd.open')) return;
       setOpen(false);
       triggerRef.current?.focus({ preventScroll: true });
     };

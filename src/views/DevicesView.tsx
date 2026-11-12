@@ -82,7 +82,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const [ga4, setGa4] = useState<Record<string, Ga4DeviceMonth> | null>(null);
   useEffect(() => {
     let alive = true;
-    loadGa4Devices([...new Set([...scope, ...prevScope, ...chartMonths])]).then((got) => alive && setGa4(got));
+    const months = [...new Set([...scope, ...prevScope, ...chartMonths])];
+    // 아직 안 받은 달로 바꾸면 받는 동안 '수집 전' 대신 불러오는 중으로 보여 준다
+    setGa4((g) => (g && months.every((m) => m in g) ? g : null));
+    loadGa4Devices(months).then((got) => alive && setGa4(got));
     return () => {
       alive = false;
     };

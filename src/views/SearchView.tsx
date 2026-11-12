@@ -376,7 +376,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
             prev={srcSharePrev?.pct ?? null}
             cmpLabel={srcSharePrev ? cmpLabel : undefined}
             deltaUnit="pp"
-            sub="전체 기간 기준"
             detail={
               srcShare ? (
                 <KpiDetailItems items={[['이 매체', `${fmt(srcShare.mine)}건`], ['전체 유입', `${fmt(srcShare.all)}건`]]} />

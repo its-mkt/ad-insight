@@ -356,7 +356,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
             cur={ytdQuotes}
             prev={sumBy(quotes.filter((r) => r.month >= ym(+yr - 1, 1) && r.month <= ym(+yr - 1, mm)), (r) => r.count)}
             cmpLabel="전년 동기"
-            detail={siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 4) === yr))}
+            detail={siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 4) === yr && r.date.slice(0, 7) <= curM))}
           />
         )}
         <KpiCard to="cat-efficiency"

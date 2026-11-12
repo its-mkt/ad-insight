@@ -134,6 +134,8 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
   const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  // 전환이 없으면 0원이 아니라 '–' 로 보여 준다 (0원은 공짜 전환처럼 읽힌다)
+  const cpaText = (v: number) => (v > 0 ? `${fmt(v)}원` : '–');
   const cpa = (mo: string) => {
     const c = sumBy(at(mo), (r) => r.conv);
     return c ? tot(mo) / c : 0;
@@ -233,7 +235,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={monthAvgDetail(yearKeys, allSpendMonths)}
             />
             <KpiCard label="전체 MDF 소진" value={`${fmt(mdfIn(yearKeys))}원`} sub="전체 기간 합계" detail={mdfShareOf(yearKeys)} />
-            <KpiCard label="전체 전환 1건당 광고비" value={`${fmt(cpaIn(yearKeys))}원`} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
+            <KpiCard label="전체 전환 1건당 광고비" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
           </>
         ) : yearTotal ? (
           <>
@@ -268,9 +270,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
             />
             <KpiCard
               label={`${yearLabel} 전환 1건당 광고비`}
-              value={`${fmt(cpaIn(yearMonths))}원`}
-              cur={cpaIn(yearMonths)}
-              prev={cpaIn(lastYrMonths)}
+              value={cpaText(cpaIn(yearMonths))}
+              cur={cpaIn(yearMonths) || null}
+              prev={cpaIn(lastYrMonths) || null}
               cmpLabel="전년 동기"
               detail={<KpiDetailItems items={[['광고전환', convIn(yearMonths)]]} />}
             />
@@ -335,9 +337,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         />
         <KpiCard
           label={`${curCaption} 전환 1건당 광고비`}
-          value={`${fmt(cpa(curM))}원`}
-          cur={cpa(curM)}
-          prev={cpa(pv)}
+          value={cpaText(cpa(curM))}
+          cur={cpa(curM) || null}
+          prev={cpa(pv) || null}
           cmpLabel={cmp}
           detail={<KpiDetailItems items={[['광고전환', curConv]]} />}
         />

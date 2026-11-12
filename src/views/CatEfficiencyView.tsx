@@ -175,7 +175,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   });
 
   const topSpendCat = catData[0];
-  const topQuoteCat = [...catData].sort((a, b) => b.quotes - a.quotes)[0];
+  const topQuoteCat = catData.filter((c) => c.quotes > 0).sort((a, b) => b.quotes - a.quotes)[0]; // 견적이 없으면 '–'
   const cpaRank = cpaRankByCat1(catData);
   // 최고 효율: 평소에는 목록과 같은 1차 기준, 1차를 고르면 그 안의 2차끼리 비교한다. '기타'는 제품군이 아니라 뺀다
   const bestCpaPool = catFilter.cat1

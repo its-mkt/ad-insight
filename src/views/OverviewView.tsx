@@ -196,7 +196,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // 사이트별 견적 건수 breakdown — quotesExtra(어드민)가 있을 때만 의미 있다
   const siteBreak = (rows: QuoteRawRow[]): React.ReactNode => <KpiDetailItems items={originGroupCounts(rows, data.site)} />;
   const curSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 7) === curM));
-  const ytdSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 4) === yr));
+  const ytdSiteDetail = siteBreak(stats.quotesRaw.filter((r) => r.date?.slice(0, 4) === yr && r.date.slice(0, 7) <= curM)); // 1~기준월만
   const allSiteDetail = siteBreak(stats.quotesRaw);
 
   const spendAxis = allPeriod ? spendYears : months;
@@ -405,8 +405,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </>
           }
           value={curCpa > 0 ? `${fmt(curCpa)}원` : '–'}
-          cur={curCpa}
-          prev={pvCpa}
+          cur={curCpa || null}
+          prev={pvCpa || null}
           cmpLabel={cmp}
           detail={<><p>광고비 <b>{fmtWon(curSpendTot)}</b></p><i>|</i><p>견적 <b>{fmt(curAdQuotes)}건</b></p></>}
         />

@@ -150,12 +150,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
         // 저장한 행은 '수동 지정' 흔적으로 바로 바꿔 보여 준다 (다음 동기화 전에도)
         const at = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 19);
         const by = user?.email || user?.name || undefined;
-        setLocalQuotes((prev) =>
-          prev.map((q) => {
+        const withMark = (rows: QuoteRawRow[]) =>
+          rows.map((q) => {
             const cat = pendingOverrides.get(quoteKey(q));
             return cat ? { ...q, manual: { category: cat, at, ...(by ? { by } : {}) } } : q;
-          })
-        );
+          });
+        setLocalQuotes(withMark);
+        // 앱 원장에도 흔적을 넣는다 — 저장 직후 표를 원장에서 다시 그릴 때 흔적이 사라지지 않게
+        onUpdateQuotesRaw?.(withMark(data.quotesRaw));
+        if (data.quotesSites?.length) onUpdateQuotesSites?.(withMark(data.quotesSites));
         setPendingOverrides(new Map());
         setOriginals(new Map());
         setIsDirty(false);

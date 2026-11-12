@@ -86,7 +86,9 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
         const rb = b.clk > 0 ? b.quotes / b.clk : 0;
         diff = ra - rb;
       } else if (sortKey === 'cpa') {
-        diff = (a.cpa ?? Infinity) - (b.cpa ?? Infinity);
+        // CPA 가 없는 그룹(견적 0건)은 정렬 방향과 관계없이 맨 뒤로 보낸다
+        if (a.cpa == null || b.cpa == null) return (a.cpa == null ? 1 : 0) - (b.cpa == null ? 1 : 0);
+        diff = a.cpa - b.cpa;
       } else {
         diff = (a[sortKey as 'cost' | 'clk' | 'conv' | 'quotes'] as number)
              - (b[sortKey as 'cost' | 'clk' | 'conv' | 'quotes'] as number);
