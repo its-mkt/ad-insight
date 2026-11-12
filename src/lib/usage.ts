@@ -2,7 +2,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from './supabase';
 
 /**
  * 이용 현황 기록·조회 (Supabase usage_daily — supabase/usage.sql).
- * 방문은 같은 기기(브라우저)를 하루 1회로 서버에서 센다. 여기서는 화면 열기와 실제로 본 시간만 보낸다.
+ * 방문은 같은 기기(접속 IP + 기기 특징)를 하루 1회로 서버에서 센다. 여기서는 화면 열기와 실제로 본 시간만 보낸다.
  */
 
 const DEVICE_KEY = 'adi_device_id';
@@ -41,6 +41,34 @@ function deviceId(): string {
   return memoryDeviceId;
 }
 
+let memoryFp = '';
+
+/**
+ * 기기 특징 — 같은 기기라면 브라우저·시크릿 창·인앱 브라우저가 달라도 같은 값 (예: win-1920x1080-8).
+ * 서버가 접속 IP 와 묶어 방문(하루 1회)을 세는 기기 키로 쓴다. 개인을 식별하는 값은 넣지 않는다
+ */
+function deviceFp(): string {
+  if (memoryFp) return memoryFp;
+  const ua = navigator.userAgent;
+  const os = /iPhone|iPad|iPod/.test(ua)
+    ? 'ios'
+    : /Android/.test(ua)
+      ? 'and'
+      : /Windows/.test(ua)
+        ? 'win'
+        : /Mac OS X|Macintosh/.test(ua)
+          ? navigator.maxTouchPoints > 1 ? 'ios' : 'mac'
+          : /Linux|CrOS/.test(ua)
+            ? 'lnx'
+            : 'etc';
+  // 휴대폰은 가로·세로로 돌리면 폭·높이가 바뀌므로 큰 쪽을 앞에 둔다
+  const w = Math.round(screen.width || 0);
+  const h = Math.round(screen.height || 0);
+  const cores = navigator.hardwareConcurrency || 0;
+  memoryFp = `${os}-${Math.max(w, h)}x${Math.min(w, h)}-${cores}`;
+  return memoryFp;
+}
+
 /** 로그인 토큰 — 창을 닫을 때도 바로 보낼 수 있게 미리 들고 있는다 */
 let accessToken = '';
 if (USAGE_TRACKING_ON) {
@@ -61,7 +89,7 @@ function send(view: string, pageview: boolean, seconds: number): void {
     method: 'POST',
     headers,
     keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds) }),
+    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
   }).catch(() => {
     // 기록 실패는 무시한다
   });
@@ -76,7 +104,7 @@ function sendCategory(view: string, category: string, pick: boolean, seconds: nu
     method: 'POST',
     headers,
     keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds) }),
+    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
   }).catch(() => {
     // 기록 실패는 무시한다 (함수가 아직 없어도 화면에는 영향 없다)
   });

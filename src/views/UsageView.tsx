@@ -406,7 +406,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     <View name="usage" title={TITLE}>
       <ViewHeader title={TITLE} description="직원들이 광고 인사이트를 얼마나 자주, 얼마나 오래 보는지 보여 줍니다." status="live" />
       <ViewNote>
-        ※ 방문은 같은 기기(브라우저)에서 하루(한국 시간)에 여러 번 열어도 1회로 셉니다. 체류시간은 탭이 보이는 동안만 재고, 5분 넘게 조작이 없으면
+        ※ 방문은 같은 기기(PC·휴대폰)에서 하루(한국 시간)에 여러 번 열어도, 브라우저·시크릿 창이 달라도 1회로 셉니다. 체류시간은 탭이 보이는 동안만 재고, 5분 넘게 조작이 없으면
         뺍니다. 개발 서버(localhost) 접속은 기록하지 않습니다. 기간은 위 기간 선택을 따르고, 진행 중인 달은 전월 같은 날짜까지와 비교합니다.{since && ` 수집 시작 ${since.replace(/-/g, '.')}.`}
         {!USAGE_TRACKING_ON && ' (지금 창은 개발 환경이라 기록되지 않습니다)'}
       </ViewNote>
