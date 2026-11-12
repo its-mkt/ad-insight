@@ -12,6 +12,7 @@ import { AdApiSource, ExtLink } from '../common/ExtLink';
 import { SkelTable } from '../common/SkeletonView';
 import { TableFootnote } from '../common/TableFootnote';
 import { Muted } from '../common/Muted';
+import { NumTd, TotalRow } from '../common/TableRows';
 import { AccordionChevron } from '../common/AccordionChevron';
 import { LIST_LIMIT, MoreButton, ShowMoreButton } from '../common/MoreButton';
 import { GoogleLogo, NaverLogo } from '../common/MediaPill';
@@ -289,13 +290,9 @@ const MetricCells: React.FC<{ stat?: AdStat; loading: boolean }> = ({ stat, load
   return (
     <>
       {METRICS.map((m) => (
-        <td
-          key={m.key}
-          className={`n cr-m-${m.key}${stat || pending ? '' : ' is-empty'}`}
-          aria-busy={pending || undefined}
-        >
+        <NumTd key={m.key} className={`cr-m-${m.key}${stat || pending ? '' : ' is-empty'}`} aria-busy={pending || undefined}>
           {stat ? m.value(stat) : pending ? <span className="skel cr-skel" /> : '–'}
-        </td>
+        </NumTd>
       ))}
     </>
   );
@@ -422,7 +419,7 @@ const CreativeItem: React.FC<{
             <div className="cr-detail">
               {hasUnavailable && (
                 <DetailGroup label="미리보기 불가">
-                  <p className="muted">{UNAVAILABLE_NOTE}</p>
+                  <Muted as="p">{UNAVAILABLE_NOTE}</Muted>
                 </DetailGroup>
               )}
               {sharedImages && <Gallery ad={top} images={getCreativeImages(top)} label="공통 이미지" />}
@@ -549,13 +546,10 @@ export const AdCreativesList: React.FC<AdCreativesListProps> = ({
                 {shown.map((r) => (
                   <CreativeItem key={r.group.key} row={r} stats={stats} loading={loading} />
                 ))}
-                <tr className="grp cr-total">
-                  <td>
-                    합계<small className="grp-total-cnt">({fmt(rows.length)}개 광고그룹)</small>
-                  </td>
+                <TotalRow className="cr-total" label={<>합계<small className="grp-total-cnt">({fmt(rows.length)}개 광고그룹)</small></>}>
                   <td />
                   <MetricCells stat={totalStat} loading={loading} />
-                </tr>
+                </TotalRow>
               </tbody>
             </table>
           </div>

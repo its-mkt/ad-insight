@@ -25,7 +25,7 @@ import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
 import { colTip } from '../utils/columnTips';
 import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
@@ -331,7 +331,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               }
               value={`${fmt(allCpa)}원`}
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
-              detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotes)}건</b></p></>}
+              detail={<KpiSpendQuoteDetail spend={cpaSpend} quotes={cpaQuotes} />}
             />
             {convCard('전체 광고전환')}
           </>
@@ -370,7 +370,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               cur={ytdCpa || null}
               prev={lastYrMonths[0] >= starts.cpaFrom ? cpaIn(lastYrMonths) : null}
               cmpLabel="전년 동기"
-              detail={<><p>광고비 <b>{fmtWon(ytdCpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(ytdAdQuotes)}건</b></p></>}
+              detail={<KpiSpendQuoteDetail spend={ytdCpaSpend} quotes={ytdAdQuotes} />}
             />
             {convCard(`${yearLabel} 광고전환`, '전년 동기')}
           </>
@@ -409,7 +409,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           cur={curCpa || null}
           prev={pvCpa || null}
           cmpLabel={cmp}
-          detail={<><p>광고비 <b>{fmtWon(curSpendTot)}</b></p><i>|</i><p>견적 <b>{fmt(curAdQuotes)}건</b></p></>}
+          detail={<KpiSpendQuoteDetail spend={curSpendTot} quotes={curAdQuotes} />}
         />
         {convCard(`${curCaption} 광고전환`, cmp)}
           </>

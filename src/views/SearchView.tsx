@@ -9,7 +9,7 @@ import { adStatKey, groupAdsByAdgroup, type AdStat } from '../utils/creativeImag
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
 import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
@@ -430,11 +430,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           sub={cpaLabel}
           detail={
             result.cpa ? (
-              <>
-                <p>광고비 <b>{fmtWon(result.cpaCost)}</b></p>
-                <i>|</i>
-                <p>견적 <b>{fmt(result.cpaQuotes)}건</b></p>
-              </>
+              <KpiSpendQuoteDetail spend={result.cpaCost} quotes={result.cpaQuotes} />
             ) : (
               <span>{dayRange && !dayCovered ? cpaLabel : result.cpaHidden ? '추적 기간이 달라 계산하지 않음' : cpaLabel}</span>
             )

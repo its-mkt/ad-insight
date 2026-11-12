@@ -3,7 +3,6 @@ import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/da
 import {
   buildSourceShareData,
   fmt,
-  fmtWon,
   mLabel,
   prevM,
   cat1Of,
@@ -22,11 +21,11 @@ import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { SourceShareTable } from '../components/quotes/SourceShareTable';
-import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
@@ -78,7 +77,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
-  const [mode, setMode] = useState<'chart' | 'table'>('chart');
+  const [mode, setMode] = useState<ChartTableMode>('chart');
   const trendQuotes = trend?.quotes ?? quotes;
   const trendRaw = trend?.quotesRaw ?? quotesRaw;
 
@@ -249,11 +248,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? sumBy(quotes.filter(inMonths(ytdValidMonths)), (r) => r.count)
     : curM >= starts.cpaFrom ? curAdQuotes : 0;
   const kpiCpaDetail = (
-    <>
-      <p>광고비 <b>{fmtWon(kpiSpend)}</b></p>
-      <i>|</i>
-      <p>견적 <b>{fmt(kpiAdQuotes)}건</b></p>
-    </>
+    <KpiSpendQuoteDetail spend={kpiSpend} quotes={kpiAdQuotes} />
   );
 
   // 접수 목록 — 기간 보기에서는 날짜를 옮기지 않은 원본(trendRaw)에서 실제 날짜로 고른다
@@ -327,7 +322,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
               label={<>견적당 광고비 (CPA)</>}
               value={allCpa ? `${fmt(allCpa)}원` : '–'}
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
-              detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotesCount)}건</b></p></>}
+              detail={<KpiSpendQuoteDetail spend={cpaSpend} quotes={cpaQuotesCount} />}
             />
             {repCard('전체 최다 접수 담당자', quotesRaw, null, false)}
             <KpiCard
@@ -387,18 +382,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
         )}
       </KpiSection>
 
-      <div className="mock-bar">
-        <SegmentedControl<'chart' | 'table'>
-          dataKey="mode"
-          options={[
-            { value: 'chart', label: '그래프' },
-            { value: 'table', label: '표' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
-        <span className="sp" />
-      </div>
+      <ChartTableToggle value={mode} onChange={setMode} />
 
       {/* 추이는 여러 기간을 비교할 때만 의미가 있어 '전체'(연도 합계·전체 기간)에서만 보여 준다 */}
       {showTrendChart && (mode === 'chart' ? (

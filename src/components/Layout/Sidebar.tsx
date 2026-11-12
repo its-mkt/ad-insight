@@ -48,7 +48,13 @@ const siteOptions = (isLoggedIn: boolean): SegmentOption<SiteId>[] => [
 ];
 
 // 순서는 종합 요약 KPI 카드 순서와 같다 — 광고비 → 견적 → 효율(광고비 ÷ 견적) → 키워드·소재 상세, 구매 상세·기기별 통계는 맨 아래
-const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
+interface NavItem {
+  id: ViewId;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const NAV_ITEMS: NavItem[] = [
   {
     id: 'overview',
     label: '종합 요약',
@@ -100,6 +106,13 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
+/** 설정·연동 메뉴 — 로그인한 관리자에게만 보인다 */
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: 'data', label: '데이터 연결', icon: <Database /> },
+  { id: 'admin', label: '어드민 관리', icon: <Lock /> },
+  { id: 'usage', label: '이용 현황', icon: <Activity /> },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   drawerOpen,
@@ -115,6 +128,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { isLoggedIn } = useAuth();
   const live = status === 'live';
+  const navButton = (item: NavItem) => {
+    const isActive = currentView === item.id;
+    return (
+      <button
+        key={item.id}
+        className={`nv nv-${item.id}${isActive ? ' on' : ''}`}
+        id={`nav-${item.id}`}
+        data-v={item.id}
+        data-btn={item.id}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={() => onNavigate(item.id)}
+      >
+        {item.icon}
+        <span>{item.label}</span>
+      </button>
+    );
+  };
   // 배지 시각은 화면이 데이터를 받아 온 시각이다. 실제로 수집한 시각은 매체마다 다르므로 툴팁에서 나눠 보여 준다
   const sourceLines = [
     ['Google 광고비·키워드', sources?.google],
@@ -157,23 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sm">
           <div className="lbl">대시보드</div>
           <nav className="toc" id="toc">
-            {NAV_ITEMS.map((item) => {
-              const isActive = currentView === item.id;
-              return (
-                <button
-                  key={item.id}
-                  className={`nv nv-${item.id}${isActive ? ' on' : ''}`}
-                  id={`nav-${item.id}`}
-                  data-v={item.id}
-                  data-btn={item.id}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => onNavigate(item.id)}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+            {NAV_ITEMS.map(navButton)}
           </nav>
         </div>
         {/* 설정·연동은 로그인한 관리자에게만 보인다 (주소로 들어오는 경우는 App 에서 막는다) */}
@@ -181,39 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sm">
             <div className="lbl">설정 · 연동</div>
             <nav className="toc">
-              <button
-                className={`nv nv-data${currentView === 'data' ? ' on' : ''}`}
-                id="nav-data"
-                data-v="data"
-                data-btn="data"
-                aria-current={currentView === 'data' ? 'page' : undefined}
-                onClick={() => onNavigate('data')}
-              >
-                <Database />
-                <span>데이터 연결</span>
-              </button>
-              <button
-                className={`nv nv-admin${currentView === 'admin' ? ' on' : ''}`}
-                id="nav-admin"
-                data-v="admin"
-                data-btn="admin"
-                aria-current={currentView === 'admin' ? 'page' : undefined}
-                onClick={() => onNavigate('admin')}
-              >
-                <Lock />
-                <span>어드민 관리</span>
-              </button>
-              <button
-                className={`nv nv-usage${currentView === 'usage' ? ' on' : ''}`}
-                id="nav-usage"
-                data-v="usage"
-                data-btn="usage"
-                aria-current={currentView === 'usage' ? 'page' : undefined}
-                onClick={() => onNavigate('usage')}
-              >
-                <Activity />
-                <span>이용 현황</span>
-              </button>
+              {ADMIN_NAV_ITEMS.map(navButton)}
             </nav>
           </div>
         )}

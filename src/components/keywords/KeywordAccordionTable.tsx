@@ -12,7 +12,7 @@ import { TabButton } from '../common/TabButton';
 import { Card } from '../common/Card';
 import { EmptyState } from '../common/EmptyState';
 import { AdApiSource } from '../common/ExtLink';
-import { NumTd } from '../common/TableRows';
+import { NumTd, TotalRow } from '../common/TableRows';
 import { Muted } from '../common/Muted';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
@@ -474,17 +474,14 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                     </React.Fragment>
                   );
                 })}
-                <tr className="grp kw-total">
-                  <td>
-                    합계<small className="grp-total-cnt">({fmt(totalGroups.length)}개 그룹)</small>
-                  </td>
+                <TotalRow className="kw-total" label={<>합계<small className="grp-total-cnt">({fmt(totalGroups.length)}개 그룹)</small></>}>
                   <NumTd value={kwTotal.imp} />
                   <NumTd value={kwTotal.clk} />
                   <NumTd>{ctr(kwTotal.clk, kwTotal.imp)}</NumTd>
                   <NumTd value={kwTotal.conv} />
                   <NumTd value={cpc(kwTotal.cost, kwTotal.clk)} unit="원" />
                   <NumTd value={kwTotal.cost} unit="원" bold />
-                </tr>
+                </TotalRow>
               </tbody>
             </>
           )}

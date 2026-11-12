@@ -5,6 +5,7 @@ import { TableFootnote } from '../common/TableFootnote';
 import { StatusBadge } from '../common/StatusBadge';
 import { Card } from '../common/Card';
 import { Chip } from '../common/Chip';
+import { Th } from '../common/Th';
 import { NumTd, TotalRow } from '../common/TableRows';
 import { LIST_LIMIT, ShowMoreButton } from '../common/MoreButton';
 import { SkelBar, SkelRows } from '../common/SkeletonView';
@@ -72,11 +73,11 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
           </colgroup>
           <thead>
             <tr>
-              <th>표준 카테고리</th>
-              <th className="n">매칭된 광고그룹 수</th>
-              <th className="n">{audit.curMonth} 광고비</th>
-              <th className="n">{audit.curMonth} 접수 견적</th>
-              <th className="c">매칭 상태</th>
+              <Th>표준 카테고리</Th>
+              <Th className="n">매칭된 광고그룹 수</Th>
+              <Th className="n">{audit.curMonth} 광고비</Th>
+              <Th className="n">{audit.curMonth} 접수 견적</Th>
+              <Th className="c">매칭 상태</Th>
             </tr>
           </thead>
           <tbody>

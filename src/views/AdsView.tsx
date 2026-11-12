@@ -21,7 +21,7 @@ import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl, type ChartTableMode } from '../components/common/SegmentedControl';
 import { SpendDetailTable } from '../components/ads/SpendDetailTable';
 import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
@@ -54,7 +54,7 @@ const ADS_SOURCES: SourceLinkItem[] = [
 ];
 
 export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
-  const [mode, setMode] = useState<'chart' | 'table'>('chart');
+  const [mode, setMode] = useState<ChartTableMode>('chart');
   const [chartSet, setChartSet] = useState<'media' | 'compare'>('media');
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
     (a, b) => b - a
@@ -347,18 +347,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         )}
       </KpiSection>
 
-      <div className="mock-bar">
-        <SegmentedControl<'chart' | 'table'>
-          dataKey="mode"
-          options={[
-            { value: 'chart', label: '그래프' },
-            { value: 'table', label: '표' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
-        <span className="sp" />
-      </div>
+      <ChartTableToggle value={mode} onChange={setMode} />
 
       {mode === 'chart' ? (
         <MultiChart
