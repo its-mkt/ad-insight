@@ -8,7 +8,8 @@ import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelTable } from '../components/common/SkeletonView';
-import { NumTd } from '../components/common/TableRows';
+import { Muted } from '../components/common/Muted';
+import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
@@ -17,6 +18,7 @@ import { yearRangeLabel } from '../utils/allPeriod';
 import { VIEW_TITLES } from '../utils/constants';
 import { daysOfMonth, fromDayKey, lastDayOf, previousRange, rangeDays, rangeLabel, toDayKey, type DayRange } from '../utils/dayRange';
 import { fmt, prevM } from '../utils/format';
+import { toggledSet } from '../utils/toggleSet';
 
 const TITLE = '이용 현황';
 
@@ -119,6 +121,7 @@ interface UsageViewProps {
 /** 직원 이용 현황 — 방문(기기당 하루 1회)·페이지뷰·체류시간. 로그인한 관리자만 보고, 기간은 상단 기간 선택을 따른다 */
 export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod = false, yearTotal = false, dayRange = null, onSelectDayRange }) => {
   const [loaded, setLoaded] = useState<Loaded>(null);
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -284,6 +287,74 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
             </table>
           ) : (
             <EmptyState message="이 기간에 기록된 화면 이용이 없습니다." />
+          )}
+        </Card>
+
+        <Card name="usage-categories" id="usage-categories" tableWrap title="카테고리별 이용" subtitle={`(${label} · 많이 고른 순)`}>
+          {cur.categories === null ? (
+            <Notice tone="warn">
+              카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 기록이 쌓입니다.
+            </Notice>
+          ) : cur.categoryGroups.length ? (
+            <table className="stk usage-table">
+              <colgroup>
+                <col />
+                <col className="col-us-count" />
+                <col className="col-us-count" />
+                <col className="col-us-duration" />
+                <col className="col-us-duration" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <Th>카테고리</Th>
+                  <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
+                  <Th className="n" tip="선택|카테고리 필터로 고르거나 표에서 카테고리 줄을 펼친 횟수">선택</Th>
+                  <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침은 시간을 세지 않음)">필터 체류</Th>
+                  <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {cur.categoryGroups.map((g) => {
+                  const children = cur.categories!.filter((c) => c.category === g.category || c.category.startsWith(`${g.category} > `));
+                  const hasChildren = children.some((c) => c.category !== g.category);
+                  const isOpen = openCats.has(g.category);
+                  return (
+                    <React.Fragment key={g.category}>
+                      <TreeParentRow
+                        label={
+                          <>
+                            {g.category} <Muted small>{g.views.map(viewTitle).join(' · ')}</Muted>
+                          </>
+                        }
+                        childCount={hasChildren ? children.length : 0}
+                        open={isOpen}
+                        onToggle={() => setOpenCats((prev) => toggledSet(prev, g.category))}
+                      >
+                        <NumTd value={g.visits} unit="회" />
+                        <NumTd value={g.picks} unit="회" bold />
+                        <NumTd>{durationText(g.seconds)}</NumTd>
+                        <NumTd>{g.picks && g.seconds ? durationText(g.seconds / g.picks) : '–'}</NumTd>
+                      </TreeParentRow>
+                      {hasChildren &&
+                        isOpen &&
+                        children.map((c) => (
+                          <TreeChildRow key={c.category} label={c.category === g.category ? '1차 전체' : childLabelOf(c.category, g.category)}>
+                            <NumTd value={c.visits} unit="회" />
+                            <NumTd value={c.picks} unit="회" />
+                            <NumTd>{durationText(c.seconds)}</NumTd>
+                            <NumTd>{c.picks && c.seconds ? durationText(c.seconds / c.picks) : '–'}</NumTd>
+                          </TreeChildRow>
+                        ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <EmptyState
+              message="이 기간에 카테고리를 고른 기록이 없습니다."
+              subMessage={`카테고리 효율·키워드 화면의 카테고리 필터와 카테고리 효율 표의 줄 펼침을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
+            />
           )}
         </Card>
 

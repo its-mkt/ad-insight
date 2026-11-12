@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { trackCategoryFilter } from '../../lib/usage';
 import { CATEGORY_HIERARCHY } from '../../utils/constants';
 import { parseCatParts } from '../../utils/format';
 import { Dropdown, type DropdownOption } from './Dropdown';
@@ -11,6 +12,11 @@ export function useCategoryFilterState() {
     setCat1State(v);
     setCat2('');
   };
+  // 이용 현황 '카테고리별 이용' 기록 — 고른 카테고리와 그 상태로 본 시간. 화면을 떠나면 해제
+  useEffect(() => {
+    trackCategoryFilter(cat2 ? `${cat1} > ${cat2}` : cat1);
+  }, [cat1, cat2]);
+  useEffect(() => () => trackCategoryFilter(''), []);
   return { cat1, cat2, setCat1, setCat2 };
 }
 
