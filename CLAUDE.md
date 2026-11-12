@@ -25,18 +25,26 @@
 | 막대 목록(카테고리·유입 경로) 증감 칸 | `BarDelta` |
 | 견적 접수처 판별·KPI 접수처 건수 / CTR 표기 | `originOf`·`originGroupCounts` (`utils/quoteOrigin`), `ctrText` (`utils/format`) |
 | KPI 큰 값 + 작고 흐린 보조 값 / 견적·판매 함께 | `KpiSubValue`, `QuoteSalesValue` (`charts/KpiCard`, 판매 건수는 `salesInMonths`·`salesInRange`) |
+| KPI 보조 줄 "이름 값 \| 이름 값" / CPA 의 "광고비 \| 견적" | `KpiDetailItems`, `KpiSpendQuoteDetail` (`charts/KpiCard`) |
+| 견적 통계(다른 사이트·전화 합산) | `useQuoteStats(data)` (`hooks/useDashboardData`) — 화면마다 `useMemo(() => quoteStatsOf(…))` 를 복사하지 않는다 |
+| 달(YYYY-MM)·연도(YYYY)별 행 찾기 | `rowsByPeriod(rows)(key)` (`utils/format`) — 키마다 `rows.filter(r => r.month.startsWith(key))` 를 반복하지 않는다 |
 | 버튼 / 링크 모양 버튼 | `Button`, `ButtonLink` |
 | 새 탭 외부 링크 | `ExtLink` (직접 `target="_blank"` 쓰지 않는다) |
 | 광고 API 출처 각주 | `AdApiSource` + `TableFootnote` |
 | 탭 / 구간 선택 | `TabButton`, `SegmentedControl` |
+| 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
+| 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
+| 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` |
+| 비로그인에 가리는 화면 안내 | `LoginGate` |
+| 마우스를 올리면 뜨는 설명 (요소 감싸기) | `Tooltip` (`common/Tooltip`, 표 머리글은 `Th` 의 `tip`) |
 | 더보기·접기 | `MoreButton`, `ShowMoreButton` |
 | 뱃지 | `StatusBadge`, `MediaPill` |
 | 매핑 흐름도 이름표 | `Chip` |
-| 흐린 보조 글자 / "(진행 중)" | `Muted`, `PendingTag` |
+| 흐린 보조 글자 / "(진행 중)" | `Muted` (`small`, 문단은 `as="p"`), `PendingTag` |
 | 차트 범례 / 기준·비교 범례 | `Legend`+`LegendItem`, `CompareLegend` |
 | 표 머리글 (정렬 없음/있음) | `Th`, `SortableTh` |
 | 표 숫자 칸 (오른쪽 정렬, 단위, 굵게, 빈 값 `–`) | `NumTd` |
-| 표 합계 줄 | `TotalRow` |
+| 표 합계 줄 | `TotalRow` (`label`, 추가 클래스 `className`) |
 | 1차 > 2차 펼침 줄 | `TreeParentRow`, `TreeChildRow`, `childLabelOf` |
 | 강조색 그룹 펼침 줄 (키워드 표 광고그룹·구매 제품) | `GroupAccordionRow` (`title`, `icon`, `count`, `open`, `canOpen`, `tone`, `plain`), 하위 줄 `GroupChildRow` |
 | 아이콘 + 굵은 이름 + 흐린 보조 글자 한 줄 (매체 이름 칸 등) | `IconLabel` (`icon`, `title`, `sub`, `lead`) — 펼침 줄이면 `GroupAccordionRow` |
