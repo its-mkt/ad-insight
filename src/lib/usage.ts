@@ -137,10 +137,9 @@ export interface UsageStats {
 /** 기간 이용 현황 (로그인 필요). 테이블·함수가 아직 없으면 setupNeeded */
 export async function loadUsageStats(
   from: string,
-  to: string,
-  excludeLoggedIn: boolean
+  to: string
 ): Promise<{ ok: true; stats: UsageStats } | { ok: false; setupNeeded: boolean; message: string }> {
-  const { data, error } = await supabase.rpc('usage_stats', { p_from: from, p_to: to, p_exclude_logged_in: excludeLoggedIn });
+  const { data, error } = await supabase.rpc('usage_stats', { p_from: from, p_to: to, p_exclude_logged_in: false });
   if (error) {
     const setupNeeded = error.code === 'PGRST202' || /could not find the function|schema cache/i.test(error.message);
     return { ok: false, setupNeeded, message: error.message };

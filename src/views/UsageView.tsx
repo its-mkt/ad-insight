@@ -25,14 +25,8 @@ const USAGE_START = '2026-11-01';
 /** 이 일수를 넘는 기간은 그래프·표를 월 단위로 묶는다 */
 const DAILY_MAX_DAYS = 62;
 
-type DeviceScope = 'all' | 'staff';
-const DEVICE_OPTIONS: SegmentOption<DeviceScope>[] = [
-  { value: 'all', label: '전체' },
-  { value: 'staff', label: '관리자 제외', title: '한 번이라도 관리자 로그인 상태로 쓴 기기를 빼고 직원 이용만 봅니다' },
-];
-
 /** 빠른 기간 — 누르면 기간 선택 바의 일·기간이 '오늘까지 N일' 로 바뀐다 */
-const RECENT_DAYS = [7, 30, 90] as const;
+const RECENT_DAYS = [1, 7, 30, 90] as const;
 
 const addDays = (key: string, n: number) => {
   const d = fromDayKey(key);
@@ -124,7 +118,6 @@ interface UsageViewProps {
 
 /** 직원 이용 현황 — 방문(기기당 하루 1회)·페이지뷰·체류시간. 로그인한 관리자만 보고, 기간은 상단 기간 선택을 따른다 */
 export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod = false, yearTotal = false, dayRange = null, onSelectDayRange }) => {
-  const [scope, setScope] = useState<DeviceScope>('all');
   const [loaded, setLoaded] = useState<Loaded>(null);
 
   const today = toDayKey(new Date());
@@ -137,10 +130,9 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   useEffect(() => {
     let alive = true;
     setLoaded(null);
-    const exclude = scope === 'staff';
     Promise.all([
-      loadUsageStats(range.from, range.to, exclude),
-      prevRange ? loadUsageStats(prevRange.from, prevRange.to, exclude) : Promise.resolve(null),
+      loadUsageStats(range.from, range.to),
+      prevRange ? loadUsageStats(prevRange.from, prevRange.to) : Promise.resolve(null),
     ]).then(([cur, prev]) => {
       if (!alive) return;
       if (!cur.ok) setLoaded({ error: cur.message, setupNeeded: cur.setupNeeded });
@@ -150,7 +142,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     return () => {
       alive = false;
     };
-  }, [range.from, range.to, prevRange?.from, prevRange?.to, scope]);
+  }, [range.from, range.to, prevRange?.from, prevRange?.to]);
 
   // 수집 시작일부터 기간 끝까지, 기록이 없는 날도 0 으로 채운다. 긴 기간은 월 단위로 묶는다
   const { buckets, monthly, spanDays } = useMemo(() => {
@@ -354,7 +346,6 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           value={recentOn ?? 0}
           onChange={(n) => onSelectDayRange({ from: addDays(today, -(n - 1)), to: today })}
         />
-        <SegmentedControl<DeviceScope> id="seg-usage-scope" options={DEVICE_OPTIONS} value={scope} onChange={setScope} />
       </div>
       {body}
     </View>
