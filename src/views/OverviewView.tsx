@@ -147,8 +147,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const curAdQuotes = totQuotes(stats.quotes, curM);
   const pvAdQuotes = totQuotes(stats.quotes, pv);
-  const curCpa = curAdQuotes > 0 ? curSpendTot / curAdQuotes : 0;
-  const pvCpa = pvAdQuotes > 0 ? pvSpendTot / pvAdQuotes : 0;
+  // CPA 는 광고비와 견적이 모두 있는 달(cpaFrom)부터만 계산한다 — 견적 상세 화면과 같은 기준
+  const starts = periodStartsOf(data);
+  const curCpa = curM >= starts.cpaFrom && curAdQuotes > 0 ? curSpendTot / curAdQuotes : 0;
+  const pvCpa = pv >= starts.cpaFrom && pvAdQuotes > 0 ? pvSpendTot / pvAdQuotes : 0;
 
   const ytdSpend = sumBy(
     data.spend.filter((r) => r.month >= ym(yr, 1) && r.month <= curM),
@@ -160,7 +162,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   );
 
   // 전체 기간: 데이터가 있는 연도별로 합산한다. CPA 는 광고비와 견적이 모두 있는 달부터만 계산한다
-  const starts = periodStartsOf(data);
   // 합계가 다른 사이트·전화문의까지 포함하므로 시작 달도 같은 데이터에서 구한다 (starts.quotes 는 아이티켓만)
   const quotesFrom = firstMonth(stats.quotes.map((r) => r.month));
   const spendYears = yearsOf(data.spend.map((r) => r.month));

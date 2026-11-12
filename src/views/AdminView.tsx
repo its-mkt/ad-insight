@@ -6,6 +6,7 @@ import { SegmentedControl } from '../components/common/SegmentedControl';
 import { getCfg, quoteDetailsPending } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { quoteKey } from '../utils/format';
+import { setUnsavedEdits } from '../utils/monthRollover';
 import type { DayRange } from '../utils/dayRange';
 
 const CHANNEL_OPTIONS: { value: QuoteChannel; label: string }[] = [
@@ -61,6 +62,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
       setLocalQuotes(toAdminRows(data.quotesRaw, data.quotesSites || []));
     }
   }, [data.quotesRaw, data.quotesSites, isDirty]);
+
+  // 저장 전 수정이 있으면 달이 바뀌어도 자동 새로고침하지 않는다
+  React.useEffect(() => {
+    setUnsavedEdits(isDirty);
+    return () => setUnsavedEdits(false);
+  }, [isDirty]);
 
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);

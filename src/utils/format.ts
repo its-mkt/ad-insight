@@ -277,7 +277,8 @@ export function buildCategoryMap(mapping: MappingRow[]): CategoryMap {
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push({
         c: String(r.category).trim(),
-        w: (Number(r.ratio) || 100) / 100,
+        // 비율이 비어 있을 때만 100%로 본다 — 0 을 100%로 바꾸면 그 광고비가 두 카테고리에 겹쳐 잡힌다
+        w: (String(r.ratio ?? '').trim() === '' || isNaN(Number(r.ratio)) ? 100 : Number(r.ratio)) / 100,
       });
     });
   return map;
