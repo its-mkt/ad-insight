@@ -55,7 +55,8 @@ export const dotYm = (mo: string): string => (mo ? mo.replace('-', '.') : '–')
 export const yearsOf = (months: string[]): string[] =>
   [...new Set(months.filter(Boolean).map((m) => m.slice(0, 4)))].sort();
 
-export const firstMonth = (months: string[]): string => months.filter(Boolean).sort()[0] || '';
+/** 가장 이른 달 (빈 값은 건너뛰고, 없으면 '') */
+export const firstMonth = (months: string[]): string => months.reduce((min, m) => (m && (!min || m < min) ? m : min), '');
 
 /** 기간에 행이 없고 마지막 수집 달도 기간 끝보다 앞인 매체 — 필터로 빠졌거나 집행이 없는 경우(0원)와 구분한다 */
 export function uncollectedMedia(
@@ -96,9 +97,12 @@ export interface PeriodStarts {
 /** 데이터마다 시작 시기가 달라, 광고비와 견적을 맞대는 지표는 모두 있는 달부터 계산한다 */
 export function periodStartsOf(data: Pick<DashboardData, 'spend' | 'quotes'>): PeriodStarts {
   const quotes = firstMonth(data.quotes.map((r) => r.month));
-  const google = firstMonth(data.spend.filter((r) => r.media === 'Google').map((r) => r.month));
-  const naver = firstMonth(data.spend.filter((r) => r.media === 'Naver').map((r) => r.month));
-  const meta = firstMonth(data.spend.filter((r) => r.media === 'Meta').map((r) => r.month));
+  // 광고비는 한 번만 훑어 매체별 첫 달을 구한다
+  const first: Record<string, string> = { Google: '', Naver: '', Meta: '' };
+  data.spend.forEach((r) => {
+    if (Object.prototype.hasOwnProperty.call(first, r.media) && r.month && (!first[r.media] || r.month < first[r.media])) first[r.media] = r.month;
+  });
+  const { Google: google, Naver: naver, Meta: meta } = first;
   const cpaFrom = [quotes, google, naver].filter(Boolean).sort().pop() || '';
   return { quotes, google, naver, meta, cpaFrom };
 }

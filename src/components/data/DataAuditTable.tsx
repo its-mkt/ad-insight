@@ -4,6 +4,7 @@ import { TableFootnote } from '../common/TableFootnote';
 import { SkelBar, SkelRows } from '../common/SkeletonView';
 import { StatusBadge } from '../common/StatusBadge';
 import { Card } from '../common/Card';
+import { Th } from '../common/Th';
 
 interface DataAuditTableProps {
   audit: DataAuditReport;
@@ -36,9 +37,9 @@ export const DataAuditTable: React.FC<DataAuditTableProps> = ({ audit, loading =
           </colgroup>
           <thead>
             <tr>
-              <th>검증 항목</th>
-              <th>실시간 대조 수치 및 검증 상세</th>
-              <th className="c">결과</th>
+              <Th>검증 항목</Th>
+              <Th>실시간 대조 수치 및 검증 상세</Th>
+              <Th className="c">결과</Th>
             </tr>
           </thead>
           <tbody>

@@ -8,7 +8,8 @@ import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelTable } from '../components/common/SkeletonView';
-import { NumTd } from '../components/common/TableRows';
+import { Muted } from '../components/common/Muted';
+import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
@@ -17,6 +18,7 @@ import { yearRangeLabel } from '../utils/allPeriod';
 import { VIEW_TITLES } from '../utils/constants';
 import { daysOfMonth, fromDayKey, lastDayOf, previousRange, rangeDays, rangeLabel, toDayKey, type DayRange } from '../utils/dayRange';
 import { fmt, prevM } from '../utils/format';
+import { toggledSet } from '../utils/toggleSet';
 
 const TITLE = '이용 현황';
 
@@ -25,14 +27,8 @@ const USAGE_START = '2026-11-01';
 /** 이 일수를 넘는 기간은 그래프·표를 월 단위로 묶는다 */
 const DAILY_MAX_DAYS = 62;
 
-type DeviceScope = 'all' | 'staff';
-const DEVICE_OPTIONS: SegmentOption<DeviceScope>[] = [
-  { value: 'all', label: '전체' },
-  { value: 'staff', label: '관리자 제외', title: '한 번이라도 관리자 로그인 상태로 쓴 기기를 빼고 직원 이용만 봅니다' },
-];
-
 /** 빠른 기간 — 누르면 기간 선택 바의 일·기간이 '오늘까지 N일' 로 바뀐다 */
-const RECENT_DAYS = [7, 30, 90] as const;
+const RECENT_DAYS = [1, 7, 30, 90] as const;
 
 const addDays = (key: string, n: number) => {
   const d = fromDayKey(key);
@@ -124,8 +120,8 @@ interface UsageViewProps {
 
 /** 직원 이용 현황 — 방문(기기당 하루 1회)·페이지뷰·체류시간. 로그인한 관리자만 보고, 기간은 상단 기간 선택을 따른다 */
 export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod = false, yearTotal = false, dayRange = null, onSelectDayRange }) => {
-  const [scope, setScope] = useState<DeviceScope>('all');
   const [loaded, setLoaded] = useState<Loaded>(null);
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set());
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -137,10 +133,9 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   useEffect(() => {
     let alive = true;
     setLoaded(null);
-    const exclude = scope === 'staff';
     Promise.all([
-      loadUsageStats(range.from, range.to, exclude),
-      prevRange ? loadUsageStats(prevRange.from, prevRange.to, exclude) : Promise.resolve(null),
+      loadUsageStats(range.from, range.to),
+      prevRange ? loadUsageStats(prevRange.from, prevRange.to) : Promise.resolve(null),
     ]).then(([cur, prev]) => {
       if (!alive) return;
       if (!cur.ok) setLoaded({ error: cur.message, setupNeeded: cur.setupNeeded });
@@ -150,7 +145,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     return () => {
       alive = false;
     };
-  }, [range.from, range.to, prevRange?.from, prevRange?.to, scope]);
+  }, [range.from, range.to, prevRange?.from, prevRange?.to]);
 
   // 수집 시작일부터 기간 끝까지, 기록이 없는 날도 0 으로 채운다. 긴 기간은 월 단위로 묶는다
   const { buckets, monthly, spanDays } = useMemo(() => {
@@ -295,6 +290,74 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           )}
         </Card>
 
+        <Card name="usage-categories" id="usage-categories" tableWrap title="카테고리별 이용" subtitle={`(${label} · 많이 고른 순)`}>
+          {cur.categories === null ? (
+            <Notice tone="warn">
+              카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 기록이 쌓입니다.
+            </Notice>
+          ) : cur.categoryGroups.length ? (
+            <table className="stk usage-table">
+              <colgroup>
+                <col />
+                <col className="col-us-count" />
+                <col className="col-us-count" />
+                <col className="col-us-duration" />
+                <col className="col-us-duration" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <Th>카테고리</Th>
+                  <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
+                  <Th className="n" tip="선택|카테고리 필터로 고르거나 표에서 카테고리 줄을 펼친 횟수">선택</Th>
+                  <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침은 시간을 세지 않음)">필터 체류</Th>
+                  <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {cur.categoryGroups.map((g) => {
+                  const children = cur.categories!.filter((c) => c.category === g.category || c.category.startsWith(`${g.category} > `));
+                  const hasChildren = children.some((c) => c.category !== g.category);
+                  const isOpen = openCats.has(g.category);
+                  return (
+                    <React.Fragment key={g.category}>
+                      <TreeParentRow
+                        label={
+                          <>
+                            {g.category} <Muted small>{g.views.map(viewTitle).join(' · ')}</Muted>
+                          </>
+                        }
+                        childCount={hasChildren ? children.length : 0}
+                        open={isOpen}
+                        onToggle={() => setOpenCats((prev) => toggledSet(prev, g.category))}
+                      >
+                        <NumTd value={g.visits} unit="회" />
+                        <NumTd value={g.picks} unit="회" bold />
+                        <NumTd>{durationText(g.seconds)}</NumTd>
+                        <NumTd>{g.picks && g.seconds ? durationText(g.seconds / g.picks) : '–'}</NumTd>
+                      </TreeParentRow>
+                      {hasChildren &&
+                        isOpen &&
+                        children.map((c) => (
+                          <TreeChildRow key={c.category} label={c.category === g.category ? '1차 전체' : childLabelOf(c.category, g.category)}>
+                            <NumTd value={c.visits} unit="회" />
+                            <NumTd value={c.picks} unit="회" />
+                            <NumTd>{durationText(c.seconds)}</NumTd>
+                            <NumTd>{c.picks && c.seconds ? durationText(c.seconds / c.picks) : '–'}</NumTd>
+                          </TreeChildRow>
+                        ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <EmptyState
+              message="이 기간에 카테고리를 고른 기록이 없습니다."
+              subMessage={`카테고리 효율·키워드 화면의 카테고리 필터와 카테고리 효율 표의 줄 펼침을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
+            />
+          )}
+        </Card>
+
         <Card name="usage-daily" id="usage-daily" tableWrap title={monthly ? '월별 이용' : '일별 이용'} subtitle={`(${label} · 최근부터)`}>
           <table className="stk usage-table">
             <colgroup>
@@ -354,7 +417,6 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           value={recentOn ?? 0}
           onChange={(n) => onSelectDayRange({ from: addDays(today, -(n - 1)), to: today })}
         />
-        <SegmentedControl<DeviceScope> id="seg-usage-scope" options={DEVICE_OPTIONS} value={scope} onChange={setScope} />
       </div>
       {body}
     </View>

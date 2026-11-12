@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toggledSet } from '../../utils/toggleSet';
 import {
   GODOMALL_GOODS,
   GODOMALL_ORDER_CUSTOMERS,
@@ -140,12 +141,7 @@ export const PurchasedGoodsTable: React.FC<PurchasedGoodsTableProps> = ({ months
   // 여러 해에 걸친 기간(연도 합계·전체 기간)이면 주문일에 연도를 붙인다 — 모든 줄을 같은 자릿수로 맞춘다
   const withYear = new Set(months.map((m) => m.slice(0, 4))).size > 1 || months.some((m) => m.slice(0, 4) !== String(new Date().getFullYear()));
   const toggle = (no: string) =>
-    setOpenRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(no)) next.delete(no);
-      else next.add(no);
-      return next;
-    });
+    setOpenRows((prev) => toggledSet(prev, no));
   const header = (key: SortKey, label: string, align = 'n') => (
     <SortableTh sortKey={key} activeKey={sortKey} order={sortOrder} onSort={toggleSort} className={align}>
       {label}

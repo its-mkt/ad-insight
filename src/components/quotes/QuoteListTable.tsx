@@ -58,9 +58,13 @@ const SORT_VALUE: Record<SortKey, (r: QuoteRawRow) => string> = {
 };
 
 /** 맨 앞에 '전체' 를 붙인 필터 목록 */
-const optionsOf = (values: string[], allLabel: string) => [
+/** 기간을 바꿔 고른 값이 목록에서 빠져도 목록에 남긴다 — 빠지면 드롭다운 이름이 비어 무엇으로 걸렀는지 안 보인다 */
+const keepSelected = (values: string[], selected: string): string[] =>
+  selected === ALL || values.includes(selected) ? values : [...values, selected];
+
+const optionsOf = (values: string[], allLabel: string, selected: string = ALL) => [
   { value: ALL, label: allLabel },
-  ...[...new Set(values)].map((v) => ({ value: v, label: v })),
+  ...[...new Set(keepSelected(values, selected))].map((v) => ({ value: v, label: v })),
 ];
 
 /** 어드민 필터와 같은 순서 — 분류표 순서로, 분류표 밖 값은 뒤에 */
@@ -121,8 +125,20 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
     ...(cat2Parts.some((c) => !c) && cat2Parts.some(Boolean) ? [NO_CAT2] : []),
   ];
   // 1차 목록 뒤에 붙는 2차 개수 — 이 기간에 실제로 고를 수 있는 2차만 센다 ('전체'·'2차 없음' 제외). 없으면 표시하지 않는다
+  // 1차 옵션마다 행 전체를 다시 훑지 않게 1차별 2차 목록을 한 번에 모아 둔다
+  const cat2ByCat1 = useMemo(() => {
+    const out = new Map<string, Set<string>>();
+    rows.forEach((r) => {
+      const { cat1: c1, cat2: c2 } = catsOf(r);
+      if (!c2) return;
+      const set = out.get(c1);
+      if (set) set.add(c2);
+      else out.set(c1, new Set([c2]));
+    });
+    return out;
+  }, [rows]);
   const cat2CountHint = (c1: string): string | undefined => {
-    const count = new Set(rows.filter((r) => catsOf(r).cat1 === c1).map((r) => catsOf(r).cat2).filter(Boolean)).size;
+    const count = cat2ByCat1.get(c1)?.size ?? 0;
     return count ? `· ${count}` : undefined;
   };
   const repNames = [...new Set(rows.map(repOf))].filter((v) => v !== NO_REP).sort((a, b) => a.localeCompare(b, 'ko'));
@@ -146,23 +162,23 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
           value={origin}
           options={[
             { value: ALL, label: '사이트 전체' },
-            ...[...new Set([...(rows.some((r) => originOf(r) === 'oncore') ? [] : ORIGINS), ...rows.map(originOf)])].map((v) => ({ value: v, label: QUOTE_SITES.find((s) => s.id === v)?.label ?? v })),
+            ...[...new Set([...(rows.some((r) => originOf(r) === 'oncore') ? [] : ORIGINS), ...keepSelected(rows.map(originOf), origin)])].map((v) => ({ value: v, label: QUOTE_SITES.find((s) => s.id === v)?.label ?? v })),
           ]}
           onChange={setOrigin}
         />
-        <Dropdown fixedMenu ariaLabel="담당자 필터" value={rep} options={optionsOf(repValues, '담당자 전체')} onChange={setRep} />
+        <Dropdown fixedMenu ariaLabel="담당자 필터" value={rep} options={optionsOf(repValues, '담당자 전체', rep)} onChange={setRep} />
         <Dropdown
           fixedMenu
           ariaLabel="1차 카테고리 필터"
           value={cat1}
-          options={optionsOf(cat1Values, '1차 카테고리 전체').map((o) => ({ ...o, hint: cat2CountHint(o.value) }))}
+          options={optionsOf(cat1Values, '1차 카테고리 전체', cat1).map((o) => ({ ...o, hint: cat2CountHint(o.value) }))}
           onChange={(v) => {
             setCat1(v);
             setCat2(ALL);
           }}
         />
-        <Dropdown fixedMenu ariaLabel="2차 카테고리 필터" value={cat2} disabled={cat2Values.length === 0} options={optionsOf(cat2Values, '2차 카테고리 전체')} onChange={setCat2} />
-        <Dropdown fixedMenu ariaLabel="유입 경로 필터" value={source} options={optionsOf(rows.map(sourceOf), '유입 경로 전체')} onChange={setSource} />
+        <Dropdown fixedMenu ariaLabel="2차 카테고리 필터" value={cat2} disabled={cat2Values.length === 0} options={optionsOf(cat2Values, '2차 카테고리 전체', cat2)} onChange={setCat2} />
+        <Dropdown fixedMenu ariaLabel="유입 경로 필터" value={source} options={optionsOf(rows.map(sourceOf), '유입 경로 전체', source)} onChange={setSource} />
         {[origin, rep, cat1, source].some((v) => v !== ALL) && <FilterReset onClick={resetFilters} />}
       </div>
       {filtered.length === 0 ? (

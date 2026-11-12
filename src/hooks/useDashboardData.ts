@@ -183,6 +183,17 @@ export function quoteStatsOf(
   };
 }
 
+/** quoteStatsOf 를 견적 원본이 바뀔 때만 다시 계산한다 (화면마다 같은 메모를 복사하지 않게) */
+export function useQuoteStats(
+  data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 'quotesExtra'> & Partial<Pick<DashboardData, 'quotesSites' | 'quotesPhone'>>
+): { quotes: QuoteRow[]; quotesRaw: QuoteRawRow[] } {
+  const { quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone } = data;
+  return useMemo(
+    () => quoteStatsOf({ quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone }),
+    [quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone]
+  );
+}
+
 /**
  * 건수 통계용 다른 사이트·전화문의 행(고객 정보 없음)에 원본 행의 SNO·제목·회사·작성자·연락처를 붙인다.
  * 원본(quotes_raw_sites·quotes_phone)을 받은 경우에만 채워지고, 분류·유입 경로 등 집계 값은 통계 행 그대로 둔다.
@@ -194,7 +205,9 @@ function withExtraDetails(extra: QuoteRawRow[], sites: QuoteRawRow[], phone: Quo
   const pool = new Map<string, QuoteRawRow[]>();
   const put = (site: string, r: QuoteRawRow) => {
     const k = keyOf(site, r.date, r.salesRep);
-    pool.set(k, [...(pool.get(k) || []), r]);
+    const bucket = pool.get(k);
+    if (bucket) bucket.push(r);
+    else pool.set(k, [r]);
   };
   sites.forEach((r) => r.site && put(r.site, r));
   phone.forEach((r) => put('phone', r));
@@ -219,13 +232,13 @@ export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): 
   const res = await fetch(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`);
   const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
   if (j.error) throw new Error(j.error);
-  return fromApi({ g_adgroup_daily: j.g_adgroup_daily_hist, n_adgroup_daily: j.n_adgroup_daily_hist } as RawApiPayload).spendDaily;
+  // fromApi 를 거치면 판매·기기 등 전역 저장소가 빈 값으로 덮이므로 일별 행만 따로 만든다
+  return spendDailyOf(j.g_adgroup_daily_hist, j.n_adgroup_daily_hist);
 }
 
-export function fromApi(j: RawApiPayload): DashboardData {
+const toSpendRow = (media: string, r: RawSpendApiRow): SpendRow => {
   const n = (v: unknown) => Number(v) || 0;
-
-  const toSpendRow = (media: string, r: RawSpendApiRow): SpendRow => ({
+  return {
     month: String(r.month ?? '').trim().slice(0, 7),
     media,
     type: String(r.type || 'SA').trim(),
@@ -236,7 +249,22 @@ export function fromApi(j: RawApiPayload): DashboardData {
     clk: n(r.clicks),
     conv: n(r.conversions),
     ...(r.campaign_tp ? { campaignTp: String(r.campaign_tp).trim() } : {}),
-  });
+  };
+};
+
+/** 일별 광고비 — 시트에 없으면(수집 전·웹앱 미갱신) 빈 목록이고, 일·기간 선택은 월 단위로 보여 준다 */
+function spendDailyOf(google: RawSpendApiRow[] = [], naver: RawSpendApiRow[] = []): SpendDailyRow[] {
+  const toDailyRow = (media: string, r: RawSpendApiRow): SpendDailyRow => {
+    const { month: _month, ...rest } = toSpendRow(media, r);
+    return { ...rest, date: String(r.date ?? '').trim().slice(0, 10) };
+  };
+  return [...google.map((r) => toDailyRow('Google', r)), ...naver.map((r) => toDailyRow('Naver', r))].filter((r) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(r.date),
+  );
+}
+
+export function fromApi(j: RawApiPayload): DashboardData {
+  const n = (v: unknown) => Number(v) || 0;
 
   const spend: SpendRow[] = (j.g_adgroup_monthly || []).map((r) => toSpendRow('Google', r));
   const hasGroup = new Set(spend.map((r) => `${r.month}\u0001${r.campaign}`));
@@ -250,15 +278,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
 
   (j.n_adgroup_monthly || []).forEach((r) => spend.push(toSpendRow('Naver', r)));
 
-  // 일별 광고비 — 시트에 없으면(수집 전·웹앱 미갱신) 빈 목록이고, 일·기간 선택은 월 단위로 보여 준다
-  const toDailyRow = (media: string, r: RawSpendApiRow): SpendDailyRow => {
-    const { month: _month, ...rest } = toSpendRow(media, r);
-    return { ...rest, date: String(r.date ?? '').trim().slice(0, 10) };
-  };
-  const spendDaily: SpendDailyRow[] = [
-    ...(j.g_adgroup_daily || []).map((r) => toDailyRow('Google', r)),
-    ...(j.n_adgroup_daily || []).map((r) => toDailyRow('Naver', r)),
-  ].filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  const spendDaily = spendDailyOf(j.g_adgroup_daily || [], j.n_adgroup_daily || []);
 
   const dailyRecentFrom: Record<string, string> = {};
   spendDaily.forEach((r) => {
@@ -564,6 +584,8 @@ export function useDashboardData(site: SiteId = 'itket') {
   // 요청 중에 사이트를 바꾸면 늦게 도착한 이전 사이트 응답은 버린다
   const siteRef = useRef(site);
   siteRef.current = site;
+  // 같은 사이트 요청이 겹치면(로그인·로그아웃·15분 갱신) 마지막에 보낸 요청의 응답만 반영한다 — 로그아웃 뒤 늦게 온 관리자 응답이 고객 정보를 다시 띄우지 않게
+  const reqId = useRef(0);
 
   const categoryMap = useMemo(() => buildCategoryMap(data.mapping), [data.mapping]);
 
@@ -574,7 +596,8 @@ export function useDashboardData(site: SiteId = 'itket') {
       const localRes = await fetch(`${import.meta.env.BASE_URL}data/latest.json`);
       if (!localRes.ok) return;
       const localJ = (await localRes.json()) as RawApiPayload;
-      if (liveLoaded.current) return;
+      // 받는 사이에 다른 사이트로 바꿨으면 아이티켓 스냅숏을 그 화면에 넣지 않는다
+      if (liveLoaded.current || siteRef.current !== site) return;
       setData((prevData) => {
         if (prevData.spend.length > 0 && prevData.quotesRaw.length > 0) return prevData;
         writeCachedPayload(localJ, site);
@@ -592,6 +615,8 @@ export function useDashboardData(site: SiteId = 'itket') {
       setStatus((prev) => (prev !== 'live' ? 'unlinked' : prev));
       return;
     }
+    const id = ++reqId.current;
+    const isStale = () => siteRef.current !== site || id !== reqId.current;
     setIsSyncing(true);
 
     try {
@@ -603,18 +628,19 @@ export function useDashboardData(site: SiteId = 'itket') {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as RawApiPayload;
       if (j.error) throw new Error(j.error);
-      if (siteRef.current !== site) return;
+      if (isStale()) return;
       liveLoaded.current = true;
       setData(withSite(fromApi(j), site));
       setStatus('live');
       writeCachedPayload(j, site);
     } catch (e) {
-      if (siteRef.current !== site) return;
+      if (isStale()) return;
       console.error('[its-ad-insight] 실데이터 동기화 오류 (화면 데이터 유지):', e);
       setStatus((prev) => (prev === 'live' ? 'live' : 'error'));
       await tryLoadStaticFallback();
     } finally {
-      setIsSyncing(false);
+      // 뒤에 보낸 요청이 아직 받는 중이면 동기화 표시를 끄지 않는다
+      if (id === reqId.current) setIsSyncing(false);
     }
   }, [site, tryLoadStaticFallback]);
 

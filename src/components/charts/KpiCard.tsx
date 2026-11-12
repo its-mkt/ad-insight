@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react';
 import type { ViewId } from '../../types/dashboard';
 import { VIEW_TITLES } from '../../utils/constants';
 import { navigateTo, parseRoute, routePath } from '../../utils/route';
-import { fmt, pct } from '../../utils/format';
+import { fmt, fmtWon, pct } from '../../utils/format';
 import { Muted } from '../common/Muted';
 
 interface KpiCardProps {
@@ -70,6 +70,14 @@ export const KpiDetailItems: React.FC<{ items: [string, number | string][] }> = 
     ))}
   </>
 );
+
+/** CPA 카드 보조 줄 — "광고비 N원 | 견적 N건" */
+export const KpiSpendQuoteDetail: React.FC<{
+  /** 광고비(원) */
+  spend: number;
+  /** 견적 건수 */
+  quotes: number;
+}> = ({ spend, quotes }) => <KpiDetailItems items={[['광고비', fmtWon(spend)], ['견적', `${fmt(quotes)}건`]]} />;
 
 export const KpiCard: React.FC<KpiCardProps> = ({
   label,

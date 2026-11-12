@@ -224,6 +224,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
     setSelectedCat2('ALL');
     setSelectedSource('ALL');
     setSelectedRep('ALL');
+    setSelectedSite('ALL'); // 전화문의에는 사이트가 없어 사이트 탭이 남아 있으면 목록이 비어 버린다
     setPage(1);
   }, [channel]);
 
@@ -344,18 +345,9 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
     const rows = filteredQuotesWithIndex.map(({ q }) => isPhone ? [
       q.sno, q.date, q.subject, q.company, q.name, q.phone, q.category, q.source, q.salesRep, q.receiver,
     ].map(cell) : [
-      `"${q.sno || ''}"`,
-      `"${(q.subject || '').replace(/"/g, '""')}"`,
-      `"${(q.name || '').replace(/"/g, '""')}"`,
-      `"${(q.company || '').replace(/"/g, '""')}"`,
-      `"${q.email || ''}"`,
-      cell(q.salesRep),
-      `"${q.date || ''}"`,
-      `"${q.source || ''}"`,
-      `"${q.sourceDetail.replace(/"/g, '""')}"`,
-      `"${q.category || ''}"`,
-      `"${siteLabelOf(q)}"`,
-    ]);
+      // 모든 칸을 같은 방식으로 감싼다 — 이메일·카테고리 등에 " 가 들어가도 열이 밀리지 않게
+      q.sno || '', q.subject, q.name, q.company, q.email, q.salesRep, q.date, q.source, q.sourceDetail, q.category, siteLabelOf(q),
+    ].map(cell));
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

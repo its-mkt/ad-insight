@@ -66,6 +66,55 @@ $$;
 revoke all on function public.track_usage(text, text, boolean, int) from public;
 grant execute on function public.track_usage(text, text, boolean, int) to anon, authenticated;
 
+-- 2-1. 카테고리 이용 — 카테고리 필터에서 고른 카테고리(선택·그 상태로 본 시간)와 표에서 펼친 카테고리 줄(선택만)
+--      카테고리 키는 '1차' 또는 '1차 > 2차' (화면 데이터의 카테고리 키와 같은 모양)
+create table if not exists public.usage_category_daily (
+  visit_date date not null,                       -- 한국 시간 날짜
+  device_id text not null,                        -- usage_daily 와 같은 기기 ID
+  view text not null,                             -- 고른 화면 id (cat-efficiency, keywords …)
+  category text not null,                         -- '1차' 또는 '1차 > 2차'
+  picks int not null default 0,                   -- 필터로 고르거나 줄을 펼친 횟수
+  active_seconds int not null default 0,          -- 필터를 그 카테고리로 둔 채 실제로 본 시간(초)
+  logged_in boolean not null default false,
+  last_at timestamptz not null default now(),
+  primary key (visit_date, device_id, view, category)
+);
+
+alter table public.usage_category_daily enable row level security;
+
+create or replace function public.track_category(
+  p_device text,
+  p_view text,
+  p_category text,
+  p_pick boolean default false,
+  p_seconds int default 0
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_date date := (now() at time zone 'Asia/Seoul')::date;
+  v_sec int := least(greatest(coalesce(p_seconds, 0), 0), 600);  -- 한 번에 10분까지만
+begin
+  if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' then return; end if;
+  if p_view is null or p_view !~ '^[a-z-]{1,32}$' then return; end if;
+  if p_category is null or char_length(p_category) not between 1 and 80 or p_category ~ '[[:cntrl:]]' then return; end if;
+  if not p_pick and v_sec = 0 then return; end if;
+
+  insert into public.usage_category_daily (visit_date, device_id, view, category, picks, active_seconds, logged_in)
+  values (v_date, p_device, p_view, p_category, case when p_pick then 1 else 0 end, v_sec, auth.uid() is not null)
+  on conflict (visit_date, device_id, view, category) do update set
+    picks = public.usage_category_daily.picks + excluded.picks,
+    active_seconds = public.usage_category_daily.active_seconds + excluded.active_seconds,
+    last_at = now(),
+    logged_in = public.usage_category_daily.logged_in or excluded.logged_in;
+end;
+$$;
+
+revoke all on function public.track_category(text, text, text, boolean, int) from public;
+grant execute on function public.track_category(text, text, text, boolean, int) to anon, authenticated;
+
 -- 3. 조회 — 로그인한 계정만. p_exclude_logged_in 이면 한 번이라도 로그인했던 기기(관리자)는 뺀다
 create or replace function public.usage_stats(
   p_from date,
@@ -90,6 +139,13 @@ begin
     where u.visit_date between p_from and p_to
       and (not p_exclude_logged_in
            or u.device_id not in (select distinct device_id from public.usage_daily where logged_in))
+  ),
+  cbase as (
+    select *
+    from public.usage_category_daily c
+    where c.visit_date between p_from and p_to
+      and (not p_exclude_logged_in
+           or c.device_id not in (select distinct device_id from public.usage_daily where logged_in))
   )
   select json_build_object(
     'daily', coalesce((
@@ -116,7 +172,34 @@ begin
     ), '[]'::json),
     'devices', (select count(distinct device_id) from base),
     'ips', (select count(distinct ip) from base),
-    'since', (select min(visit_date) from public.usage_daily)
+    'since', (select min(visit_date) from public.usage_daily),
+    -- 카테고리 키별 ('1차' / '1차 > 2차')
+    'categories', coalesce((
+      select json_agg(c order by c.picks desc)
+      from (
+        select category,
+               count(distinct visit_date::text || '|' || device_id) as visits,
+               sum(picks) as picks,
+               sum(active_seconds) as seconds,
+               array_agg(distinct view) as views
+        from cbase
+        group by category
+      ) c
+    ), '[]'::json),
+    -- 1차 카테고리로 묶은 값 (방문은 겹치는 기기를 한 번만 센다)
+    'category_groups', coalesce((
+      select json_agg(g order by g.picks desc)
+      from (
+        select split_part(category, ' > ', 1) as category,
+               count(distinct visit_date::text || '|' || device_id) as visits,
+               sum(picks) as picks,
+               sum(active_seconds) as seconds,
+               array_agg(distinct view) as views
+        from cbase
+        group by split_part(category, ' > ', 1)
+      ) g
+    ), '[]'::json),
+    'category_since', (select min(visit_date) from public.usage_category_daily)
   ) into v_result;
 
   return v_result;

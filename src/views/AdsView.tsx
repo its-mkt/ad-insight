@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { DashboardData, SpendRow, SyncStatus } from '../types/dashboard';
 import {
+  rowsByPeriod,
   fmt,
   fmtWon,
   mLabel,
@@ -14,14 +15,13 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl, type ChartTableMode } from '../components/common/SegmentedControl';
 import { SpendDetailTable } from '../components/ads/SpendDetailTable';
 import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
@@ -41,7 +41,6 @@ interface AdsViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const ADS_SOURCES: SourceLinkItem[] = [
@@ -53,8 +52,8 @@ const ADS_SOURCES: SourceLinkItem[] = [
   { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
 ];
 
-export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
-  const [mode, setMode] = useState<'chart' | 'table'>('chart');
+export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
+  const [mode, setMode] = useState<ChartTableMode>('chart');
   const [chartSet, setChartSet] = useState<'media' | 'compare'>('media');
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
     (a, b) => b - a
@@ -90,10 +89,10 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   const allMonths12 = allPeriod ? yearKeys : yearMonths12;
   const isFuture = (mo: string) => !allPeriod && Y === THIS_Y && mo > months[months.length - 1];
   // 키는 달(YYYY-MM) 또는 전체 기간의 연도(YYYY)
-  const at = (key: string) => data.spend.filter((r) => r.month.startsWith(key));
+  const at = rowsByPeriod(data.spend);
   const colLabel = (key: string) => (allPeriod ? `${key}년` : mLabel(key));
   const tot = (mo: string) => sumBy(at(mo), (r) => r.cost);
-  const trendAt = (key: string) => trendSpend.filter((r) => r.month.startsWith(key));
+  const trendAt = rowsByPeriod(trendSpend);
   const trendTot = (mo: string) => sumBy(trendAt(mo), (r) => r.cost);
   const man = (mo: string, item: string) =>
     sumBy(
@@ -133,7 +132,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
       : monthsOfY[monthsOfY.length - 1];
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : '전월';
+  // 전환이 없으면 0원이 아니라 '–' 로 보여 준다 (0원은 공짜 전환처럼 읽힌다)
+  const cpaText = (v: number) => (v > 0 ? `${fmt(v)}원` : '–');
   const cpa = (mo: string) => {
     const c = sumBy(at(mo), (r) => r.conv);
     return c ? tot(mo) / c : 0;
@@ -191,9 +192,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 일평균: 진행 중인 달은 오늘까지의 날짜 수로 나눠, 다 끝난 전월과 같은 기준으로 비교한다
   const daysInMonth = (mo: string) => new Date(+mo.slice(0, 4), +mo.slice(5), 0).getDate();
   const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysInMonth(mo));
-  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : sameDate && mo === pv ? sameDate.days : elapsedDays(mo));
+  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : elapsedDays(mo));
   // 수동 입력 MDF 는 달 전체 금액이라, 같은 날짜 비교에서는 일수 비율만큼만 쓴다
-  const pvMdf = sameDate && man(pv, 'MDF') ? (man(pv, 'MDF') * sameDate.days) / daysInMonth(pv) : mdfCost(pv);
+  const pvMdf = mdfCost(pv);
   const missing = uncollectedMedia(data.spend, [curM]).map((m): [string, string] => [m, '미수집']);
   // 매체별 성과 표 — 위 KPI 와 같은 기간 (전체 / 연도 합계 / 선택한 달·일 기간)
   const statsRows = allPeriod ? data.spend : data.spend.filter((r) => (yearTotal ? yearMonths : [curM]).includes(r.month));
@@ -233,7 +234,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={monthAvgDetail(yearKeys, allSpendMonths)}
             />
             <KpiCard label="전체 MDF 소진" value={`${fmt(mdfIn(yearKeys))}원`} sub="전체 기간 합계" detail={mdfShareOf(yearKeys)} />
-            <KpiCard label="전체 전환 1건당 광고비" value={`${fmt(cpaIn(yearKeys))}원`} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
+            <KpiCard label="전체 전환 1건당 광고비" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
           </>
         ) : yearTotal ? (
           <>
@@ -268,9 +269,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
             />
             <KpiCard
               label={`${yearLabel} 전환 1건당 광고비`}
-              value={`${fmt(cpaIn(yearMonths))}원`}
-              cur={cpaIn(yearMonths)}
-              prev={cpaIn(lastYrMonths)}
+              value={cpaText(cpaIn(yearMonths))}
+              cur={cpaIn(yearMonths) || null}
+              prev={cpaIn(lastYrMonths) || null}
               cmpLabel="전년 동기"
               detail={<KpiDetailItems items={[['광고전환', convIn(yearMonths)]]} />}
             />
@@ -335,9 +336,9 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         />
         <KpiCard
           label={`${curCaption} 전환 1건당 광고비`}
-          value={`${fmt(cpa(curM))}원`}
-          cur={cpa(curM)}
-          prev={cpa(pv)}
+          value={cpaText(cpa(curM))}
+          cur={cpa(curM) || null}
+          prev={cpa(pv) || null}
           cmpLabel={cmp}
           detail={<KpiDetailItems items={[['광고전환', curConv]]} />}
         />
@@ -345,18 +346,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         )}
       </KpiSection>
 
-      <div className="mock-bar">
-        <SegmentedControl<'chart' | 'table'>
-          dataKey="mode"
-          options={[
-            { value: 'chart', label: '그래프' },
-            { value: 'table', label: '표' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
-        <span className="sp" />
-      </div>
+      <ChartTableToggle value={mode} onChange={setMode} />
 
       {mode === 'chart' ? (
         <MultiChart

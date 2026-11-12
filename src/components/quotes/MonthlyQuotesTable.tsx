@@ -48,6 +48,14 @@ const CAT_OTHER = '기타';
 
 const monthOf = (r: QuoteRawRow): string => r.date?.slice(0, 7) ?? '';
 const repOf = (r: QuoteRawRow): string => r.salesRep || REP_UNASSIGNED;
+/** 집계 키 — 'YYYY-MM…' 값의 연도(YYYY)·달(YYYY-MM). startsWith(연도|달) 비교와 같은 결과가 되도록 형식이 맞을 때만 */
+const prefixesOf = (v?: string): string[] => {
+  if (!v) return [];
+  const out: string[] = [];
+  if (v.length >= 4) out.push(v.slice(0, 4));
+  if (v.length >= 7) out.push(v.slice(0, 7));
+  return out;
+};
 
 /** 행을 키별로 한 번에 센다 (weightOf 를 주면 그 값을 더한다) */
 function tally<T>(rows: T[], keyOf: (row: T) => string, weightOf: (row: T) => number = () => 1): Map<string, number> {
@@ -100,14 +108,40 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
   const isFuture = (mo: string) => mo > curM;
   const colLabel = (mo: string) => (allPeriod ? `${mo}년` : mLabel(mo));
 
+  // 칸마다 전체 행을 다시 훑지 않도록, 달(YYYY-MM)·연도(YYYY) 단위 건수를 한 번에 세어 둔다
+  const counts = useMemo(() => {
+    const quote = new Map<string, number>();
+    const raw = new Map<string, number>();
+    const add = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) || 0) + n);
+    quotes.forEach((r) => {
+      const cat1 = cat1Of(r.category || CAT_OTHER);
+      for (const p of prefixesOf(r.month)) {
+        add(quote, p, r.count);
+        add(quote, `${p}\u0001${cat1}`, r.count);
+      }
+    });
+    quotesRaw.forEach((r) => {
+      const rep = repOf(r);
+      for (const p of prefixesOf(r.date)) {
+        add(raw, p, 1);
+        add(raw, `${p}\u0001${rep}`, 1);
+      }
+    });
+    return { quote, raw };
+  }, [quotes, quotesRaw]);
+  // 달·연도가 아닌 값이 오면 예전처럼 직접 센다
+  const indexed = (mo: string) => mo.length === 4 || mo.length === 7;
+
   // 카테고리는 분류표 1차 기준 — "SAN 스토리지 > 화웨이" 같은 2차 견적은 1차 행에 합산한다
   const cntCat = (mo: string, cat1: string) =>
-    quotes.filter((r) => r.month.startsWith(mo) && cat1Of(r.category || CAT_OTHER) === cat1).reduce((a, r) => a + r.count, 0);
+    indexed(mo)
+      ? counts.quote.get(`${mo}\u0001${cat1}`) || 0
+      : quotes.filter((r) => r.month.startsWith(mo) && cat1Of(r.category || CAT_OTHER) === cat1).reduce((a, r) => a + r.count, 0);
   // 올해 견적이 있는 1차 카테고리 전부, 건수 큰 순 ('기타'는 맨 뒤)
   const yearCats = useMemo(() => quoteCat1Order(quotes.filter((r) => months.includes(r.month))), [quotes, months]);
 
   const totMonth = (mo: string) =>
-    quotes.filter((r) => r.month.startsWith(mo)).reduce((a, r) => a + r.count, 0);
+    indexed(mo) ? counts.quote.get(mo) || 0 : quotes.filter((r) => r.month.startsWith(mo)).reduce((a, r) => a + r.count, 0);
 
   // 진행 중인 달은 작년 같은 날짜까지만 세어 다 끝난 달과 비교되지 않게 한다 (끝난 달은 월 합계 그대로)
   const today = new Date().getDate();
@@ -122,7 +156,7 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
   // 담당자별: 원장(quotes_raw)의 영업담당 기준. 값이 없는 건은 '미지정'으로 모은다
   const hasRepData = useMemo(() => quotesRaw.some((r) => r.salesRep), [quotesRaw]);
   const cntRep = (mo: string, rep: string) =>
-    quotesRaw.filter((r) => r.date?.startsWith(mo) && repOf(r) === rep).length;
+    indexed(mo) ? counts.raw.get(`${mo}\u0001${rep}`) || 0 : quotesRaw.filter((r) => r.date?.startsWith(mo) && repOf(r) === rep).length;
 
   // 표의 행 목록: 올해 견적이 있는 담당자, 건수 큰 순
   const yearRaw = useMemo(() => {
@@ -145,8 +179,7 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
     [quotesRaw, hasRepData]
   );
 
-  const totRawMonth = (mo: string) =>
-    quotesRaw.filter((r) => r.date?.startsWith(mo)).length;
+  const totRawMonth = (mo: string) => (indexed(mo) ? counts.raw.get(mo) || 0 : quotesRaw.filter((r) => r.date?.startsWith(mo)).length);
 
   // 차트 모드 데이터 산출: 선택 범위의 행을 한 번만 훑어 항목별로 센다
   const chartData = useMemo(() => {

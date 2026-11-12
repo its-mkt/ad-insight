@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/dashboard';
 import {
+  rowsByPeriod,
   buildSourceShareData,
   fmt,
-  fmtWon,
   mLabel,
   prevM,
   cat1Of,
@@ -14,19 +14,18 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteDetailsPending, quoteStatsOf } from '../hooks/useDashboardData';
+import { quoteDetailsPending, quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
-import type { SameDateCompare } from '../utils/dayData';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { SourceShareTable } from '../components/quotes/SourceShareTable';
-import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiPlaceholder, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
@@ -50,7 +49,6 @@ interface QuotesViewProps {
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
-  sameDate?: SameDateCompare;
 }
 
 const QUOTES_SOURCES: SourceLinkItem[] = [
@@ -73,12 +71,12 @@ const ORIGIN_COLORS: Record<string, string> = {
   톡플러스: '--c-ka',
 };
 
-export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
+export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   const { isLoggedIn } = useAuth();
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
-  const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
+  const { quotes, quotesRaw } = useQuoteStats(data);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
-  const [mode, setMode] = useState<'chart' | 'table'>('chart');
+  const [mode, setMode] = useState<ChartTableMode>('chart');
   const trendQuotes = trend?.quotes ?? quotes;
   const trendRaw = trend?.quotesRaw ?? quotesRaw;
 
@@ -211,7 +209,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : sameDate ? sameDate.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : '전월';
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');
@@ -249,11 +247,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? sumBy(quotes.filter(inMonths(ytdValidMonths)), (r) => r.count)
     : curM >= starts.cpaFrom ? curAdQuotes : 0;
   const kpiCpaDetail = (
-    <>
-      <p>광고비 <b>{fmtWon(kpiSpend)}</b></p>
-      <i>|</i>
-      <p>견적 <b>{fmt(kpiAdQuotes)}건</b></p>
-    </>
+    <KpiSpendQuoteDetail spend={kpiSpend} quotes={kpiAdQuotes} />
   );
 
   // 접수 목록 — 기간 보기에서는 날짜를 옮기지 않은 원본(trendRaw)에서 실제 날짜로 고른다
@@ -267,9 +261,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const listPeriod = period ? period.label : allPeriod ? '전체 기간' : kpiLabel;
   // 접수처 비중 — 아래 접수 목록과 같은 기간·같은 행으로 센다. 전화문의 시트 건은 시트의 경로(전화·톡플러스·메일)로 나눈다
   // 주요 접수처는 건수가 0이어도 남겨 어디가 비었는지 보이게 한다
-  const originItems = [...new Set([...(isOtherSite ? [] : ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스']), ...listRows.map(originOf)])]
+  const originCounts = new Map<string, number>();
+  listRows.forEach((r) => {
+    const o = originOf(r);
+    originCounts.set(o, (originCounts.get(o) || 0) + 1);
+  });
+  const originItems = [...new Set([...(isOtherSite ? [] : ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스']), ...originCounts.keys()])]
     .map((k) => {
-      const count = listRows.filter((r) => originOf(r) === k).length;
+      const count = originCounts.get(k) || 0;
       return { k, c: ORIGIN_COLORS[k] || '--c-etc', count, v: listRows.length ? Math.round((count / listRows.length) * 1000) / 10 : 0 };
     })
     .sort((a, b) => b.count - a.count);
@@ -278,13 +277,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
   // 추이 차트: 건수 상위 6개 1차 카테고리 + 그 외
   const chartCats = quoteChartCats(yrQuotes);
+  const yrQuotesAt = rowsByPeriod(yrQuotes);
   const series = chartCats.keys
     .map((k, ci) => ({
       k,
       c: quoteSeriesColor(k, ci),
       v: axisKeys.map((key) =>
         sumBy(
-          yrQuotes.filter((r) => r.month.startsWith(key) && chartCats.keyOf(r.category) === k),
+          yrQuotesAt(key).filter((r) => chartCats.keyOf(r.category) === k),
           (r) => r.count
         )
       ),
@@ -298,7 +298,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
       c: '--acc',
       v: axisKeys.map((key) =>
         sumBy(
-          yrQuotes.filter((r) => r.month.startsWith(key) && cat1Of(r.category || '기타') === k),
+          yrQuotesAt(key).filter((r) => cat1Of(r.category || '기타') === k),
           (r) => r.count
         )
       ),
@@ -327,7 +327,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
               label={<>견적당 광고비 (CPA)</>}
               value={allCpa ? `${fmt(allCpa)}원` : '–'}
               sub={`${dotYm(starts.cpaFrom)} 이후 기준`}
-              detail={<><p>광고비 <b>{fmtWon(cpaSpend)}</b></p><i>|</i><p>견적 <b>{fmt(cpaQuotesCount)}건</b></p></>}
+              detail={<KpiSpendQuoteDetail spend={cpaSpend} quotes={cpaQuotesCount} />}
             />
             {repCard('전체 최다 접수 담당자', quotesRaw, null, false)}
             <KpiCard
@@ -356,7 +356,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
             cur={ytdQuotes}
             prev={sumBy(quotes.filter((r) => r.month >= ym(+yr - 1, 1) && r.month <= ym(+yr - 1, mm)), (r) => r.count)}
             cmpLabel="전년 동기"
-            detail={siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 4) === yr))}
+            detail={siteBreak(quotesRaw.filter((r) => r.date?.slice(0, 4) === yr && r.date.slice(0, 7) <= curM))}
           />
         )}
         <KpiCard to="cat-efficiency"
@@ -387,18 +387,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
         )}
       </KpiSection>
 
-      <div className="mock-bar">
-        <SegmentedControl<'chart' | 'table'>
-          dataKey="mode"
-          options={[
-            { value: 'chart', label: '그래프' },
-            { value: 'table', label: '표' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
-        <span className="sp" />
-      </div>
+      <ChartTableToggle value={mode} onChange={setMode} />
 
       {/* 추이는 여러 기간을 비교할 때만 의미가 있어 '전체'(연도 합계·전체 기간)에서만 보여 준다 */}
       {showTrendChart && (mode === 'chart' ? (

@@ -4,6 +4,7 @@ import { TableFootnote } from '../common/TableFootnote';
 import { SkelBar } from '../common/SkeletonView';
 import { StatusBadge, type StatusLevel } from '../common/StatusBadge';
 import { Card } from '../common/Card';
+import { Th } from '../common/Th';
 
 export interface DataSourceRowItem {
   media: string;
@@ -44,9 +45,9 @@ export const DataSourceTable: React.FC<DataSourceTableProps> = ({ sourceRows, lo
           </colgroup>
           <thead>
             <tr>
-              <th>소스</th>
-              <th>수집 방식 · 현재 적재량</th>
-              <th className="c">상태</th>
+              <Th>소스</Th>
+              <Th>수집 방식 · 현재 적재량</Th>
+              <Th className="c">상태</Th>
             </tr>
           </thead>
           <tbody>

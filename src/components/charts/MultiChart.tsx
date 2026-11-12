@@ -107,7 +107,8 @@ export const MultiChart: React.FC<MultiChartProps> = ({
 
   const renderDonutSvg = () => {
     const sums = series.map((s) => s.v.reduce((a, v) => a + (v || 0), 0));
-    const total = Math.max(1, sums.reduce((a, v) => a + v, 0));
+    const sumAll = sums.reduce((a, v) => a + v, 0);
+    const total = Math.max(1, sumAll); // 나눗셈용 — 가운데 합계는 실제 합(sumAll)을 보여 준다 (모두 0 이면 '1' 로 보이지 않게)
     const fsName = r * 0.7;
     const fsNameHover = r * 0.82;
     const fsPct = r * 0.75;
@@ -195,7 +196,7 @@ export const MultiChart: React.FC<MultiChartProps> = ({
           fill="var(--ink)"
           style={{ fontSize: `${hoverPie !== null ? r * 1.1 : r * 0.95}px` }}
         >
-          {hoveredItem ? `${hoveredPct}%` : fmt(total)}
+          {hoveredItem ? `${hoveredPct}%` : fmt(sumAll)}
         </text>
         {series.map((s, si) => {
           const pctStr = ((sums[si] / total) * 100).toFixed(1);

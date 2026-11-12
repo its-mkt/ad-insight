@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { toggledSet } from '../utils/toggleSet';
 import type { CategoryMap, DashboardData, KeywordRow, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { cat1Of, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
+import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
@@ -9,7 +10,7 @@ import { adStatKey, groupAdsByAdgroup, type AdStat } from '../utils/creativeImag
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader } from '../components/common/ViewHeader';
-import { KpiCard, KpiDetailItems, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
 import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
@@ -162,12 +163,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const [campTab, setCampTab] = useState(0);
   const [openQuotes, setOpenQuotes] = useState<Set<string>>(new Set());
   const toggleQuote = (key: string) =>
-    setOpenQuotes((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setOpenQuotes((prev) => toggledSet(prev, key));
   const adGroups = useMemo(() => (result ? resultAdGroups(result) : []), [result]);
   const campaigns = useMemo(() => campaignBuckets(adGroups), [adGroups]);
   const adCreatives = useMemo(() => groupAdsByAdgroup((result?.ads || []).map((a) => a.ad)), [result]);
@@ -263,10 +259,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
     ? yearsOf([...chartSpend.map((r) => r.month), ...chartQuotes.map((r) => r.month)])
     : monthsUpTo(selectedMonth);
   const axisLabels = axis.map((key) => (allPeriod ? `${key}년` : mLabel(key)));
+  const chartSpendAt = rowsByPeriod(chartSpend);
+  const chartQuotesAt = rowsByPeriod(chartQuotes);
   const spendSeries = SERIES_DEFS.map((s) => ({
     k: s.k,
     c: s.c,
-    raw: axis.map((key) => sumBy(chartSpend.filter((r) => r.month.startsWith(key)).filter(s.f), (r) => r.cost)),
+    raw: axis.map((key) => sumBy(chartSpendAt(key).filter(s.f), (r) => r.cost)),
   }))
     .filter((s) => s.raw.some((v) => v))
     .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
@@ -276,7 +274,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       k,
       c: quoteSeriesColor(k, i),
       v: axis.map((key) =>
-        sumBy(chartQuotes.filter((r) => r.month.startsWith(key) && quoteCats.keyOf(r.category) === k), (r) => r.count)
+        sumBy(chartQuotesAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
       ),
     }))
     .filter((s) => s.v.some((x) => x));
@@ -321,7 +319,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const srcShare = sourceScope ? sourceShareIn(months) : null;
   const srcSharePrev =
     sourceScope && !allPeriod ? sourceShareIn(yearTotal ? sameMonthsLastYear(months || []) : [prevM(selectedMonth)]) : null;
-  const fmtShare = (v: number | null) => (v == null ? '–' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`);
+  const fmtShare = (v: number | null) => (v == null ? '–' : pctLabel(v));
   const topRow = (rows: [string, number][], skip: string) => rows.find(([k]) => k !== skip);
   const topCat = topRow(breakdowns[0].rows, '기타');
   const topRep = topRow(breakdowns[3].rows, '미지정');
@@ -334,7 +332,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     if ((cmpLabel || !items.length) && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
     return items.length ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['건수', '0건']]} />;
   };
-  const monthlyTotal = axis.map((key) => sumBy(chartQuotes.filter((r) => r.month.startsWith(key)), (r) => r.count));
+  const monthlyTotal = axis.map((key) => sumBy(chartQuotesAt(key), (r) => r.count));
 
   return (
     <View name="search" title={TITLE}>
@@ -376,7 +374,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
             prev={srcSharePrev?.pct ?? null}
             cmpLabel={srcSharePrev ? cmpLabel : undefined}
             deltaUnit="pp"
-            sub="전체 기간 기준"
             detail={
               srcShare ? (
                 <KpiDetailItems items={[['이 매체', `${fmt(srcShare.mine)}건`], ['전체 유입', `${fmt(srcShare.all)}건`]]} />
@@ -431,11 +428,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           sub={cpaLabel}
           detail={
             result.cpa ? (
-              <>
-                <p>광고비 <b>{fmtWon(result.cpaCost)}</b></p>
-                <i>|</i>
-                <p>견적 <b>{fmt(result.cpaQuotes)}건</b></p>
-              </>
+              <KpiSpendQuoteDetail spend={result.cpaCost} quotes={result.cpaQuotes} />
             ) : (
               <span>{dayRange && !dayCovered ? cpaLabel : result.cpaHidden ? '추적 기간이 달라 계산하지 않음' : cpaLabel}</span>
             )

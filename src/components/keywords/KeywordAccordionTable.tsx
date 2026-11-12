@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
+import { toggledSet } from '../../utils/toggleSet';
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../../types/dashboard';
 import { ctrText as ctr, fmt, mLabel, THIS_M } from '../../utils/format';
 import { MediaPill } from '../common/MediaPill';
@@ -12,7 +14,7 @@ import { TabButton } from '../common/TabButton';
 import { Card } from '../common/Card';
 import { EmptyState } from '../common/EmptyState';
 import { AdApiSource } from '../common/ExtLink';
-import { NumTd } from '../common/TableRows';
+import { NumTd, TotalRow } from '../common/TableRows';
 import { Muted } from '../common/Muted';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
@@ -70,13 +72,21 @@ const restOf = (g: KeywordGroup) => {
 const REST_TITLE =
   '광고그룹 실적에서 키워드 실적 합을 뺀 값입니다. 키워드 확장으로 노출된 검색어, 삭제되거나 수집 전에 중지된 키워드, 쇼핑검색(상품 단위 입찰)처럼 키워드가 없는 광고의 실적은 광고그룹에만 집계됩니다.';
 
-/** 그룹 합계 — 따로 받은 실적이 있으면 그 값, 없으면 키워드 합 */
-const groupTotals = (g: KeywordGroup) =>
-  g.totals || {
-    imp: g.list.reduce((sum, k) => sum + k.imp, 0),
-    clk: g.list.reduce((sum, k) => sum + k.clk, 0),
-    conv: g.list.reduce((sum, k) => sum + k.conv, 0),
-  };
+/** 그룹 합계 — 따로 받은 실적이 있으면 그 값, 없으면 키워드 합. 정렬 비교마다 다시 더하지 않게 그룹별로 기억해 둔다 */
+const groupTotalsCache = new WeakMap<KeywordGroup, { imp: number; clk: number; conv: number }>();
+const groupTotals = (g: KeywordGroup) => {
+  if (g.totals) return g.totals;
+  let t = groupTotalsCache.get(g);
+  if (!t) {
+    t = {
+      imp: g.list.reduce((sum, k) => sum + k.imp, 0),
+      clk: g.list.reduce((sum, k) => sum + k.clk, 0),
+      conv: g.list.reduce((sum, k) => sum + k.conv, 0),
+    };
+    groupTotalsCache.set(g, t);
+  }
+  return t;
+};
 
 const getGroupMetric = (g: KeywordGroup, key: SortKey) => {
   if (key === 'cost') return g.cost;
@@ -122,21 +132,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('cost');
 
   // 더보기 목록: 바깥 클릭·Esc 로 닫는다
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!tabBarRef.current?.contains(e.target as Node)) setMoreOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMoreOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [moreOpen]);
+  useDismiss(tabBarRef, moreOpen, () => setMoreOpen(false));
 
   const toggleGroup = (groupKey: string) => {
     setOpenGroups((prev) => {
@@ -157,15 +153,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
   };
 
   const toggleExpandKwGroup = (groupKey: string) => {
-    setExpandedKwGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupKey)) {
-        next.delete(groupKey);
-      } else {
-        next.add(groupKey);
-      }
-      return next;
-    });
+    setExpandedKwGroups((prev) => toggledSet(prev, groupKey));
   };
 
   // 같은 캠페인 이름이 Google·Naver 양쪽에 있으면 한 탭으로 합치고, 탭 오른쪽에 매체 아이콘을 모두 붙인다
@@ -181,7 +169,11 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
     setVisibleCount(10);
   }
 
-  const displayGroups = selectedCamp ? selectedCamp.groups : topGroups.slice(0, visibleCount);
+  // slice 가 렌더마다 새 배열을 만들면 아래 정렬 메모가 매번 다시 돌므로 함께 메모한다
+  const displayGroups = useMemo(
+    () => (selectedCamp ? selectedCamp.groups : topGroups.slice(0, visibleCount)),
+    [selectedCamp, topGroups, visibleCount]
+  );
   const sortedDisplayGroups = useMemo(() => {
     const list = [...displayGroups];
     const groupName = (g: KeywordGroup) => (selectedCamp ? g.adgroup : `${g.campaign} › ${g.adgroup}`);
@@ -381,7 +373,8 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   const groupKey = `${g.media}-${g.campaign}-${g.adgroup}`;
                   const isOpen = openGroups.has(groupKey);
                   const isKwExpanded = expandedKwGroups.has(groupKey);
-                  const allSortedKws = [...g.list].sort((a, b) => {
+                  // 닫힌 그룹은 키워드 목록을 그리지 않으므로 정렬하지 않는다
+                  const allSortedKws = !isOpen ? g.list : [...g.list].sort((a, b) => {
                     if (sortKey === 'name') {
                       const c = a.keyword.localeCompare(b.keyword);
                       return sortOrder === 'desc' ? -c : c;
@@ -474,17 +467,14 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                     </React.Fragment>
                   );
                 })}
-                <tr className="grp kw-total">
-                  <td>
-                    합계<small className="grp-total-cnt">({fmt(totalGroups.length)}개 그룹)</small>
-                  </td>
+                <TotalRow className="kw-total" label={<>합계<small className="grp-total-cnt">({fmt(totalGroups.length)}개 그룹)</small></>}>
                   <NumTd value={kwTotal.imp} />
                   <NumTd value={kwTotal.clk} />
                   <NumTd>{ctr(kwTotal.clk, kwTotal.imp)}</NumTd>
                   <NumTd value={kwTotal.conv} />
                   <NumTd value={cpc(kwTotal.cost, kwTotal.clk)} unit="원" />
                   <NumTd value={kwTotal.cost} unit="원" bold />
-                </tr>
+                </TotalRow>
               </tbody>
             </>
           )}

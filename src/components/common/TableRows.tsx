@@ -28,12 +28,14 @@ export const NumTd: React.FC<NumTdProps> = ({ value, unit = '', bold, fallback =
 interface TotalRowProps {
   /** 첫 칸 글자 */
   label?: React.ReactNode;
+  /** tr.grp 뒤에 덧붙일 클래스 (cr-total·kw-total 등) */
+  className?: string;
   children: React.ReactNode;
 }
 
 /** 표 맨 아래 합계 줄 (tr.grp) — 나머지 칸은 children 으로 */
-export const TotalRow: React.FC<TotalRowProps> = ({ label = '합계', children }) => (
-  <tr className="grp">
+export const TotalRow: React.FC<TotalRowProps> = ({ label = '합계', className, children }) => (
+  <tr className={`grp${className ? ` ${className}` : ''}`}>
     <td>{label}</td>
     {children}
   </tr>

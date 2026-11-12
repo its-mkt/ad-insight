@@ -35,9 +35,6 @@ export const CATEGORY_HIERARCHY: CatHierarchyNode[] = [
   { cat1: '기타', cat2: [] },
 ];
 
-/** 분류표의 모든 카테고리 — 1차 다음에 그 2차("1차 > 2차")를 둔다 (어드민 수동 지정 목록 등) */
-export const ALL_CATEGORIES: string[] = CATEGORY_HIERARCHY.flatMap((n) => [n.cat1, ...n.cat2.map((c2) => `${n.cat1} > ${c2}`)]);
-
 export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',

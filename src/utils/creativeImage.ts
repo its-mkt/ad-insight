@@ -6,14 +6,6 @@ export const MEDIA_COLOR_VARS: Record<string, string> = {
   Meta: '--c-m',
 };
 
-/**
- * 광고 계정에서 수집한 실제 이미지(소재 이미지 또는 광고그룹·캠페인의 이미지 확장소재)만 쓴다.
- * 없으면 빈 문자열 — 비슷해 보이는 사진으로 채우지 않는다 (실제 집행 소재로 오인될 수 있음).
- */
-export function getCreativeImage(c: AdRow): string {
-  return (c.image || '').trim();
-}
-
 /** 소재 성과 합계 (기준월) */
 export type AdStat = Pick<AdStatRow, 'cost' | 'imp' | 'clk' | 'conv'>;
 

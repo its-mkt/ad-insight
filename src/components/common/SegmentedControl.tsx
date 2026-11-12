@@ -50,3 +50,25 @@ export function SegmentedControl<T extends string | number>({
     </span>
   );
 }
+
+export type ChartTableMode = 'chart' | 'table';
+
+interface ChartTableToggleProps {
+  /** 지금 보기 — 'chart'(그래프) 또는 'table'(표) */
+  value: ChartTableMode;
+  /** 보기를 바꿀 때 */
+  onChange: (value: ChartTableMode) => void;
+}
+
+const CHART_TABLE_OPTIONS: SegmentOption<ChartTableMode>[] = [
+  { value: 'chart', label: '그래프' },
+  { value: 'table', label: '표' },
+];
+
+/** 추이 카드 위의 그래프/표 전환 바 (div.mock-bar) */
+export const ChartTableToggle: React.FC<ChartTableToggleProps> = ({ value, onChange }) => (
+  <div className="mock-bar">
+    <SegmentedControl<ChartTableMode> dataKey="mode" options={CHART_TABLE_OPTIONS} value={value} onChange={onChange} />
+    <span className="sp" />
+  </div>
+);

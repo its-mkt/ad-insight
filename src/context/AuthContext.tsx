@@ -63,10 +63,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 1. Supabase Auth 세션 확인
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? toAuthUser(session.user) : readDevSession());
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ? toAuthUser(session.user) : readDevSession());
+      })
+      // 세션 확인이 실패해도 로딩에 멈춰 있지 않게 비로그인으로 넘긴다
+      .catch(() => setUser(readDevSession()))
+      .finally(() => setLoading(false));
 
     // 2. Supabase Auth 상태 변화 리스너
     const {

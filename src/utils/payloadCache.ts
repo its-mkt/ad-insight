@@ -63,7 +63,7 @@ export async function readCachedPayload(site: SiteId = 'itket'): Promise<RawApiP
 
 /** 브라우저에는 공개 데이터만 남긴다 — 관리자 응답의 고객 정보는 저장하지 않는다 */
 function toPublicPayload(payload: RawApiPayload): RawApiPayload {
-  const { quotes_raw_sites: _sites, quotes_phone: _phone, ...rest } = payload;
+  const { quotes_raw_sites: _sites, quotes_phone: _phone, godo_order_customers: _customers, ...rest } = payload;
   return {
     ...rest,
     quotes_raw: rest.quotes_raw?.map(({ name: _name, company: _company, email: _email, ...row }) => row),

@@ -82,7 +82,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const [ga4, setGa4] = useState<Record<string, Ga4DeviceMonth> | null>(null);
   useEffect(() => {
     let alive = true;
-    loadGa4Devices([...new Set([...scope, ...prevScope, ...chartMonths])]).then((got) => alive && setGa4(got));
+    const months = [...new Set([...scope, ...prevScope, ...chartMonths])];
+    // 아직 안 받은 달로 바꾸면 받는 동안 '수집 전' 대신 불러오는 중으로 보여 준다
+    setGa4((g) => (g && months.every((m) => m in g) ? g : null));
+    loadGa4Devices(months).then((got) => alive && setGa4(got));
     return () => {
       alive = false;
     };
@@ -94,15 +97,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const g = ga4 ?? {};
 
   // GA4 방문·전환
-  const visits = sumGa4(g, scope, (m) => (Object.keys(m.sessions).length ? m.sessions : null), addDevices);
+  const pickSessions = (m: Ga4DeviceMonth) => (Object.keys(m.sessions).length ? m.sessions : null);
+  const visits = sumGa4(g, scope, pickSessions, addDevices);
   const prevVisits = sumGa4(g, prevScope, (m) => (Object.keys(m.sessions).length ? m.sessions : null), addDevices);
   const conv = (id: Ga4ConvId, months: string[]) => sumGa4(g, months, (m) => m.conv?.[id] ?? null, addDevices);
   const estimates = conv('estimate', scope);
   const orders = conv('order', scope);
   const visitTotal = sumBy([...visits.acc.values()], (n) => n);
+  // 전환율의 분모 — 견적 완료가 수집된 달의 방문만 더한다 (방문은 더 일찍부터 수집돼 여러 달을 합치면 전환율이 낮게 나온다)
+  const visitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.conv?.estimate != null), pickSessions, addDevices);
 
   // 기기 × 채널 (방문·견적 완료)
-  const chVisits = sumGa4(g, scope, (m) => m.channels, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.sessions)));
+  const addChannelVisits = (acc: Map<string, number>, rows: NonNullable<Ga4DeviceMonth['channels']>) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.sessions));
+  const chVisits = sumGa4(g, scope, (m) => m.channels, addChannelVisits);
+  const chVisitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.convChannels?.estimate != null), (m) => m.channels, addChannelVisits);
   const chEst = sumGa4(g, scope, (m) => m.convChannels?.estimate ?? null, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.s)));
   const channelNames = [...new Set([...chVisits.acc.keys()].map((k) => k.slice(k.indexOf('|') + 1)))].sort(
     (a, b) => sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${b}`) ?? 0) - sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${a}`) ?? 0)
@@ -186,7 +194,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                   items={[
                     ['비중', pctText(share(n ?? 0, visitTotal))],
                     // 괄호 안은 견적 전환율 (견적 완료 ÷ 방문)
-                    ['견적 완료', est === null ? PENDING : `${fmt(est)}회 (${pctText(share(est, n ?? 0))})`],
+                    ['견적 완료', est === null ? PENDING : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
                     ['주문 완료', ord === null ? PENDING : `${fmt(ord)}회`],
                   ]}
                 />
@@ -267,7 +275,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                       <React.Fragment key={d}>
                         <NumTd value={v} />
                         <NumTd value={e} fallback={PENDING} />
-                        <NumTd>{e === null ? '–' : pctText(share(e, v))}</NumTd>
+                        <NumTd>{e === null ? '–' : pctText(share(e, chVisitsForEst.acc.get(`${d}|${ch}`) ?? 0))}</NumTd>
                       </React.Fragment>
                     );
                   })}
@@ -281,7 +289,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                     <React.Fragment key={d}>
                       <NumTd value={v} bold />
                       <NumTd value={e} fallback={PENDING} bold />
-                      <NumTd bold>{e === null ? '–' : pctText(share(e, v))}</NumTd>
+                      <NumTd bold>{e === null ? '–' : pctText(share(e, sumBy(channelNames, (ch) => chVisitsForEst.acc.get(`${d}|${ch}`) ?? 0)))}</NumTd>
                     </React.Fragment>
                   );
                 })}
