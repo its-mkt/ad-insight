@@ -1,7 +1,7 @@
 # its-ad-insight 데이터 연동 설정 및 상시 자동화 가이드
 
 본 문서는 `its-ad-insight` 광고·견적 통합 대시보드의 **실제 데이터 연동 정보**와 **상시 무인 자동화(Zero-Touch) 아키텍처**를 기록한 문서입니다.  
-대시보드 스크립트([js/main.js](file:///C:/0.Project/its-ad-insight/js/main.js)) 내부에 해당 정보가 기본값으로 고정되어 있으므로, **별도의 "연결 설정" 버튼을 누르지 않아도 모든 사용자와 브라우저에서 자동으로 즉시 연동**됩니다.
+대시보드 스크립트([js/main.js](file:///C:/0.Project/ad-insight/js/main.js)) 내부에 해당 정보가 기본값으로 고정되어 있으므로, **별도의 "연결 설정" 버튼을 누르지 않아도 모든 사용자와 브라우저에서 자동으로 즉시 연동**됩니다.
 
 ---
 
@@ -33,7 +33,7 @@ flowchart TD
 ```
 
 1. **스크립트 고정 기본값 (Fallback)**:
-   - [js/main.js](file:///C:/0.Project/its-ad-insight/js/main.js)의 `DEFAULT_URL`과 `DEFAULT_KEY`에 위 연동 정보가 고정되어 있습니다.
+   - [js/main.js](file:///C:/0.Project/ad-insight/js/main.js)의 `DEFAULT_URL`과 `DEFAULT_KEY`에 위 연동 정보가 고정되어 있습니다.
    - `localStorage`나 `config.js`가 비어 있더라도 스크립트가 알아서 해당 주소로 통신합니다.
 2. **0초 SWR(Stale-While-Revalidate) 로컬 캐싱**:
    - 한 번 받아온 실데이터는 브라우저 로컬 저장소에 안전하게 보존됩니다.
@@ -70,7 +70,7 @@ flowchart TD
 
 만약 향후 구글 스프레드시트의 Apps Script를 새로 배포하여 웹앱 URL이나 비밀키가 변경되는 경우:
 1. **방법 1 (간편)**: 대시보드 우측 상단 톱니바퀴 아이콘을 클릭하여 새 URL과 비밀키를 입력하고 [저장 · 불러오기]를 누릅니다.
-2. **방법 2 (영구 고정)**: [js/main.js](file:///C:/0.Project/its-ad-insight/js/main.js) 상단의 `DEFAULT_URL`과 `DEFAULT_KEY`를 새 값으로 수정합니다.
+2. **방법 2 (영구 고정)**: [js/main.js](file:///C:/0.Project/ad-insight/js/main.js) 상단의 `DEFAULT_URL`과 `DEFAULT_KEY`를 새 값으로 수정합니다.
 
 ---
 
