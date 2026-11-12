@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteId, ViewId } from './types/dashboard';
 import { VALID_VIEWS, VIEW_TITLES } from './utils/constants';
-import { parseRoute, routePath } from './utils/route';
-
-/** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
-const APP_TITLE = '아이티스 광고 인사이트';
+import { normalizeRoutePath, parseRoute, routePath } from './utils/route';
 import { prevM, THIS_M, THIS_Y } from './utils/format';
 import { fetchDailyHist, siteConnected, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -38,6 +35,9 @@ import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
 import { LoginGate } from './components/common/LoginGate';
+
+/** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
+const APP_TITLE = '아이티스 광고 인사이트';
 
 function getInitialDark(): boolean {
   try {
@@ -75,9 +75,7 @@ export const App: React.FC = () => {
   const [isDark, setIsDark] = useState<boolean>(getInitialDark);
   // 처음 열 때 사이트가 없는 주소('/', 예전 '#quotes'·'#itket/quotes')는 같은 화면의 경로 주소로 바꿔 둔다
   useEffect(() => {
-    const { site: s, view, query } = parseRoute();
-    const path = routePath(s, view, query);
-    if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
+    normalizeRoutePath();
   }, []);
   // 사이트를 바꿔도 보던 화면은 그대로 두고 주소 앞부분만 바꾼다 (뒤로 가기로 돌아갈 수 있게 기록을 남긴다)
   const changeSite = (next: SiteId) => {
@@ -319,10 +317,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
     const onRouteChange = () => {
-      const { site: nextSite, view, query } = parseRoute();
       // 예전 해시 주소('#quotes')를 직접 입력해도 경로 주소로 맞춘다
-      const path = routePath(nextSite, view, query);
-      if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
+      const { site: nextSite, view, query } = normalizeRoutePath();
       setSite(nextSite);
       setCurrentView(view);
       if (view === 'search') setSearchQuery(query);

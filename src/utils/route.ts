@@ -43,6 +43,14 @@ export function routePath(site: SiteId, view: ViewId, query = ''): string {
   return `/${site}/${view}${view === 'search' && query ? `?q=${encodeURIComponent(query)}` : ''}`;
 }
 
+/** 지금 주소가 정식 경로와 다르면(사이트 없는 '/', 예전 해시 '#quotes' 등) 기록을 남기지 않고 정식 경로로 바꾼다. 읽은 경로를 돌려준다 */
+export function normalizeRoutePath(): Route {
+  const route = parseRoute();
+  const path = routePath(route.site, route.view, route.query);
+  if (window.location.pathname + window.location.search + window.location.hash !== path) window.history.replaceState(null, '', path);
+  return route;
+}
+
 /** 새로고침 없이 앱 안의 다른 주소로 간다 — App 이 popstate 를 듣고 화면을 바꾼다 */
 export function navigateTo(path: string): void {
   window.history.pushState(null, '', path);
