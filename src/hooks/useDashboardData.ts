@@ -183,6 +183,17 @@ export function quoteStatsOf(
   };
 }
 
+/** quoteStatsOf 를 견적 원본이 바뀔 때만 다시 계산한다 (화면마다 같은 메모를 복사하지 않게) */
+export function useQuoteStats(
+  data: Pick<DashboardData, 'quotes' | 'quotesRaw' | 'quotesExtra'> & Partial<Pick<DashboardData, 'quotesSites' | 'quotesPhone'>>
+): { quotes: QuoteRow[]; quotesRaw: QuoteRawRow[] } {
+  const { quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone } = data;
+  return useMemo(
+    () => quoteStatsOf({ quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone }),
+    [quotes, quotesRaw, quotesExtra, quotesSites, quotesPhone]
+  );
+}
+
 /**
  * 건수 통계용 다른 사이트·전화문의 행(고객 정보 없음)에 원본 행의 SNO·제목·회사·작성자·연락처를 붙인다.
  * 원본(quotes_raw_sites·quotes_phone)을 받은 경우에만 채워지고, 분류·유입 경로 등 집계 값은 통계 행 그대로 둔다.
@@ -194,7 +205,9 @@ function withExtraDetails(extra: QuoteRawRow[], sites: QuoteRawRow[], phone: Quo
   const pool = new Map<string, QuoteRawRow[]>();
   const put = (site: string, r: QuoteRawRow) => {
     const k = keyOf(site, r.date, r.salesRep);
-    pool.set(k, [...(pool.get(k) || []), r]);
+    const bucket = pool.get(k);
+    if (bucket) bucket.push(r);
+    else pool.set(k, [r]);
   };
   sites.forEach((r) => r.site && put(r.site, r));
   phone.forEach((r) => put('phone', r));

@@ -125,8 +125,20 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
     ...(cat2Parts.some((c) => !c) && cat2Parts.some(Boolean) ? [NO_CAT2] : []),
   ];
   // 1차 목록 뒤에 붙는 2차 개수 — 이 기간에 실제로 고를 수 있는 2차만 센다 ('전체'·'2차 없음' 제외). 없으면 표시하지 않는다
+  // 1차 옵션마다 행 전체를 다시 훑지 않게 1차별 2차 목록을 한 번에 모아 둔다
+  const cat2ByCat1 = useMemo(() => {
+    const out = new Map<string, Set<string>>();
+    rows.forEach((r) => {
+      const { cat1: c1, cat2: c2 } = catsOf(r);
+      if (!c2) return;
+      const set = out.get(c1);
+      if (set) set.add(c2);
+      else out.set(c1, new Set([c2]));
+    });
+    return out;
+  }, [rows]);
   const cat2CountHint = (c1: string): string | undefined => {
-    const count = new Set(rows.filter((r) => catsOf(r).cat1 === c1).map((r) => catsOf(r).cat2).filter(Boolean)).size;
+    const count = cat2ByCat1.get(c1)?.size ?? 0;
     return count ? `· ${count}` : undefined;
   };
   const repNames = [...new Set(rows.map(repOf))].filter((v) => v !== NO_REP).sort((a, b) => a.localeCompare(b, 'ko'));

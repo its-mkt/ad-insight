@@ -60,6 +60,25 @@ export const mLabel = (mo?: string): string => {
 export const sumBy = <T>(rows: T[], f: (r: T) => number): number =>
   rows.reduce((a, r) => a + f(r), 0);
 
+/**
+ * 행을 달(YYYY-MM)·연도(YYYY) 키별로 한 번에 나눠, rows.filter((r) => r.month.startsWith(key)) 와 같은 결과를 찾아 주는 함수를 돌려준다.
+ * 같은 행 목록을 키마다 다시 훑지 않기 위한 것 — 돌려받은 배열은 고치지 말고 읽기만 한다. 달·연도 형식이 아닌 키는 직접 거른다
+ */
+export function rowsByPeriod<T extends { month: string }>(rows: T[]): (key: string) => T[] {
+  const index = new Map<string, T[]>();
+  const put = (k: string, r: T) => {
+    const list = index.get(k);
+    if (list) list.push(r);
+    else index.set(k, [r]);
+  };
+  rows.forEach((r) => {
+    if (r.month.length >= 4) put(r.month.slice(0, 4), r);
+    if (r.month.length >= 7) put(r.month.slice(0, 7), r);
+  });
+  const EMPTY: T[] = [];
+  return (key) => (key.length === 4 || key.length === 7 ? index.get(key) || EMPTY : rows.filter((r) => r.month.startsWith(key)));
+}
+
 export const niceMax = (v: number): number => {
   if (v <= 0) return 1;
   const p = 10 ** Math.floor(Math.log10(v));
@@ -284,9 +303,23 @@ export function buildCategoryMap(mapping: MappingRow[]): CategoryMap {
   return map;
 }
 
+/** catsOf 결과 — 분류표(CategoryMap)마다, 매체·캠페인·광고그룹이 같으면 결과도 같으므로 한 번만 분류한다 */
+const catsCache = new WeakMap<CategoryMap, Map<string, CategoryWeight[]>>();
+
+/** 광고 행의 표준 카테고리와 비율 — 돌려받은 배열은 여러 곳이 함께 쓰므로 고치지 말고 읽기만 한다 */
 export function catsOf(map: CategoryMap, r: SpendRow): CategoryWeight[] {
   const camp = r.campaign.trim();
   const grp = r.adgroup.trim();
+  let cache = catsCache.get(map);
+  if (!cache) catsCache.set(map, (cache = new Map()));
+  const key = `${r.media}\u0001${camp}\u0001${grp}`;
+  let out = cache.get(key);
+  if (!out) cache.set(key, (out = classifyCats(map, r.media, camp, grp)));
+  return out;
+}
+
+function classifyCats(map: CategoryMap, media: string, camp: string, grp: string): CategoryWeight[] {
+  const r = { media };
   const hit =
     map.get([r.media, camp, grp].join('\u0001')) || map.get([r.media, camp, ''].join('\u0001'));
   // mapping 시트에 예전 분류(서버·워크스테이션·스토리지…)만 남아 있으면 새 카테고리 체계로 다시 계산한다

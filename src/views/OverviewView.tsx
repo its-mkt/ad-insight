@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SpendRow, SyncStatus } from '../types/dashboard';
 import {
+  rowsByPeriod,
   buildCategoryBarItems,
   buildSourceShareData,
   catSum,
@@ -17,7 +18,7 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteStatsOf } from '../hooks/useDashboardData';
+import { quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
 import type { SameDateCompare } from '../utils/dayData';
@@ -76,7 +77,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   sameDate,
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
-  const stats = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
+  const stats = useQuoteStats(data);
   const trendStats = useMemo(() => (monthly ? quoteStatsOf(monthly) : stats), [monthly, stats]);
   const hasSpend = data.spend.length > 0;
   const hasQuotes = data.quotes.length > 0;
@@ -201,9 +202,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const allSiteDetail = siteBreak(stats.quotesRaw);
 
   const spendAxis = allPeriod ? spendYears : months;
+  const spendAt = rowsByPeriod((monthly ?? data).spend);
   const spendSeries = SERIES_DEFS.map((s) => ({
     ...s,
-    raw: spendAxis.map((key) => sumBy((monthly ?? data).spend.filter((r) => r.month.startsWith(key)).filter(s.f), (r) => r.cost)),
+    raw: spendAxis.map((key) => sumBy(spendAt(key).filter(s.f), (r) => r.cost)),
   }))
     .filter((s) => s.raw.some((v) => v))
     .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
@@ -212,12 +214,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const yrQuoteRows = allPeriod ? trendStats.quotes : trendStats.quotes.filter((r) => r.month >= ym(+yr, 1) && r.month <= curM);
   const quoteAxis = allPeriod ? quoteYears : months;
   const quoteCats = quoteChartCats(yrQuoteRows);
+  const quoteAt = rowsByPeriod(yrQuoteRows);
   const quoteSeries = quoteCats.keys
     .map((k, ci) => ({
       k,
       c: quoteSeriesColor(k, ci),
       v: quoteAxis.map((key) =>
-        yrQuoteRows.filter((r) => r.month.startsWith(key) && quoteCats.keyOf(r.category) === k).reduce((a, r) => a + r.count, 0)
+        quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k).reduce((a, r) => a + r.count, 0)
       ),
     }))
     .filter((s) => s.v.some((x) => x));

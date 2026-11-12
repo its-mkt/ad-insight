@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type {
   AdRow,
   CategoryMap,
@@ -69,6 +69,34 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const [kwTabIdx, setKwTabIdx] = useState<number>(0);
   const catState = useCategoryFilterState();
 
+  const pass = (r: { media: string; type: string }) =>
+    (media === 'all' || r.media === media) && r.type === type;
+
+  // 기준월·기간 행·키워드 그룹은 캠페인 탭·카테고리 필터를 바꿀 때 다시 셀 필요가 없어 기간·매체·유형이 바뀔 때만 계산한다
+  const base = useMemo(() => {
+    const ms = [...new Set(data.spend.map((r) => r.month))].sort();
+    const mo =
+      (selectedMonth && ms.includes(selectedMonth) ? selectedMonth : undefined) ||
+      selectedMonth ||
+      ms.filter((m) => m <= THIS_M).pop() ||
+      ms[ms.length - 1] ||
+      THIS_M;
+    const periodMonths = yearTotal ? monthsUpTo(mo) : [mo];
+    const inPeriod = allPeriod ? () => true : inMonths(periodMonths);
+    const rows = data.spend.filter((r) => inPeriod(r) && pass(r));
+    // 키워드 그룹 집계 (SA) - 선택된 기간 기준 집계
+    const monthKs = data.keywords.filter((k) => inPeriod(k) && pass(k));
+    const ks = allPeriod || yearTotal ? mergeKeywordMonths(monthKs) : monthKs;
+    // 키워드 실적이 있는 가장 이른 달 — 이보다 앞선 달은 키워드 재구성 전이라 비어 있다
+    const kwFirstMonth = data.keywords.reduce<string | undefined>((min, k) => (pass(k) && (min === undefined || k.month < min) ? k.month : min), undefined);
+    // 그룹 줄은 광고그룹 전체 실적(위 KPI 와 같은 값)으로 — 네이버는 키워드 확장·중지·삭제 키워드 실적이 키워드 목록에 없어 키워드 합이 더 작다.
+    // 일·기간 보기는 광고비만 그 기간으로 바뀌고 키워드는 월 단위라 맞지 않으므로 키워드 합을 그대로 쓴다
+    const allGroups = period || !ks.length ? groupKeywordRows(ks) : withGroupTotals(groupKeywordRows(ks), rows, true);
+    return { mo, periodMonths, inPeriod, rows, kwFirstMonth, allGroups };
+    // pass 는 media·type 으로만 정해진다
+  }, [data.spend, data.keywords, media, type, selectedMonth, allPeriod, yearTotal, period]);
+  const { mo, periodMonths, inPeriod, rows, kwFirstMonth, allGroups } = base;
+
   if (!data.keywords.length && !data.spend.length) {
     return (
       <View name="keywords" title="키워드 · 소재">
@@ -85,19 +113,6 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     );
   }
 
-  const pass = (r: { media: string; type: string }) =>
-    (media === 'all' || r.media === media) && r.type === type;
-
-  const ms = [...new Set(data.spend.map((r) => r.month))].sort();
-  const mo =
-    (selectedMonth && ms.includes(selectedMonth) ? selectedMonth : undefined) ||
-    selectedMonth ||
-    ms.filter((m) => m <= THIS_M).pop() ||
-    ms[ms.length - 1] ||
-    THIS_M;
-  const periodMonths = yearTotal ? monthsUpTo(mo) : [mo];
-  const inPeriod = allPeriod ? () => true : inMonths(periodMonths);
-  const rows = data.spend.filter((r) => inPeriod(r) && pass(r));
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
   const totalClk  = rows.reduce((s, r) => s + r.clk, 0);
   const totalImp  = rows.reduce((s, r) => s + r.imp, 0);
@@ -151,17 +166,6 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   // 1차/2차 카테고리 필터 — ck에 실제로 존재하는 값만 노출
   const catFilter = buildCategoryFilter(ck, catState);
 
-  // 키워드 그룹 집계 (SA) - 선택된 기간 기준 집계
-  const monthKs = data.keywords.filter((k) => inPeriod(k) && pass(k));
-  const ks = allPeriod || yearTotal ? mergeKeywordMonths(monthKs) : monthKs;
-  // 키워드 실적이 있는 가장 이른 달 — 이보다 앞선 달은 키워드 재구성 전이라 비어 있다
-  const kwFirstMonth = data.keywords
-    .filter(pass)
-    .map((k) => k.month)
-    .sort()[0];
-  // 그룹 줄은 광고그룹 전체 실적(위 KPI 와 같은 값)으로 — 네이버는 키워드 확장·중지·삭제 키워드 실적이 키워드 목록에 없어 키워드 합이 더 작다.
-  // 일·기간 보기는 광고비만 그 기간으로 바뀌고 키워드는 월 단위라 맞지 않으므로 키워드 합을 그대로 쓴다
-  const allGroups = period || !ks.length ? groupKeywordRows(ks) : withGroupTotals(groupKeywordRows(ks), rows, true);
 
   // 카테고리 필터 — 광고그룹의 매핑 카테고리로 판단해 키워드 그룹과 주요 · 확장 소재에 똑같이 적용
   const inCategory = (g: { media: string; campaign: string; adgroup: string }) =>

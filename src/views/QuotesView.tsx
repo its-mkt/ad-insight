@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/dashboard';
 import {
+  rowsByPeriod,
   buildSourceShareData,
   fmt,
   mLabel,
@@ -13,7 +14,7 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteDetailsPending, quoteStatsOf } from '../hooks/useDashboardData';
+import { quoteDetailsPending, quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
 import type { SameDateCompare } from '../utils/dayData';
@@ -75,7 +76,7 @@ const ORIGIN_COLORS: Record<string, string> = {
 export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, sameDate }) => {
   const { isLoggedIn } = useAuth();
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
-  const { quotes, quotesRaw } = useMemo(() => quoteStatsOf(data), [data.quotes, data.quotesRaw, data.quotesExtra, data.quotesSites, data.quotesPhone]);
+  const { quotes, quotesRaw } = useQuoteStats(data);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
   const [mode, setMode] = useState<ChartTableMode>('chart');
   const trendQuotes = trend?.quotes ?? quotes;
@@ -262,9 +263,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const listPeriod = period ? period.label : allPeriod ? '전체 기간' : kpiLabel;
   // 접수처 비중 — 아래 접수 목록과 같은 기간·같은 행으로 센다. 전화문의 시트 건은 시트의 경로(전화·톡플러스·메일)로 나눈다
   // 주요 접수처는 건수가 0이어도 남겨 어디가 비었는지 보이게 한다
-  const originItems = [...new Set([...(isOtherSite ? [] : ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스']), ...listRows.map(originOf)])]
+  const originCounts = new Map<string, number>();
+  listRows.forEach((r) => {
+    const o = originOf(r);
+    originCounts.set(o, (originCounts.get(o) || 0) + 1);
+  });
+  const originItems = [...new Set([...(isOtherSite ? [] : ['itket', 'zbyhp', 'cadkorea', '전화', '톡플러스']), ...originCounts.keys()])]
     .map((k) => {
-      const count = listRows.filter((r) => originOf(r) === k).length;
+      const count = originCounts.get(k) || 0;
       return { k, c: ORIGIN_COLORS[k] || '--c-etc', count, v: listRows.length ? Math.round((count / listRows.length) * 1000) / 10 : 0 };
     })
     .sort((a, b) => b.count - a.count);
@@ -273,13 +279,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
   // 추이 차트: 건수 상위 6개 1차 카테고리 + 그 외
   const chartCats = quoteChartCats(yrQuotes);
+  const yrQuotesAt = rowsByPeriod(yrQuotes);
   const series = chartCats.keys
     .map((k, ci) => ({
       k,
       c: quoteSeriesColor(k, ci),
       v: axisKeys.map((key) =>
         sumBy(
-          yrQuotes.filter((r) => r.month.startsWith(key) && chartCats.keyOf(r.category) === k),
+          yrQuotesAt(key).filter((r) => chartCats.keyOf(r.category) === k),
           (r) => r.count
         )
       ),
@@ -293,7 +300,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
       c: '--acc',
       v: axisKeys.map((key) =>
         sumBy(
-          yrQuotes.filter((r) => r.month.startsWith(key) && cat1Of(r.category || '기타') === k),
+          yrQuotesAt(key).filter((r) => cat1Of(r.category || '기타') === k),
           (r) => r.count
         )
       ),

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { DashboardData, SpendRow, SyncStatus } from '../types/dashboard';
 import {
+  rowsByPeriod,
   fmt,
   fmtWon,
   mLabel,
@@ -90,10 +91,10 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   const allMonths12 = allPeriod ? yearKeys : yearMonths12;
   const isFuture = (mo: string) => !allPeriod && Y === THIS_Y && mo > months[months.length - 1];
   // 키는 달(YYYY-MM) 또는 전체 기간의 연도(YYYY)
-  const at = (key: string) => data.spend.filter((r) => r.month.startsWith(key));
+  const at = rowsByPeriod(data.spend);
   const colLabel = (key: string) => (allPeriod ? `${key}년` : mLabel(key));
   const tot = (mo: string) => sumBy(at(mo), (r) => r.cost);
-  const trendAt = (key: string) => trendSpend.filter((r) => r.month.startsWith(key));
+  const trendAt = rowsByPeriod(trendSpend);
   const trendTot = (mo: string) => sumBy(trendAt(mo), (r) => r.cost);
   const man = (mo: string, item: string) =>
     sumBy(

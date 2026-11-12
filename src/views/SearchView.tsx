@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { CategoryMap, DashboardData, KeywordRow, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { cat1Of, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
+import { rowsByPeriod, cat1Of, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
@@ -263,10 +263,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
     ? yearsOf([...chartSpend.map((r) => r.month), ...chartQuotes.map((r) => r.month)])
     : monthsUpTo(selectedMonth);
   const axisLabels = axis.map((key) => (allPeriod ? `${key}년` : mLabel(key)));
+  const chartSpendAt = rowsByPeriod(chartSpend);
+  const chartQuotesAt = rowsByPeriod(chartQuotes);
   const spendSeries = SERIES_DEFS.map((s) => ({
     k: s.k,
     c: s.c,
-    raw: axis.map((key) => sumBy(chartSpend.filter((r) => r.month.startsWith(key)).filter(s.f), (r) => r.cost)),
+    raw: axis.map((key) => sumBy(chartSpendAt(key).filter(s.f), (r) => r.cost)),
   }))
     .filter((s) => s.raw.some((v) => v))
     .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
@@ -276,7 +278,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       k,
       c: quoteSeriesColor(k, i),
       v: axis.map((key) =>
-        sumBy(chartQuotes.filter((r) => r.month.startsWith(key) && quoteCats.keyOf(r.category) === k), (r) => r.count)
+        sumBy(chartQuotesAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
       ),
     }))
     .filter((s) => s.v.some((x) => x));
@@ -334,7 +336,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     if ((cmpLabel || !items.length) && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
     return items.length ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['건수', '0건']]} />;
   };
-  const monthlyTotal = axis.map((key) => sumBy(chartQuotes.filter((r) => r.month.startsWith(key)), (r) => r.count));
+  const monthlyTotal = axis.map((key) => sumBy(chartQuotesAt(key), (r) => r.count));
 
   return (
     <View name="search" title={TITLE}>

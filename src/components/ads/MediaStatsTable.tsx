@@ -493,19 +493,27 @@ const STATS_TABS = {
 
 type StatsTabId = (typeof STATS_TABS)['SA'][number]['id'];
 
-/** 기간 안에 그 매체·구분의 실적(광고비·노출·클릭)이 있는지 — 없으면 탭을 누를 수 없게 한다 */
-const hasStats = (rows: SpendRow[], media: 'Naver' | 'Google', segment: SaSegment) =>
-  rows.some((r) => r.media === media && inSegment(r, segment) && (r.cost > 0 || r.imp > 0 || r.clk > 0));
+/** 기간 안에 실적(광고비·노출·클릭)이 있는 "매체|구분" 목록 — 탭마다 행 전체를 다시 훑지 않게 한 번에 모은다 */
+const statKeysOf = (rows: SpendRow[]): Set<string> => {
+  const keys = new Set<string>();
+  rows.forEach((r) => {
+    if (!(r.cost > 0 || r.imp > 0 || r.clk > 0)) return;
+    const segment: SaSegment | null = r.type === 'DA' ? 'display' : r.type === 'SA' ? (isShoppingRow(r) ? 'shopping' : 'search') : null;
+    if (segment) keys.add(`${r.media}|${segment}`);
+  });
+  return keys;
+};
 
 /** 매체별 성과 표 — 오른쪽 위 SA·DA 전환 + 매체 탭(SA: 네이버·구글·쇼핑검색, DA: 네이버·구글) */
 export const MediaStatsTabs: React.FC<MediaStatsTabsProps> = (props) => {
   const [adType, setAdType] = useState<'SA' | 'DA'>('SA');
   const [tabId, setTabId] = useState<StatsTabId>('naver');
-  // 기간을 바꿔 DA 실적이 모두 없어지면 SA 로 본다
-  const shownType = adType === 'DA' && !STATS_TABS.DA.some((t) => hasStats(props.rows, t.media, t.segment)) ? 'SA' : adType;
-  const list: readonly { id: StatsTabId; media: 'Naver' | 'Google'; segment: SaSegment; label: string }[] = STATS_TABS[shownType];
+  const statKeys = useMemo(() => statKeysOf(props.rows), [props.rows]);
   // 기간 안에 실적이 없는 탭은 막는다. DA 탭이 모두 비면 DA 전환 자체를 막는다
-  const hasData = (t: { media: 'Naver' | 'Google'; segment: SaSegment }) => hasStats(props.rows, t.media, t.segment);
+  const hasData = (t: { media: 'Naver' | 'Google'; segment: SaSegment }) => statKeys.has(`${t.media}|${t.segment}`);
+  // 기간을 바꿔 DA 실적이 모두 없어지면 SA 로 본다
+  const shownType = adType === 'DA' && !STATS_TABS.DA.some(hasData) ? 'SA' : adType;
+  const list: readonly { id: StatsTabId; media: 'Naver' | 'Google'; segment: SaSegment; label: string }[] = STATS_TABS[shownType];
   const daEmpty = !STATS_TABS.DA.some(hasData);
   // 고른 탭이 없거나(DA 로 바꿨을 때 쇼핑검색) 실적이 없으면 실적이 있는 첫 탭으로
   const picked = list.find((t) => t.id === tabId);

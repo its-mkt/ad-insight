@@ -70,13 +70,21 @@ const restOf = (g: KeywordGroup) => {
 const REST_TITLE =
   '광고그룹 실적에서 키워드 실적 합을 뺀 값입니다. 키워드 확장으로 노출된 검색어, 삭제되거나 수집 전에 중지된 키워드, 쇼핑검색(상품 단위 입찰)처럼 키워드가 없는 광고의 실적은 광고그룹에만 집계됩니다.';
 
-/** 그룹 합계 — 따로 받은 실적이 있으면 그 값, 없으면 키워드 합 */
-const groupTotals = (g: KeywordGroup) =>
-  g.totals || {
-    imp: g.list.reduce((sum, k) => sum + k.imp, 0),
-    clk: g.list.reduce((sum, k) => sum + k.clk, 0),
-    conv: g.list.reduce((sum, k) => sum + k.conv, 0),
-  };
+/** 그룹 합계 — 따로 받은 실적이 있으면 그 값, 없으면 키워드 합. 정렬 비교마다 다시 더하지 않게 그룹별로 기억해 둔다 */
+const groupTotalsCache = new WeakMap<KeywordGroup, { imp: number; clk: number; conv: number }>();
+const groupTotals = (g: KeywordGroup) => {
+  if (g.totals) return g.totals;
+  let t = groupTotalsCache.get(g);
+  if (!t) {
+    t = {
+      imp: g.list.reduce((sum, k) => sum + k.imp, 0),
+      clk: g.list.reduce((sum, k) => sum + k.clk, 0),
+      conv: g.list.reduce((sum, k) => sum + k.conv, 0),
+    };
+    groupTotalsCache.set(g, t);
+  }
+  return t;
+};
 
 const getGroupMetric = (g: KeywordGroup, key: SortKey) => {
   if (key === 'cost') return g.cost;
@@ -181,7 +189,11 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
     setVisibleCount(10);
   }
 
-  const displayGroups = selectedCamp ? selectedCamp.groups : topGroups.slice(0, visibleCount);
+  // slice 가 렌더마다 새 배열을 만들면 아래 정렬 메모가 매번 다시 돌므로 함께 메모한다
+  const displayGroups = useMemo(
+    () => (selectedCamp ? selectedCamp.groups : topGroups.slice(0, visibleCount)),
+    [selectedCamp, topGroups, visibleCount]
+  );
   const sortedDisplayGroups = useMemo(() => {
     const list = [...displayGroups];
     const groupName = (g: KeywordGroup) => (selectedCamp ? g.adgroup : `${g.campaign} › ${g.adgroup}`);
@@ -381,7 +393,8 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                   const groupKey = `${g.media}-${g.campaign}-${g.adgroup}`;
                   const isOpen = openGroups.has(groupKey);
                   const isKwExpanded = expandedKwGroups.has(groupKey);
-                  const allSortedKws = [...g.list].sort((a, b) => {
+                  // 닫힌 그룹은 키워드 목록을 그리지 않으므로 정렬하지 않는다
+                  const allSortedKws = !isOpen ? g.list : [...g.list].sort((a, b) => {
                     if (sortKey === 'name') {
                       const c = a.keyword.localeCompare(b.keyword);
                       return sortOrder === 'desc' ? -c : c;
