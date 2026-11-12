@@ -38,6 +38,8 @@
 | 비로그인에 가리는 화면 안내 | `LoginGate` |
 | 마우스를 올리면 뜨는 설명 (요소 감싸기) | `Tooltip` (`common/Tooltip`, 표 머리글은 `Th` 의 `tip`) |
 | 더보기·접기 | `MoreButton`, `ShowMoreButton` |
+| 펼침 줄 Set 상태 토글 / 비중 % 표기 | `setX((prev) => toggledSet(prev, key))` (`utils/toggleSet`), `pctLabel` (`utils/format`) |
+| 메뉴·목록을 바깥 클릭·Esc 로 닫기 | `useDismiss(ref, open, close)` (`hooks/useDismiss`) |
 | 뱃지 | `StatusBadge`, `MediaPill` |
 | 매핑 흐름도 이름표 | `Chip` |
 | 흐린 보조 글자 / "(진행 중)" | `Muted` (`small`, 문단은 `as="p"`), `PendingTag` |
