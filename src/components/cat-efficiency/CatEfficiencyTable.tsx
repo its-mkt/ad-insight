@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { toggledSet } from '../../utils/toggleSet';
 import type { CatEfficiencyItem } from './types';
 import { fmt, sumBy } from '../../utils/format';
 import { TableFootnote } from '../common/TableFootnote';
@@ -47,11 +48,7 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
 
 
   const toggleParent = (key: string) =>
-    setOpenParents((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+    setOpenParents((prev) => toggledSet(prev, key));
 
   // 1차·2차 카테고리 그룹화
   const parentGroups = useMemo((): ParentGroup[] => {

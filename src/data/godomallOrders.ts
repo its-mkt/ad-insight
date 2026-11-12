@@ -39,7 +39,12 @@ export interface GodoGoodsRow {
 /** 달별 판매 제품 (결제완료일 기준). 고객별 일회성 결제 상품은 수집 단계에서 '개별 결제 상품'으로 묶는다. 시트 godo_goods_monthly 에서 받는다 */
 export const GODOMALL_GOODS: Record<string, GodoGoodsRow[]> = {};
 
+/** 제품 목록·주문 줄을 새로 받을 때마다 1씩 오른다 — 이 둘로 만든 값을 기억해 두는 쪽이 다시 계산할 때를 안다 */
+let goodsVersion = 0;
+export const godoGoodsVersion = (): number => goodsVersion;
+
 export function applyGodoGoods(rows: { month?: unknown; goods_no?: unknown; goods_name?: unknown; orders?: unknown; qty?: unknown; amount?: unknown }[]): void {
+  goodsVersion++;
   Object.keys(GODOMALL_GOODS).forEach((month) => delete GODOMALL_GOODS[month]);
   rows.forEach((r) => {
     const month = String(r.month ?? '').slice(0, 7);
@@ -92,6 +97,7 @@ export interface GodoOrderLine {
 export const GODOMALL_ORDER_LINES: GodoOrderLine[] = [];
 
 export function applyGodoOrderLines(rows: Record<string, unknown>[]): void {
+  goodsVersion++;
   GODOMALL_ORDER_LINES.length = 0;
   const s = (v: unknown) => String(v ?? '');
   rows.forEach((r) => {
@@ -152,6 +158,8 @@ export interface GodoDailyRow {
 
 /** GA4 와 같은 기준으로 비교하는 일별 주문 건수. 시트 godo_orders_daily 에서 받으며, 주문이 있는 날만 있다 */
 export const GODOMALL_DAILY: GodoDailyRow[] = [];
+/** 일별 판매의 첫 날짜 (없으면 '') — 판매 건수를 셀 때마다 다시 찾지 않게 받을 때 한 번 구한다 */
+let dailyFirst = '';
 
 export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?: unknown; not_web?: unknown }[]): void {
   GODOMALL_DAILY.length = 0;
@@ -159,6 +167,7 @@ export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?:
     const date = String(r.date ?? '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(date)) GODOMALL_DAILY.push({ date, paid: Number(r.paid) || 0, reached: Number(r.reached) || 0, notWeb: Number(r.not_web) || 0 });
   });
+  dailyFirst = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
 }
 
 /** 지금 보고 있는 사이트 — 고도몰 주문은 아이티켓 것이라 다른 사이트에서는 판매 건수를 내지 않는다 (useDashboardData 가 데이터와 함께 맞춘다) */
@@ -167,7 +176,6 @@ export function setSalesSite(site: SiteId): void {
   salesSite = site;
 }
 
-/** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
 /** 판매를 세는 마지막 날 — 로그인하지 않으면 어제까지만 센다 (App 이 정한다, 빈 값이면 제한 없음) */
 let SALES_CUTOFF = '';
 export const setSalesCutoff = (day: string) => {
@@ -175,6 +183,7 @@ export const setSalesCutoff = (day: string) => {
 };
 export const salesCutoff = () => SALES_CUTOFF;
 
+/** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
 export function salesInMonths(months: string[]): number | null {
   if (salesSite !== 'itket') return null;
   if (SALES_CUTOFF) {
@@ -189,7 +198,7 @@ export function salesInMonths(months: string[]): number | null {
 /** 날짜 범위('YYYY-MM-DD', 양끝 포함)의 판매 건수 합. 일별 값은 주문이 있는 날만 있으므로, 수집 시작일 이후 범위면 빈 날은 0건으로 본다 */
 export function salesInRange(from: string, to: string): number | null {
   if (salesSite !== 'itket') return null;
-  const first = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
+  const first = dailyFirst;
   if (!first || to < first) return null;
   const end = SALES_CUTOFF && SALES_CUTOFF < to ? SALES_CUTOFF : to;
   return GODOMALL_DAILY.reduce((sum, r) => (r.date >= from && r.date <= end ? sum + r.paid : sum), 0);

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
 import { useAuth } from '../../context/AuthContext';
 import { User } from 'lucide-react';
 import { SkelBar } from '../common/SkeletonView';
@@ -13,24 +14,8 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin })
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 바깥 클릭 시 닫기
-  useEffect(() => {
-    if (!open) return;
-    const handleDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', handleDown);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleDown);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
+  // 바깥 클릭·Esc 로 닫기
+  useDismiss(containerRef, open, () => setOpen(false));
 
   const avatar = user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : (user?.name || user?.email || 'A')[0].toUpperCase();
 

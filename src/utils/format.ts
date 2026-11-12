@@ -79,6 +79,9 @@ export function rowsByPeriod<T extends { month: string }>(rows: T[]): (key: stri
   return (key) => (key.length === 4 || key.length === 7 ? index.get(key) || EMPTY : rows.filter((r) => r.month.startsWith(key)));
 }
 
+/** 비중 표기 — 정수면 그대로, 아니면 소수 첫째 자리까지 ('12%', '12.5%') */
+export const pctLabel = (v: number): string => `${Number.isInteger(v) ? v : v.toFixed(1)}%`;
+
 export const niceMax = (v: number): number => {
   if (v <= 0) return 1;
   const p = 10 ** Math.floor(Math.log10(v));

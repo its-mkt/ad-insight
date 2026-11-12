@@ -1,7 +1,7 @@
 import React from 'react';
 import type { SourceShareItem } from '../../types/dashboard';
 
-import { sourceTone } from '../../utils/format';
+import { pctLabel, sourceTone } from '../../utils/format';
 import { BarDelta } from '../common/BarDelta';
 import { EmptyState } from '../common/EmptyState';
 
@@ -46,7 +46,6 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
     );
   }
 
-  const fmtPct = (v: number) => (Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`);
   // 점유율 증감(%p): 기간 길이와 무관해 진행 중인 달에도 공정하게 비교된다
   const deltaOf = (s: SourceShareItem) =>
     compareLabel && s.prevV != null ? Math.round((s.v - s.prevV) * 10) / 10 : null;
@@ -73,9 +72,9 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
         const d = deltaOf(s);
         // 막대마다 따로 툴팁: 굵은 막대는 기준 기간, 얇은 막대는 비교 기간 값
         const curTip = `${curLabel ? `${s.k} · ${curLabel}` : s.k}|${
-          s.count != null ? `${s.count.toLocaleString('ko-KR')}건 (${fmtPct(s.v)})` : fmtPct(s.v)
+          s.count != null ? `${s.count.toLocaleString('ko-KR')}건 (${pctLabel(s.v)})` : pctLabel(s.v)
         }`;
-        const prevTip = `${s.k} · ${compareLabel}|${(s.prevCount ?? 0).toLocaleString('ko-KR')}건 (${fmtPct(s.prevV ?? 0)})`;
+        const prevTip = `${s.k} · ${compareLabel}|${(s.prevCount ?? 0).toLocaleString('ko-KR')}건 (${pctLabel(s.prevV ?? 0)})`;
         const tone = colorTop !== undefined && idx >= colorTop ? { bar: 'var(--c-rest)' } : itemColors ? { bar: `var(${s.c})` } : sourceTone(s.k);
         return (
         <div key={s.k} className={`src-bar-row${compareLabel ? ' has-prev' : ''}`}>
@@ -109,7 +108,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
               {/* 비교 모드: 기준 기간 점유율은 굵은 막대 끝에 붙이고 오른쪽 점유율 열은 두지 않는다 */}
               {compareLabel && (
                 <span className="src-bar-cur-val">
-                  {fmtPct(s.v)}
+                  {pctLabel(s.v)}
                   {s.count != null && (
                     <span className="src-bar-cur-count">({s.count.toLocaleString('ko-KR')}건)</span>
                   )}
@@ -128,7 +127,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
                   data-tip={prevTip}
                 />
                 <span className="src-bar-prev-val">
-                  {fmtPct(s.prevV ?? 0)}
+                  {pctLabel(s.prevV ?? 0)}
                   {/* 전월 데이터가 없는 매체(0건)는 점유율만 둔다 */}
                   {(s.prevCount ?? 0) > 0 && (
                     <span className="src-bar-prev-count">({(s.prevCount ?? 0).toLocaleString('ko-KR')}건)</span>
@@ -141,7 +140,7 @@ export const SourceBarChart: React.FC<SourceBarChartProps> = ({
             {!compareLabel && s.count != null && (
               <span className="count">{s.count.toLocaleString('ko-KR')}건</span>
             )}
-            {!compareLabel && <span className="pct">{fmtPct(s.v)}</span>}
+            {!compareLabel && <span className="pct">{pctLabel(s.v)}</span>}
             {compareLabel && (
               <BarDelta d={d} />
             )}

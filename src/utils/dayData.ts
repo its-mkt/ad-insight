@@ -5,9 +5,22 @@ import { inDayRange, monthsOfRange, previousRange, type DayRange } from './dayRa
 const DAILY_MEDIA = ['Google', 'Naver'];
 type DailyCoverage = Pick<DashboardData, 'spend' | 'spendDaily' | 'dailyRecentFrom' | 'dailyHistMonths' | 'dailyLoadedMonths'>;
 
+/** 월 광고비가 있는 "매체|달" — 같은 광고비 목록이면 한 번만 모은다 */
+const spendKeysCache = new WeakMap<DailyCoverage['spend'], Set<string>>();
+const spendKeysOf = (spend: DailyCoverage['spend']): Set<string> => {
+  let keys = spendKeysCache.get(spend);
+  if (!keys) {
+    keys = new Set(spend.map((r) => `${r.media}|${r.month}`));
+    spendKeysCache.set(spend, keys);
+  }
+  return keys;
+};
+
 /** 그 달에 월 광고비가 있는 매체 — 집행이 없던 매체는 일별 자료를 요구하지 않는다 */
-const mediaOfMonth = (data: DailyCoverage, month: string): string[] =>
-  DAILY_MEDIA.filter((m) => data.spend.some((r) => r.media === m && r.month === month));
+const mediaOfMonth = (data: DailyCoverage, month: string): string[] => {
+  const keys = spendKeysOf(data.spend);
+  return DAILY_MEDIA.filter((m) => keys.has(`${m}|${month}`));
+};
 
 /** 일·기간 전체의 광고비가 일별 자료로 갖춰졌는지 — 아니면 월 단위로 보여 준다 */
 export function rangeCovered(data: DailyCoverage, range: DayRange): boolean {

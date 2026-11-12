@@ -4,7 +4,7 @@ import { adStatKey, type AdStat } from './creativeImage';
 import { catsOf, parseCatParts } from './format';
 import { inDayRange, type DayRange } from './dayRange';
 import { goodsCategoryOf } from './categoryText';
-import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
+import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, godoGoodsVersion, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
 
@@ -51,8 +51,17 @@ export interface SearchSaleLine extends GodoOrderLine {
   category: string;
 }
 
-/** 판매 주문 줄에 제품명·카테고리를 붙인다. 제품명은 그 달 판매 제품 목록의 이름, 없으면 다른 달의 이름 */
+/** saleLinesWithGoods 결과 — 검색어와 무관해 제품 목록·주문 줄이 바뀔 때만 다시 만든다 (검색 한 번에 여러 번 부른다) */
+let saleLinesCache: { version: number; lines: SearchSaleLine[] } | null = null;
+
+/** 판매 주문 줄에 제품명·카테고리를 붙인다 (돌려받은 배열은 읽기만 한다). 제품명은 그 달 판매 제품 목록의 이름, 없으면 다른 달의 이름 */
 function saleLinesWithGoods(): SearchSaleLine[] {
+  const version = godoGoodsVersion();
+  if (saleLinesCache?.version !== version) saleLinesCache = { version, lines: buildSaleLines() };
+  return saleLinesCache.lines;
+}
+
+function buildSaleLines(): SearchSaleLine[] {
   const byMonth = new Map<string, string>();
   const byNo = new Map<string, string>();
   Object.entries(GODOMALL_GOODS).forEach(([month, rows]) =>

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { toggledSet } from '../utils/toggleSet';
 import type { CategoryMap, DashboardData, KeywordRow, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { rowsByPeriod, cat1Of, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
+import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, mLabel, prevM, quoteSeriesColor, quoteChartCats, SERIES_DEFS, sourceColorVar, sumBy } from '../utils/format';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
@@ -162,12 +163,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const [campTab, setCampTab] = useState(0);
   const [openQuotes, setOpenQuotes] = useState<Set<string>>(new Set());
   const toggleQuote = (key: string) =>
-    setOpenQuotes((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setOpenQuotes((prev) => toggledSet(prev, key));
   const adGroups = useMemo(() => (result ? resultAdGroups(result) : []), [result]);
   const campaigns = useMemo(() => campaignBuckets(adGroups), [adGroups]);
   const adCreatives = useMemo(() => groupAdsByAdgroup((result?.ads || []).map((a) => a.ad)), [result]);
@@ -323,7 +319,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const srcShare = sourceScope ? sourceShareIn(months) : null;
   const srcSharePrev =
     sourceScope && !allPeriod ? sourceShareIn(yearTotal ? sameMonthsLastYear(months || []) : [prevM(selectedMonth)]) : null;
-  const fmtShare = (v: number | null) => (v == null ? '–' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`);
+  const fmtShare = (v: number | null) => (v == null ? '–' : pctLabel(v));
   const topRow = (rows: [string, number][], skip: string) => rows.find(([k]) => k !== skip);
   const topCat = topRow(breakdowns[0].rows, '기타');
   const topRep = topRow(breakdowns[3].rows, '미지정');

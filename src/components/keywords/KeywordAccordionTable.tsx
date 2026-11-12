@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
+import { toggledSet } from '../../utils/toggleSet';
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../../types/dashboard';
 import { ctrText as ctr, fmt, mLabel, THIS_M } from '../../utils/format';
 import { MediaPill } from '../common/MediaPill';
@@ -130,21 +132,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('cost');
 
   // 더보기 목록: 바깥 클릭·Esc 로 닫는다
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!tabBarRef.current?.contains(e.target as Node)) setMoreOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMoreOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [moreOpen]);
+  useDismiss(tabBarRef, moreOpen, () => setMoreOpen(false));
 
   const toggleGroup = (groupKey: string) => {
     setOpenGroups((prev) => {
@@ -165,15 +153,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
   };
 
   const toggleExpandKwGroup = (groupKey: string) => {
-    setExpandedKwGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupKey)) {
-        next.delete(groupKey);
-      } else {
-        next.add(groupKey);
-      }
-      return next;
-    });
+    setExpandedKwGroups((prev) => toggledSet(prev, groupKey));
   };
 
   // 같은 캠페인 이름이 Google·Naver 양쪽에 있으면 한 탭으로 합치고, 탭 오른쪽에 매체 아이콘을 모두 붙인다

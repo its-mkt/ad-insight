@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CategoryBarItem } from '../../types/dashboard';
-import { fmt } from '../../utils/format';
+import { fmt, pctLabel } from '../../utils/format';
 import { BarDelta } from '../common/BarDelta';
 
 import { EmptyState } from '../common/EmptyState';
@@ -53,7 +53,7 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
   const full = hidePrev ? 100 : 70;
   const hasShare = (totalCur ?? 0) > 0;
   const shareOf = (v: number, total?: number) => (total && total > 0 ? Math.round((v / total) * 1000) / 10 : null);
-  const fmtPct = (v: number | null) => (v == null ? '' : Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`);
+  const fmtPct = (v: number | null) => (v == null ? '' : pctLabel(v));
   const wOf = (v: number) => (v > 0 ? Math.max(1.5, (v / max) * full) : 0);
 
   return (

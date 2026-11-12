@@ -99,6 +99,8 @@ export const App: React.FC = () => {
   }, [data, guest]);
   const baseData = guestClip ? guestClip.data : data;
   const isLoading = !hasData && (status === 'init' || isSyncing) && !loginOnlyView;
+  // 데이터 화면을 그릴 수 있는 상태 (첫 동기화 스켈레톤·온코어 연결 전 안내가 아닐 때)
+  const viewReady = !isLoading && !oncorePending;
 
   const allMonths = useMemo(() => {
     return [
@@ -213,11 +215,15 @@ export const App: React.FC = () => {
   // 키워드 연도 합계는 당월 키워드가 이미 빠져 있어 그대로 보여 준다
   const guestLocked = guest && monthlyOnlyView && !allPeriod && viewMonth === THIS_M && (!yearTotal || (currentView !== 'keywords' && !guestYearMonth));
   const monthlyViewMonth = currentView !== 'keywords' && guestYearMonth ? guestYearMonth : viewMonth;
-  const showPrevMonth = () => {
-    const pm = prevM(THIS_M);
+  // 일·기간, '전체', 연도 합계 선택을 모두 푼다 (달을 고르거나 기간을 되돌릴 때)
+  const clearPeriodModes = () => {
     setSearchDay(null);
     setAllPeriodOn(false);
     setYearTotalOn(false);
+  };
+  const showPrevMonth = () => {
+    const pm = prevM(THIS_M);
+    clearPeriodModes();
     setSelectedYear(pm.slice(0, 4));
     setSelectedMonth(pm);
   };
@@ -426,16 +432,12 @@ export const App: React.FC = () => {
               onSelectYear={setSelectedYear}
               periodChanged={!!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
               onResetPeriod={() => {
-                setSearchDay(null);
-                setAllPeriodOn(false);
-                setYearTotalOn(false);
+                clearPeriodModes();
                 setSelectedYear(String(THIS_Y));
                 setSelectedMonth(THIS_M);
               }}
               onSelectMonth={(m) => {
-                setSearchDay(null);
-                setAllPeriodOn(false);
-                setYearTotalOn(false);
+                clearPeriodModes();
                 setSelectedMonth(m);
               }}
               allPeriod={allPeriod}
@@ -477,7 +479,7 @@ export const App: React.FC = () => {
                   variant={currentView === 'keywords' ? 'table' : 'dashboard'}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'overview' && (
+              {viewReady && currentView === 'overview' && (
                 <OverviewView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   categoryMap={categoryMap}
@@ -488,7 +490,7 @@ export const App: React.FC = () => {
                   onSearchName={searchFromName}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'ads' && (
+              {viewReady && currentView === 'ads' && (
                 <AdsView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   status={status}
@@ -497,7 +499,7 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'cat-efficiency' && (
+              {viewReady && currentView === 'cat-efficiency' && (
                 <CatEfficiencyView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
@@ -507,7 +509,7 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {guestLocked && !isLoading && !oncorePending && (
+              {guestLocked && viewReady && (
                 <LoginGate
                   name={currentView}
                   title={currentView === 'keywords' ? '키워드 · 소재 성과' : VIEW_TITLES[currentView]}
@@ -525,7 +527,7 @@ export const App: React.FC = () => {
                   alt={{ label: `${+prevM(THIS_M).slice(5, 7)}월 보기`, onClick: showPrevMonth }}
                 />
               )}
-              {!guestLocked && !isLoading && !oncorePending && currentView === 'keywords' && (
+              {!guestLocked && viewReady && currentView === 'keywords' && (
                 <KeywordsView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
@@ -536,7 +538,7 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {!isLoading && !oncorePending && currentView === 'quotes' && (
+              {viewReady && currentView === 'quotes' && (
                 <QuotesView monthly={period ? baseData : undefined} period={period}
                   data={viewData}
                   status={status}
@@ -547,12 +549,12 @@ export const App: React.FC = () => {
                 />
               )}
               {/* 구매 상세·기기별 통계는 아이티켓 고도몰 주문·GA4 기준이라 다른 사이트에서는 연결 전 안내 */}
-              {!isLoading && !oncorePending && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
+              {viewReady && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
                 <OncoreView status={status} viewTitle={VIEW_TITLES[currentView]} />
               )}
-              {!guestLocked && !isLoading && !oncorePending && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
-              {!guestLocked && !isLoading && !oncorePending && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
-              {!isLoading && !oncorePending && currentView === 'search' && (
+              {!guestLocked && viewReady && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
+              {!guestLocked && viewReady && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
+              {viewReady && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}
                   data={viewData}

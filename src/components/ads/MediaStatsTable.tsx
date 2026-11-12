@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { toggledSet } from '../../utils/toggleSet';
 import type { SpendRow } from '../../types/dashboard';
 import { ctrText, fmt } from '../../utils/format';
 import { EXTERNAL_LINKS } from '../../utils/constants';
@@ -177,12 +178,7 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
   // 줄을 누르면 그 아래에 비교 기간 대비 증감 줄이 펼쳐진다 (처음에는 모두 접힘)
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
   const toggleRow = (key: string) =>
-    setOpenRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setOpenRows((prev) => toggledSet(prev, key));
   /** 펼칠 수 있는 줄 + (펼쳤으면) 증감 줄 */
   const accRow = (
     key: string,
@@ -375,12 +371,7 @@ export const MediaStatsTable: React.FC<MediaStatsTableProps> = ({
     });
 
   const toggle = (key: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setOpen((prev) => toggledSet(prev, key));
 
   const colCount = withDelta ? 10 : 9;
   const id = cardId || (segment === 'shopping' ? 'media-stats-naver-shopping' : `media-stats-${media.toLowerCase()}`);

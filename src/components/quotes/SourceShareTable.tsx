@@ -1,6 +1,6 @@
 import React from 'react';
 import type { SourceShareItem } from '../../types/dashboard';
-import { sumBy } from '../../utils/format';
+import { pctLabel, sumBy } from '../../utils/format';
 import { EmptyState } from '../common/EmptyState';
 import { NumTd, TotalRow } from '../common/TableRows';
 import { Th } from '../common/Th';
@@ -20,8 +20,6 @@ interface SourceShareTableProps {
   children?: React.ReactNode;
 }
 
-const pctText = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1)}%`;
-
 /** 비중 표 — 이름·건수·점유율 (기본은 유입 매체) */
 export const SourceShareTable: React.FC<SourceShareTableProps> = ({ items, emptyMessage, tableId = 'tbQuoteSource', nameLabel = '매체', total, children }) => {
   if (!items.length) return <EmptyState message={emptyMessage} />;
@@ -39,7 +37,7 @@ export const SourceShareTable: React.FC<SourceShareTableProps> = ({ items, empty
           <tr key={s.k}>
             <td>{s.k}</td>
             <NumTd value={s.count ?? 0} unit="건" />
-            <NumTd>{pctText(s.v)}</NumTd>
+            <NumTd>{pctLabel(s.v)}</NumTd>
           </tr>
         ))}
         <TotalRow>
