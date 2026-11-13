@@ -168,16 +168,26 @@ begin
     raise exception 'login required' using errcode = '42501';
   end if;
 
-  with base as (
-    select u.*, public.usage_visit_key(u.ip, u.fp, u.device_id) as vkey
+  -- 같은 날 같은 브라우저(device_id)는 기기 키를 하나로 고정한다
+  -- (하루 중 IP 가 바뀌거나 창을 다른 모니터로 옮겨 화면 크기가 달라져도 1회)
+  with dkey as (
+    select visit_date, device_id, min(public.usage_visit_key(ip, fp, device_id)) as vkey
+    from public.usage_daily
+    where visit_date between p_from and p_to
+    group by visit_date, device_id
+  ),
+  base as (
+    select u.*, k.vkey
     from public.usage_daily u
+    join dkey k using (visit_date, device_id)
     where u.visit_date between p_from and p_to
       and (not p_exclude_logged_in
            or u.device_id not in (select distinct device_id from public.usage_daily where logged_in))
   ),
   cbase as (
-    select c.*, public.usage_visit_key(c.ip, c.fp, c.device_id) as vkey
+    select c.*, coalesce(k.vkey, public.usage_visit_key(c.ip, c.fp, c.device_id)) as vkey
     from public.usage_category_daily c
+    left join dkey k using (visit_date, device_id)
     where c.visit_date between p_from and p_to
       and (not p_exclude_logged_in
            or c.device_id not in (select distinct device_id from public.usage_daily where logged_in))
