@@ -2,7 +2,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from './supabase';
 
 /**
  * 이용 현황 기록·조회 (Supabase usage_daily — supabase/usage.sql).
- * 방문은 같은 기기(브라우저)를 하루 1회로 서버에서 센다. 여기서는 화면 열기와 실제로 본 시간만 보낸다.
+ * 방문은 같은 기기(접속 IP + 기기 특징)를 하루 1회로 서버에서 센다. 여기서는 화면 열기와 실제로 본 시간만 보낸다.
  */
 
 const DEVICE_KEY = 'adi_device_id';
@@ -41,6 +41,46 @@ function deviceId(): string {
   return memoryDeviceId;
 }
 
+let memoryFp = '';
+
+/**
+ * 기기 특징 — 같은 기기라면 브라우저·시크릿 창·인앱 브라우저가 달라도 같은 값 (예: pc-win-1920x1080-8).
+ * 맨 앞은 기기 종류(pc·tab·mob)로 이용 현황의 PC/태블릿/모바일 대수에 쓴다.
+ * 서버가 접속 IP 와 묶어 방문(하루 1회)을 세는 기기 키로 쓴다. 개인을 식별하는 값은 넣지 않는다
+ */
+function deviceFp(): string {
+  if (memoryFp) return memoryFp;
+  const ua = navigator.userAgent;
+  const touch = navigator.maxTouchPoints > 1;
+  // 휴대폰은 가로·세로로 돌리면 폭·높이가 바뀌므로 큰 쪽을 앞에 둔다
+  const w = Math.round(screen.width || 0);
+  const h = Math.round(screen.height || 0);
+  const long = Math.max(w, h);
+  const short = Math.min(w, h);
+  let os: string;
+  let kind: 'pc' | 'tab' | 'mob';
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && touch)) {
+    // 아이패드 사파리는 맥으로 자신을 알리므로 터치 여부로 가른다
+    os = 'ios';
+    kind = 'tab';
+  } else if (/iPhone|iPod/.test(ua)) {
+    os = 'ios';
+    kind = 'mob';
+  } else if (/Android/.test(ua)) {
+    // 안드로이드 휴대폰 브라우저는 UA 에 Mobile 이 붙고, 태블릿은 붙지 않는다
+    os = 'and';
+    kind = /Mobile/.test(ua) ? 'mob' : 'tab';
+  } else if (/Windows|Macintosh|Mac OS X|Linux|CrOS/.test(ua)) {
+    os = /Windows/.test(ua) ? 'win' : /Mac/.test(ua) ? 'mac' : 'lnx';
+    kind = 'pc';
+  } else {
+    os = 'etc';
+    kind = !touch ? 'pc' : short >= 600 ? 'tab' : 'mob';
+  }
+  memoryFp = `${kind}-${os}-${long}x${short}-${navigator.hardwareConcurrency || 0}`;
+  return memoryFp;
+}
+
 /** 로그인 토큰 — 창을 닫을 때도 바로 보낼 수 있게 미리 들고 있는다 */
 let accessToken = '';
 if (USAGE_TRACKING_ON) {
@@ -61,7 +101,7 @@ function send(view: string, pageview: boolean, seconds: number): void {
     method: 'POST',
     headers,
     keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds) }),
+    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
   }).catch(() => {
     // 기록 실패는 무시한다
   });
@@ -76,7 +116,7 @@ function sendCategory(view: string, category: string, pick: boolean, seconds: nu
     method: 'POST',
     headers,
     keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds) }),
+    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
   }).catch(() => {
     // 기록 실패는 무시한다 (함수가 아직 없어도 화면에는 영향 없다)
   });
@@ -182,8 +222,8 @@ export interface UsageStats {
   categorySince: string | null;
   /** 기간 안의 서로 다른 기기 수 */
   devices: number;
-  /** 기간 안의 서로 다른 IP 수 */
-  ips: number;
+  /** 기기 종류별 대수 (unknown = 기기 종류를 기록하기 전 옛 기록, 화면의 '미수집') — 집계 SQL 을 다시 실행하기 전이면 null */
+  deviceKinds: { pc: number; tablet: number; mobile: number; unknown: number } | null;
   /** 수집을 시작한 날 (기록이 없으면 null) */
   since: string | null;
 }
@@ -198,7 +238,8 @@ export async function loadUsageStats(
     const setupNeeded = error.code === 'PGRST202' || /could not find the function|schema cache/i.test(error.message);
     return { ok: false, setupNeeded, message: error.message };
   }
-  const raw = (data || {}) as Partial<Pick<UsageStats, 'daily' | 'views' | 'devices' | 'ips' | 'since'>> & {
+  const raw = (data || {}) as Partial<Pick<UsageStats, 'daily' | 'views' | 'devices' | 'since'>> & {
+    device_kinds?: Partial<Record<'pc' | 'tablet' | 'mobile' | 'unknown', unknown>> | null;
     categories?: Partial<UsageByCategory>[];
     category_groups?: Partial<UsageByCategory>[];
     category_since?: string | null;
@@ -217,7 +258,9 @@ export async function loadUsageStats(
       daily: (raw.daily || []).map((d) => ({ date: String(d.date), visits: num(d.visits), pageviews: num(d.pageviews), seconds: num(d.seconds) })),
       views: (raw.views || []).map((v) => ({ view: String(v.view), visits: num(v.visits), pageviews: num(v.pageviews), seconds: num(v.seconds) })),
       devices: num(raw.devices),
-      ips: num(raw.ips),
+      deviceKinds: raw.device_kinds
+        ? { pc: num(raw.device_kinds.pc), tablet: num(raw.device_kinds.tablet), mobile: num(raw.device_kinds.mobile), unknown: num(raw.device_kinds.unknown) }
+        : null,
       since: raw.since ? String(raw.since) : null,
       categories: raw.categories ? raw.categories.map(cat) : null,
       categoryGroups: (raw.category_groups || []).map(cat),
