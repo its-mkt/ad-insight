@@ -25,9 +25,13 @@ function releaseInfo(): { tag: string; commit: string } {
 }
 const release = releaseInfo();
 
+/** 로컬 데이터 파일 요청 — 배포 경로(/ad-insight/)가 붙은 주소와 붙지 않은 주소 모두 */
+const LOCAL_DATA_URL = /^(\/ad-insight)?\/data\/latest\.json/;
+
 export default defineConfig(({ command }) => ({
-  // 화면 주소가 /itket/quotes 처럼 깊어져도 파일을 루트 기준으로 찾게 한다 (배포 주소가 도메인 루트)
-  base: '/',
+  // 배포 주소가 공용 도메인 아래 경로(https://its.itket.com/ad-insight/)라 파일을 그 경로 기준으로 찾는다.
+  // 화면 주소가 /ad-insight/itket/quotes 처럼 깊어져도 같다. 개발 서버도 같은 경로(localhost:2000/ad-insight/)로 연다
+  base: '/ad-insight/',
   // 로컬 개발 서버에서는 배포본과 헷갈리지 않게 -dev 를 붙인다
   define: {
     __APP_RELEASE__: JSON.stringify(command === 'serve' ? `${release.tag}-dev` : release.tag),
@@ -39,7 +43,7 @@ export default defineConfig(({ command }) => ({
       name: 'serve-local-data-and-config',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url?.startsWith('/data/latest.json')) {
+          if (LOCAL_DATA_URL.test(req.url || '')) {
             const filePath = path.resolve(__dirname, 'data/latest.json');
             if (fs.existsSync(filePath)) {
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -60,7 +64,7 @@ export default defineConfig(({ command }) => ({
       },
       configurePreviewServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url?.startsWith('/data/latest.json')) {
+          if (LOCAL_DATA_URL.test(req.url || '')) {
             const filePath = path.resolve(__dirname, 'data/latest.json');
             if (fs.existsSync(filePath)) {
               res.setHeader('Content-Type', 'application/json; charset=utf-8');

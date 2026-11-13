@@ -3,6 +3,16 @@ import { VALID_VIEWS } from './constants';
 
 export const SITES: SiteId[] = ['itket', 'oncore'];
 
+/** 앱이 놓인 경로 — 공용 도메인 아래 '/ad-insight' (vite base, 끝 '/' 제외). 화면 경로는 이 뒤에 붙는다 */
+const BASE = import.meta.env.BASE_URL.replace(/\/+$/, '');
+
+/** 주소 경로에서 앱 경로('/ad-insight')를 뗀 화면 경로 — '/ad-insight/itket/quotes' → '/itket/quotes' */
+function stripBase(pathname: string): string {
+  if (!BASE) return pathname;
+  if (pathname === BASE) return '/';
+  return pathname.startsWith(`${BASE}/`) ? pathname.slice(BASE.length) : pathname;
+}
+
 /** 지금 열 수 있는 사이트 — 막힌 사이트 주소는 아이티켓으로 연다 (온코어 수집기가 아직 연결 전이면 화면에서 안내를 보여 준다) */
 export const SITE_ENABLED: Record<SiteId, boolean> = { itket: true, oncore: true };
 
@@ -34,13 +44,13 @@ export function parseRoute(loc: Pick<Location, 'pathname' | 'search' | 'hash'> =
     const [path, params = ''] = hash.split('?');
     return routeOf(path, params);
   }
-  return routeOf(loc.pathname, loc.search.replace(/^\?/, ''));
+  return routeOf(stripBase(loc.pathname), loc.search.replace(/^\?/, ''));
 }
 
-/** 사이트·화면·검색어 → 주소 경로. 종합 요약은 사이트만('/itket') */
+/** 사이트·화면·검색어 → 주소 경로(앱 경로 포함). 종합 요약은 사이트만('/ad-insight/itket') */
 export function routePath(site: SiteId, view: ViewId, query = ''): string {
-  if (view === 'overview') return `/${site}`;
-  return `/${site}/${view}${view === 'search' && query ? `?q=${encodeURIComponent(query)}` : ''}`;
+  if (view === 'overview') return `${BASE}/${site}`;
+  return `${BASE}/${site}/${view}${view === 'search' && query ? `?q=${encodeURIComponent(query)}` : ''}`;
 }
 
 /** 지금 주소가 정식 경로와 다르면(사이트 없는 '/', 예전 해시 '#quotes' 등) 기록을 남기지 않고 정식 경로로 바꾼다. 읽은 경로를 돌려준다 */

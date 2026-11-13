@@ -41,7 +41,7 @@ async function fetchLatest(): Promise<boolean> {
   for (let m = THIS_M; m >= GA4_ORDER_SOURCES_AS_OF.slice(0, 7); m = prevM(m)) months.unshift(m);
   const files = await Promise.all(
     months.map((m) =>
-      fetch(`https://raw.githubusercontent.com/its-mkt/itket-analytics/main/data/ga4/${m}.json`)
+      fetch(`https://raw.githubusercontent.com/its-mkt/analytics/main/data/ga4/${m}.json`)
         .then((res): Promise<Ga4MonthFile | null> | null => (res.ok ? res.json() : null))
         .catch(() => null),
     ),
