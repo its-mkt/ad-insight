@@ -216,7 +216,20 @@ begin
       ) v
     ), '[]'::json),
     'devices', (select count(distinct vkey) from base),
-    'ips', (select count(distinct ip) from base),
+    'ips', (select count(distinct ip) from base),  -- 화면에서는 안 쓰지만 옛 화면 호환으로 남긴다
+    -- 기기 종류별 대수 — 기기 키의 fp 앞부분(OS)으로 나눈다. fp 가 없는 옛 기록은 unknown
+    'device_kinds', (
+      select json_build_object(
+        'pc', count(distinct vkey) filter (where kind in ('win', 'mac', 'lnx')),
+        'mobile', count(distinct vkey) filter (where kind in ('ios', 'and')),
+        'other', count(distinct vkey) filter (where kind = 'etc'),
+        'unknown', count(distinct vkey) filter (where kind is null)
+      )
+      from (
+        select vkey, case when vkey like 'd:%' then null else split_part(split_part(vkey, '|', 2), '-', 1) end as kind
+        from base
+      ) k
+    ),
     'since', (select min(visit_date) from public.usage_daily),
     -- 카테고리 키별 ('1차' / '1차 > 2차')
     'categories', coalesce((

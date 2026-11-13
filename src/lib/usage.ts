@@ -210,8 +210,8 @@ export interface UsageStats {
   categorySince: string | null;
   /** 기간 안의 서로 다른 기기 수 */
   devices: number;
-  /** 기간 안의 서로 다른 IP 수 */
-  ips: number;
+  /** 기기 종류별 대수 (unknown = 종류 기록 전 옛 기록) — 집계 SQL 을 다시 실행하기 전이면 null */
+  deviceKinds: { pc: number; mobile: number; other: number; unknown: number } | null;
   /** 수집을 시작한 날 (기록이 없으면 null) */
   since: string | null;
 }
@@ -226,7 +226,8 @@ export async function loadUsageStats(
     const setupNeeded = error.code === 'PGRST202' || /could not find the function|schema cache/i.test(error.message);
     return { ok: false, setupNeeded, message: error.message };
   }
-  const raw = (data || {}) as Partial<Pick<UsageStats, 'daily' | 'views' | 'devices' | 'ips' | 'since'>> & {
+  const raw = (data || {}) as Partial<Pick<UsageStats, 'daily' | 'views' | 'devices' | 'since'>> & {
+    device_kinds?: Partial<Record<'pc' | 'mobile' | 'other' | 'unknown', unknown>> | null;
     categories?: Partial<UsageByCategory>[];
     category_groups?: Partial<UsageByCategory>[];
     category_since?: string | null;
@@ -245,7 +246,9 @@ export async function loadUsageStats(
       daily: (raw.daily || []).map((d) => ({ date: String(d.date), visits: num(d.visits), pageviews: num(d.pageviews), seconds: num(d.seconds) })),
       views: (raw.views || []).map((v) => ({ view: String(v.view), visits: num(v.visits), pageviews: num(v.pageviews), seconds: num(v.seconds) })),
       devices: num(raw.devices),
-      ips: num(raw.ips),
+      deviceKinds: raw.device_kinds
+        ? { pc: num(raw.device_kinds.pc), mobile: num(raw.device_kinds.mobile), other: num(raw.device_kinds.other), unknown: num(raw.device_kinds.unknown) }
+        : null,
       since: raw.since ? String(raw.since) : null,
       categories: raw.categories ? raw.categories.map(cat) : null,
       categoryGroups: (raw.category_groups || []).map(cat),
