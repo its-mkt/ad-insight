@@ -222,8 +222,8 @@ export interface UsageStats {
   categorySince: string | null;
   /** 기간 안의 서로 다른 기기 수 */
   devices: number;
-  /** 기기 종류별 대수 (종류 기록 전 옛 기록은 빠진다) — 집계 SQL 을 다시 실행하기 전이면 null */
-  deviceKinds: { pc: number; tablet: number; mobile: number } | null;
+  /** 기기 종류별 대수 (unknown = 기기 종류를 기록하기 전 옛 기록, 화면의 '미수집') — 집계 SQL 을 다시 실행하기 전이면 null */
+  deviceKinds: { pc: number; tablet: number; mobile: number; unknown: number } | null;
   /** 수집을 시작한 날 (기록이 없으면 null) */
   since: string | null;
 }
@@ -239,7 +239,7 @@ export async function loadUsageStats(
     return { ok: false, setupNeeded, message: error.message };
   }
   const raw = (data || {}) as Partial<Pick<UsageStats, 'daily' | 'views' | 'devices' | 'since'>> & {
-    device_kinds?: Partial<Record<'pc' | 'tablet' | 'mobile', unknown>> | null;
+    device_kinds?: Partial<Record<'pc' | 'tablet' | 'mobile' | 'unknown', unknown>> | null;
     categories?: Partial<UsageByCategory>[];
     category_groups?: Partial<UsageByCategory>[];
     category_since?: string | null;
@@ -259,7 +259,7 @@ export async function loadUsageStats(
       views: (raw.views || []).map((v) => ({ view: String(v.view), visits: num(v.visits), pageviews: num(v.pageviews), seconds: num(v.seconds) })),
       devices: num(raw.devices),
       deviceKinds: raw.device_kinds
-        ? { pc: num(raw.device_kinds.pc), tablet: num(raw.device_kinds.tablet), mobile: num(raw.device_kinds.mobile) }
+        ? { pc: num(raw.device_kinds.pc), tablet: num(raw.device_kinds.tablet), mobile: num(raw.device_kinds.mobile), unknown: num(raw.device_kinds.unknown) }
         : null,
       since: raw.since ? String(raw.since) : null,
       categories: raw.categories ? raw.categories.map(cat) : null,

@@ -217,12 +217,13 @@ begin
     ), '[]'::json),
     'devices', (select count(distinct vkey) from base),
     'ips', (select count(distinct ip) from base),  -- 화면에서는 안 쓰지만 옛 화면 호환으로 남긴다
-    -- 기기 종류별 대수 — 기기 키의 fp 앞부분(pc·tab·mob)으로 나눈다. fp 가 없는 옛 기록은 어느 쪽에도 넣지 않는다
+    -- 기기 종류별 대수 — 기기 키의 fp 앞부분(pc·tab·mob)으로 나눈다. fp 가 없는 옛 기록은 unknown(화면의 '미수집')
     'device_kinds', (
       select json_build_object(
         'pc', count(distinct vkey) filter (where kind = 'pc'),
         'tablet', count(distinct vkey) filter (where kind = 'tab'),
-        'mobile', count(distinct vkey) filter (where kind = 'mob')
+        'mobile', count(distinct vkey) filter (where kind = 'mob'),
+        'unknown', count(distinct vkey) filter (where kind is null)  -- 화면의 '미수집'
       )
       from (
         select vkey, case when vkey like 'd:%' then null else split_part(split_part(vkey, '|', 2), '-', 1) end as kind
