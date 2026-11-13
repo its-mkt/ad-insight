@@ -27,8 +27,8 @@ type DashboardId = 'ad-insight' | 'analytics';
 
 /** 브랜드 선택 박스로 오가는 대시보드 — 개발 서버에서는 각 프로젝트의 로컬 서버, 배포본에서는 운영 주소로 간다 */
 const DASHBOARDS: { id: DashboardId; label: string; local: string; live: string }[] = [
-  { id: 'ad-insight', label: 'its-ad-insight', local: 'http://localhost:2000/', live: 'https://its-ad-insight.itket.com/' },
-  { id: 'analytics', label: 'its-analytics', local: 'http://localhost:1000/', live: 'https://its-analytics.itket.com/' },
+  { id: 'ad-insight', label: 'its-ad-insight', local: 'http://localhost:2000/ad-insight/', live: 'https://its.itket.com/ad-insight/' },
+  { id: 'analytics', label: 'its-analytics', local: 'http://localhost:1000/', live: 'https://its.itket.com/analytics/' },
 ];
 const DASHBOARD_OPTIONS: DropdownOption<DashboardId>[] = DASHBOARDS.map((d) => ({ value: d.id, label: d.label, title: import.meta.env.DEV ? d.local : d.live }));
 const goDashboard = (id: DashboardId) => {
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="brand" id="brand">
           <a
             className="brand-home"
-            href="/"
+            href={import.meta.env.BASE_URL}
             title="종합 요약으로"
             aria-label="종합 요약으로"
             onClick={(e) => {

@@ -177,7 +177,7 @@ export async function loadGa4Devices(months: string[]): Promise<Record<string, G
     wanted.map((m) => {
       let p = ga4Cache.get(m);
       if (!p) {
-        p = fetch(`https://raw.githubusercontent.com/its-mkt/itket-analytics/main/data/ga4/${m}.json`)
+        p = fetch(`https://raw.githubusercontent.com/its-mkt/analytics/main/data/ga4/${m}.json`)
           .then((res) => (res.ok ? (res.json() as Promise<Ga4MonthFile>) : null))
           .then((file) => (file?.total?.sessions ? parseGa4(file) : null))
           .catch(() => null);
