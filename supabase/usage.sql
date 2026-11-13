@@ -3,7 +3,7 @@
 -- Supabase 대시보드 > SQL Editor 에 붙여넣고 [Run] — 여러 번 실행해도 된다
 --
 -- 방문: 같은 기기(PC·휴대폰)는 하루(한국 시간)에 1회만 센다
---   기기는 '접속 IP + 기기 특징(fp: OS·화면 크기·CPU 코어 수)' 으로 판별한다
+--   기기는 '접속 IP + 기기 특징(fp: 기기 종류·OS·화면 크기·CPU 코어 수)' 으로 판별한다
 --   → 같은 기기에서 시크릿 창·다른 브라우저·인앱 브라우저로 열어도 1회
 --   (fp 가 없는 옛 기록은 브라우저 저장 ID(device_id) 로 센다)
 -- 기록은 track_usage 함수로만 넣고, 조회는 로그인한 계정만 usage_stats 함수로 한다
@@ -27,7 +27,7 @@ create table if not exists public.usage_daily (
 alter table public.usage_daily enable row level security;
 -- 정책을 두지 않아 anon·authenticated 모두 테이블에 직접 접근할 수 없다 (아래 함수만 쓴다)
 
-alter table public.usage_daily add column if not exists fp text;  -- 기기 특징 (브라우저와 무관, 예: win-1920x1080-8)
+alter table public.usage_daily add column if not exists fp text;  -- 기기 특징 (브라우저와 무관, 예: pc-win-1920x1080-8)
 
 -- 1-1. 요청 헤더의 접속 IP (없으면 null)
 create or replace function public.usage_client_ip() returns text
@@ -217,13 +217,12 @@ begin
     ), '[]'::json),
     'devices', (select count(distinct vkey) from base),
     'ips', (select count(distinct ip) from base),  -- 화면에서는 안 쓰지만 옛 화면 호환으로 남긴다
-    -- 기기 종류별 대수 — 기기 키의 fp 앞부분(OS)으로 나눈다. fp 가 없는 옛 기록은 unknown
+    -- 기기 종류별 대수 — 기기 키의 fp 앞부분(pc·tab·mob)으로 나눈다. fp 가 없는 옛 기록은 어느 쪽에도 넣지 않는다
     'device_kinds', (
       select json_build_object(
-        'pc', count(distinct vkey) filter (where kind in ('win', 'mac', 'lnx')),
-        'mobile', count(distinct vkey) filter (where kind in ('ios', 'and')),
-        'other', count(distinct vkey) filter (where kind = 'etc'),
-        'unknown', count(distinct vkey) filter (where kind is null)
+        'pc', count(distinct vkey) filter (where kind = 'pc'),
+        'tablet', count(distinct vkey) filter (where kind = 'tab'),
+        'mobile', count(distinct vkey) filter (where kind = 'mob')
       )
       from (
         select vkey, case when vkey like 'd:%' then null else split_part(split_part(vkey, '|', 2), '-', 1) end as kind

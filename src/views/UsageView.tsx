@@ -200,17 +200,14 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     const avgSec = visits ? seconds / visits : 0;
     const prevAvgSec = prevVisits ? prevSeconds / prevVisits : 0;
     const activeDays = cur.daily.filter((d) => d.visits > 0).length;
-    // 이용 기기 보조 줄 — PC·모바일 (0 인 기타·종류 기록 전은 숨긴다)
+    // 이용 기기 보조 줄 — PC·태블릿·모바일
     const kinds = cur.deviceKinds;
     const kindItems: [string, string][] = kinds
-      ? ([
-          ['PC', kinds.pc],
-          ['모바일', kinds.mobile],
-          ['기타', kinds.other],
-          ['구분 전', kinds.unknown],
-        ] as [string, number][])
-          .filter(([k, n]) => n > 0 || k === 'PC' || k === '모바일')
-          .map(([k, n]) => [k, `${fmt(n)}대`])
+      ? [
+          ['PC', `${fmt(kinds.pc)}대`],
+          ['태블릿', `${fmt(kinds.tablet)}대`],
+          ['모바일', `${fmt(kinds.mobile)}대`],
+        ]
       : [];
 
     body = (
@@ -418,7 +415,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     <View name="usage" title={TITLE}>
       <ViewHeader title={TITLE} description="직원들이 광고 인사이트를 얼마나 자주, 얼마나 오래 보는지 보여 줍니다." status="live" />
       <ViewNote>
-        ※ 방문은 같은 기기(PC·휴대폰)에서 하루(한국 시간)에 여러 번 열어도, 브라우저·시크릿 창이 달라도 1회로 셉니다. 이용 기기는 기간 동안 들어온 PC·휴대폰 대수입니다. 체류시간은 탭이 보이는 동안만 재고, 5분 넘게 조작이 없으면
+        ※ 방문은 같은 기기(PC·휴대폰)에서 하루(한국 시간)에 여러 번 열어도, 브라우저·시크릿 창이 달라도 1회로 셉니다. 이용 기기는 기간 동안 들어온 기기 대수이고, PC·태블릿·모바일로 나눠 보여 줍니다. 체류시간은 탭이 보이는 동안만 재고, 5분 넘게 조작이 없으면
         뺍니다. 개발 서버(localhost) 접속은 기록하지 않습니다. 기간은 위 기간 선택을 따르고, 진행 중인 달은 전월 같은 날짜까지와 비교합니다.{since && ` 수집 시작 ${since.replace(/-/g, '.')}.`}
         {!USAGE_TRACKING_ON && ' (지금 창은 개발 환경이라 기록되지 않습니다)'}
       </ViewNote>
