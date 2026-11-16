@@ -15,7 +15,7 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { loadUsageStats, USAGE_TRACKING_ON, type UsageDay, type UsageStats } from '../lib/usage';
 import { yearRangeLabel } from '../utils/allPeriod';
 import { VIEW_TITLES } from '../utils/constants';
-import { daysOfMonth, fromDayKey, lastDayOf, previousRange, rangeDays, rangeLabel, toDayKey, type DayRange } from '../utils/dayRange';
+import { daysOfMonth, fromDayKey, lastDayOf, rangeLabel, sameRangeLastMonth, toDayKey, type DayRange } from '../utils/dayRange';
 import { fmt, prevM } from '../utils/format';
 import { toggledSet } from '../utils/toggleSet';
 
@@ -82,7 +82,7 @@ function usagePeriodOf(month: string, allPeriod: boolean, yearTotal: boolean, da
   const clip = (r: DayRange): DayRange => ({ from: r.from, to: r.to > today ? today : r.to });
   if (dayRange) {
     const cur = clip(dayRange);
-    return { cur, prev: previousRange(cur), label: rangeLabel(cur), cmpLabel: `직전 ${rangeDays(cur)}일 대비` };
+    return { cur, prev: sameRangeLastMonth(cur), label: rangeLabel(cur), cmpLabel: '전월 동기간 대비' };
   }
   if (allPeriod) return { cur: { from: USAGE_START, to: today }, prev: null, label: '전체 기간' };
   if (yearTotal) {

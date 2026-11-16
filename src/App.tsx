@@ -29,12 +29,18 @@ import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import { dayPeriodOf, type DayRange } from './utils/dayRange';
+import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
 import { LoginGate } from './components/common/LoginGate';
+
+/** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
+const cmpRangeText = (r: DayRange): string => {
+  const prev = sameRangeLastMonth(r);
+  return `${rangeLabel(prev)}${rangeDays(prev) !== rangeDays(r) ? ` · ${rangeDays(prev)}일` : ''}`;
+};
 
 /** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
 const APP_TITLE = '아이티스 광고 인사이트';
@@ -465,7 +471,7 @@ export const App: React.FC = () => {
                   ? `${VIEW_TITLES[currentView]}는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : searchDay && !isSearchView && currentView !== 'admin' && currentView !== 'usage'
                   ? dayCovered
-                    ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
+                    ? `광고비·견적은 선택한 기간, 비교는 전월 동기간(${cmpRangeText(searchDay)}) 기준입니다 (키워드·소재 성과는 월 단위)`
                     : dailyLoading
                       ? '일별 데이터를 불러오는 중입니다…'
                       : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`

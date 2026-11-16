@@ -69,13 +69,22 @@ export const rangeLabel = (r: DayRange): string => {
 export const rangeDays = (r: DayRange): number =>
   Math.round((fromDayKey(r.to).getTime() - fromDayKey(r.from).getTime()) / 86400000) + 1;
 
-/** 바로 앞의 같은 일수 구간 — 8일을 고르면 그 직전 8일 (일·기간 보기의 비교 기준) */
-export const previousRange = (r: DayRange): DayRange => {
-  const to = fromDayKey(r.from);
-  to.setDate(to.getDate() - 1);
-  const from = new Date(to);
-  from.setDate(from.getDate() - (rangeDays(r) - 1));
-  return { from: toDayKey(from), to: toDayKey(to) };
+/**
+ * 전월 같은 날짜 구간 — 11.10~11.16 을 고르면 10.10~10.16 (일·기간 보기의 비교 기준, 2026-11-16 사용자 요청).
+ * 전월에 없는 날짜(29~31일)는 전월 말일로 맞춘다 — 3.29~3.31 → 2.28~2.28
+ */
+export const sameRangeLastMonth = (r: DayRange): DayRange => {
+  const shift = (day: string): string => {
+    let y = +day.slice(0, 4);
+    let m = +day.slice(5, 7) - 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    const month = ym(y, m);
+    return `${month}-${pad(Math.min(+day.slice(8, 10), daysOfMonth(month)))}`;
+  };
+  return { from: shift(r.from), to: shift(r.to) };
 };
 
 /** 일·기간 보기에서 화면 문구와 계산에 쓰는 값 */
@@ -84,15 +93,20 @@ export interface DayPeriod {
   label: string;
   /** 선택한 일수 */
   days: number;
-  /** 비교 문구 — '직전 8일' */
+  /** 비교 문구 — '전월 동기간' */
   cmpLabel: string;
   /** 선택한 날짜 범위 */
   range: DayRange;
+  /** 비교 범위 — 전월 같은 날짜 (말일은 전월 말일로 맞춤) */
+  prevRange: DayRange;
+  /** 비교 범위 일수 — 말일을 맞추면 선택한 일수보다 적을 수 있다 */
+  prevDays: number;
 }
 
 export const dayPeriodOf = (r: DayRange): DayPeriod => {
   const short = (day: string) => day.slice(5).replace('-', '.');
   const days = rangeDays(r);
   const label = r.from === r.to ? short(r.to) : r.from.slice(0, 4) === r.to.slice(0, 4) ? `${short(r.from)}~${short(r.to)}` : rangeLabel(r);
-  return { label, days, cmpLabel: `직전 ${days}일`, range: r };
+  const prevRange = sameRangeLastMonth(r);
+  return { label, days, cmpLabel: '전월 동기간', range: r, prevRange, prevDays: rangeDays(prevRange) };
 };
