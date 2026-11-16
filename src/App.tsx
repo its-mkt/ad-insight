@@ -9,7 +9,7 @@ import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
 import { PeriodNav } from './components/common/PeriodNav';
 import { lastMonthOfYear, TOTAL_PERIOD_VIEWS } from './utils/allPeriod';
-import { parseScope, type SearchTab } from './utils/search';
+import { categoryOfQuery, type SearchTab } from './utils/search';
 import { addRecentSearch, clearRecentSearches, loadFavoriteSearches, sameSearch, toggleFavoriteSearch } from './utils/recentSearches';
 import { Star } from 'lucide-react';
 import { SkeletonView } from './components/common/SkeletonView';
@@ -29,12 +29,18 @@ import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import { dayPeriodOf, type DayRange } from './utils/dayRange';
+import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
 import { LoginGate } from './components/common/LoginGate';
+
+/** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
+const cmpRangeText = (r: DayRange): string => {
+  const prev = sameRangeLastMonth(r);
+  return `${rangeLabel(prev)}${rangeDays(prev) !== rangeDays(r) ? ` · ${rangeDays(prev)}일` : ''}`;
+};
 
 /** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
 const APP_TITLE = '아이티스 광고 인사이트';
@@ -311,9 +317,9 @@ export const App: React.FC = () => {
   // 이용 현황 기록 — 화면(검색은 검색어)이 바뀔 때마다 페이지뷰 1회. 방문은 서버에서 기기당 하루 1회로 센다
   useEffect(() => {
     trackPageview(currentView);
-    // 검색창의 카테고리 필터나 종합 요약의 카테고리 이름으로 연 카테고리 검색('카테고리: 1차 › 2차')도 카테고리를 고른 것으로 1회 센다
-    const scope = currentView === 'search' ? parseScope(searchQuery) : null;
-    if (scope?.cat1) trackCategoryOpen(scope.cat2 ? `${scope.cat1} > ${scope.cat2}` : scope.cat1);
+    // 카테고리로 연 검색(검색창 카테고리 필터·종합 요약 카테고리 이름·카테고리 이름 입력)도 카테고리를 고른 것으로 1회 센다
+    const category = currentView === 'search' ? categoryOfQuery(searchQuery) : null;
+    if (category) trackCategoryOpen(category);
   }, [currentView, currentView === 'search' ? searchQuery : '']);
 
   // 설정·연동(데이터 연결·어드민 관리·이용 현황)은 로그인한 관리자만. 로그아웃하면 종합 요약으로, 로그인 없이 주소(#data·#admin)로 들어오면 종합 요약 + 로그인 모달
@@ -465,7 +471,7 @@ export const App: React.FC = () => {
                   ? `${VIEW_TITLES[currentView]}는 월 단위라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : searchDay && !isSearchView && currentView !== 'admin' && currentView !== 'usage'
                   ? dayCovered
-                    ? '광고비·견적은 선택한 기간, 비교는 직전 같은 일수 기준입니다 (키워드·소재 성과는 월 단위)'
+                    ? `광고비·견적은 선택한 기간, 비교는 전월 동기간(${cmpRangeText(searchDay)}) 기준입니다 (키워드·소재 성과는 월 단위)`
                     : dailyLoading
                       ? '일별 데이터를 불러오는 중입니다…'
                       : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`

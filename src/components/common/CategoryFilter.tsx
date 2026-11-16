@@ -12,12 +12,19 @@ export function useCategoryFilterState() {
     setCat1State(v);
     setCat2('');
   };
-  // 이용 현황 '카테고리별 이용' 기록 — 고른 카테고리와 그 상태로 본 시간. 화면을 떠나면 해제
+  useTrackCategoryFilter(cat1, cat2);
+  return { cat1, cat2, setCat1, setCat2 };
+}
+
+/**
+ * 이용 현황 '카테고리별 이용' 기록 — 고른 1차·2차 카테고리와 그 상태로 본 시간. 화면을 떠나면 해제.
+ * 카테고리 필터가 있는 표·화면마다 이 훅 하나로 기록한다 (빈 값은 전체)
+ */
+export function useTrackCategoryFilter(cat1: string, cat2: string): void {
   useEffect(() => {
-    trackCategoryFilter(cat2 ? `${cat1} > ${cat2}` : cat1);
+    trackCategoryFilter(cat1 ? (cat2 ? `${cat1} > ${cat2}` : cat1) : '');
   }, [cat1, cat2]);
   useEffect(() => () => trackCategoryFilter(''), []);
-  return { cat1, cat2, setCat1, setCat2 };
 }
 
 export interface CategoryFilterModel {

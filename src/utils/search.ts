@@ -4,6 +4,7 @@ import { adStatKey, type AdStat } from './creativeImage';
 import { catsOf, parseCatParts } from './format';
 import { inDayRange, type DayRange } from './dayRange';
 import { goodsCategoryOf } from './categoryText';
+import { CATEGORY_HIERARCHY } from './constants';
 import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, godoGoodsVersion, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
@@ -143,6 +144,25 @@ export function parseScope(query: string): SearchScope | null {
 
 export const formatScope = (parts: (string | undefined)[]): string =>
   parts.filter(Boolean).join(` ${SCOPE_SEP} `);
+
+/**
+ * 검색어가 가리키는 표준 카테고리 — 이용 현황 '카테고리별 이용' 기록용 ('1차' 또는 '1차 > 2차', 아니면 null).
+ * "카테고리: 1차 › 2차" 단계 검색어와, 분류표의 1차·2차 이름을 그대로 입력한 검색어(공백·대소문자 무시)를 카테고리로 본다
+ */
+export function categoryOfQuery(query: string): string | null {
+  const scope = parseScope(query);
+  if (scope?.cat1) return scope.cat2 ? `${scope.cat1} > ${scope.cat2}` : scope.cat1;
+  if (scope) return null;
+  const q = compact(query);
+  if (!q) return null;
+  const node = CATEGORY_HIERARCHY.find((n) => compact(n.cat1) === q);
+  if (node) return node.cat1;
+  for (const n of CATEGORY_HIERARCHY) {
+    const cat2 = n.cat2.find((c) => compact(c) === q);
+    if (cat2) return `${n.cat1} > ${cat2}`;
+  }
+  return null;
+}
 
 /** 표준 카테고리 단계 검색어 — "카테고리: HPE 서버" 또는 "카테고리: 노트북 › HP 노트북" */
 export const formatCategoryScope = (cat1: string, cat2?: string): string =>

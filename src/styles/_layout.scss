@@ -59,7 +59,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  /* padding: 0.25rem 0.5rem; */
   font-weight: 600;
   font-size: 0.875rem;
   letter-spacing: -0.01em;
@@ -73,8 +73,8 @@
   }
 
   i {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 0;
     background: var(--acc);
     display: grid;
@@ -83,8 +83,8 @@
     flex: none;
 
     svg {
-      width: 1rem;
-      height: 1rem;
+      width: 1.25rem;
+      height: 1.25rem;
     }
   }
 }
@@ -108,7 +108,7 @@
 
     .dd-trigger {
       width: 100%;
-      height: 1.75rem;
+      height: 2rem;
       padding: 0 0.5rem 0 0.5rem;
       border-color: transparent;
       background: none;
@@ -126,7 +126,7 @@
       background: var(--accbg);
     }
 
-    .dd-menu {
+    .dd-menu .dd-opt {
       font-size: 0.875rem;
     }
   }
@@ -134,7 +134,7 @@
 
 // 브랜드 아래 사이트 선택 (아이티켓 / 온코어) — 사이드바 폭을 반씩 나눠 쓴다
 .site-switch {
-  padding: 0 0.5rem;
+  /* padding: 0 0.5rem; */
 
   .seg {
     display: flex;

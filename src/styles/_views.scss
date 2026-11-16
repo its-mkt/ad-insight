@@ -415,6 +415,17 @@ tr.kw-cat-child {
   color: var(--sub);
 }
 
+// 1차 줄 이름 뒤 보조 글자 (TreeParentRow sub) — 이름·하위 수와 세로선으로 구분한다
+.tree-row-sub {
+  margin-left: 0.625rem;
+  padding-left: 0.625rem;
+  border-left: 1px solid var(--line2);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--sub);
+}
+
 // 구매 상세 표 — 기간을 바꿔도 내용 길이에 따라 열 너비가 달라지지 않게 고정한다
 #tbPurchasesGoods {
   table-layout: fixed;

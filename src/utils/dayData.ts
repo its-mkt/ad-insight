@@ -1,6 +1,6 @@
 import type { DashboardData, QuoteRawRow, QuoteRow, SpendDailyRow, SpendRow } from '../types/dashboard';
 import { prevM } from './format';
-import { inDayRange, monthsOfRange, previousRange, type DayRange } from './dayRange';
+import { inDayRange, monthsOfRange, sameRangeLastMonth, type DayRange } from './dayRange';
 
 const DAILY_MEDIA = ['Google', 'Naver'];
 type DailyCoverage = Pick<DashboardData, 'spend' | 'spendDaily' | 'dailyRecentFrom' | 'dailyHistMonths' | 'dailyLoadedMonths'>;
@@ -33,9 +33,9 @@ export function rangeCovered(data: DailyCoverage, range: DayRange): boolean {
   });
 }
 
-/** 이 기간과 직전 같은 일수를 계산하려면 더 받아야 하는 달 */
+/** 이 기간과 전월 같은 기간을 계산하려면 더 받아야 하는 달 */
 export function dailyMonthsToLoad(data: DailyCoverage, range: DayRange): string[] {
-  const months = new Set([...monthsOfRange(range), ...monthsOfRange(previousRange(range))]);
+  const months = new Set([...monthsOfRange(range), ...monthsOfRange(sameRangeLastMonth(range))]);
   return [...months].filter(
     (month) =>
       !data.dailyLoadedMonths.includes(month) &&
@@ -98,8 +98,8 @@ const quoteRowsOf = (raw: QuoteRawRow[], month: string): QuoteRow[] => {
 
 /**
  * 일·기간으로 본다 — 광고비·노출·클릭·전환은 일별 자료로, 견적은 접수일로 다시 모아 "종료일이 속한 달" 한 달로 넘긴다.
- * 그 전달 자리에는 직전 같은 일수의 값을 넣어, 화면들의 "기준월 vs 전월" 비교가 그대로 같은 일수끼리의 비교가 되게 한다.
- * 직전 구간이 일별 자료 밖이면 광고비 비교값은 비워 둔다 (달 전체와 비교하면 오해를 부른다).
+ * 그 전달 자리에는 전월 같은 날짜 구간(sameRangeLastMonth)의 값을 넣어, 화면들의 "기준월 vs 전월" 비교가 그대로 전월 동기간 비교가 되게 한다.
+ * 비교 구간이 일별 자료 밖이면 광고비 비교값은 비워 둔다 (달 전체와 비교하면 오해를 부른다).
  * 일별 자료가 없는 것(키워드·소재 성과, GFA·Meta 등 월 단위 매체)은 이 달 값이 그대로 남거나 빠진다.
  * 기간이 일별 구간 밖이면 원본을 그대로 돌려준다 (월 단위로 보여 준다).
  */
@@ -113,7 +113,7 @@ export function applyDayRange(data: DashboardData, range: DayRange | null, opts:
   }
 
   const prevMonth = prevM(month);
-  const before = previousRange(range);
+  const before = sameRangeLastMonth(range);
   months.add(prevMonth);
   const both = <T extends QuoteRawRow>(rows: T[]): T[] => [...shiftToMonth(rows, range, month), ...shiftToMonth(rows, before, prevMonth)];
   return {

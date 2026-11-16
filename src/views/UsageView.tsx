@@ -8,7 +8,6 @@ import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
-import { Muted } from '../components/common/Muted';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
@@ -16,7 +15,7 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { loadUsageStats, USAGE_TRACKING_ON, type UsageDay, type UsageStats } from '../lib/usage';
 import { yearRangeLabel } from '../utils/allPeriod';
 import { VIEW_TITLES } from '../utils/constants';
-import { daysOfMonth, fromDayKey, lastDayOf, previousRange, rangeDays, rangeLabel, toDayKey, type DayRange } from '../utils/dayRange';
+import { daysOfMonth, fromDayKey, lastDayOf, rangeLabel, sameRangeLastMonth, toDayKey, type DayRange } from '../utils/dayRange';
 import { fmt, prevM } from '../utils/format';
 import { toggledSet } from '../utils/toggleSet';
 
@@ -83,7 +82,7 @@ function usagePeriodOf(month: string, allPeriod: boolean, yearTotal: boolean, da
   const clip = (r: DayRange): DayRange => ({ from: r.from, to: r.to > today ? today : r.to });
   if (dayRange) {
     const cur = clip(dayRange);
-    return { cur, prev: previousRange(cur), label: rangeLabel(cur), cmpLabel: `직전 ${rangeDays(cur)}일 대비` };
+    return { cur, prev: sameRangeLastMonth(cur), label: rangeLabel(cur), cmpLabel: '전월 동기간 대비' };
   }
   if (allPeriod) return { cur: { from: USAGE_START, to: today }, prev: null, label: '전체 기간' };
   if (yearTotal) {
@@ -317,7 +316,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                 <tr>
                   <Th>카테고리</Th>
                   <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
-                  <Th className="n" tip="선택|카테고리 필터로 고르거나, 표에서 카테고리 줄을 펼치거나, 카테고리로 검색한 횟수">선택</Th>
+                  <Th className="n" tip="선택|카테고리 필터(카테고리 효율·키워드·견적 목록)로 고르거나, 표에서 카테고리 줄을 펼치거나, 카테고리로 검색한 횟수">선택</Th>
                   <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침·카테고리 검색은 시간을 세지 않음)">필터 체류</Th>
                   <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
                 </tr>
@@ -330,11 +329,8 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                   return (
                     <React.Fragment key={g.category}>
                       <TreeParentRow
-                        label={
-                          <>
-                            {g.category} <Muted small>{g.views.map(viewTitle).join(' · ')}</Muted>
-                          </>
-                        }
+                        label={g.category}
+                        sub={g.views.map(viewTitle).join(' · ')}
                         childCount={hasChildren ? children.length : 0}
                         open={isOpen}
                         onToggle={() => setOpenCats((prev) => toggledSet(prev, g.category))}
@@ -362,7 +358,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           ) : (
             <EmptyState
               message="이 기간에 카테고리를 고른 기록이 없습니다."
-              subMessage={`카테고리 효율·키워드 화면의 카테고리 필터, 카테고리 효율 표의 줄 펼침, 검색창 카테고리 필터·종합 요약 카테고리 이름으로 연 검색을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
+              subMessage={`카테고리 효율·키워드·견적 목록의 카테고리 필터, 카테고리 효율 표의 줄 펼침, 카테고리로 연 검색(검색창 카테고리 필터·종합 요약 카테고리 이름·카테고리 이름 입력)을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
             />
           )}
         </Card>

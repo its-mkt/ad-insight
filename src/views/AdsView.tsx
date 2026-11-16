@@ -192,7 +192,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 일평균: 진행 중인 달은 오늘까지의 날짜 수로 나눠, 다 끝난 전월과 같은 기준으로 비교한다
   const daysInMonth = (mo: string) => new Date(+mo.slice(0, 4), +mo.slice(5), 0).getDate();
   const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysInMonth(mo));
-  const dailySpend = (mo: string) => tot(mo) / (period ? period.days : elapsedDays(mo));
+  const dailySpend = (mo: string) => tot(mo) / (period ? (mo === pv ? period.prevDays : period.days) : elapsedDays(mo));
   // 수동 입력 MDF 는 달 전체 금액이라, 같은 날짜 비교에서는 일수 비율만큼만 쓴다
   const pvMdf = mdfCost(pv);
   const missing = uncollectedMedia(data.spend, [curM]).map((m): [string, string] => [m, '미수집']);
