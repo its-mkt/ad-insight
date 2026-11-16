@@ -1,5 +1,5 @@
 /**
- * its-ad-insight — 네이버 성과형 DA(GFA) 무인 자동 수집 스크립트 (Playwright 기반)
+ * ad-insight — 네이버 성과형 DA(GFA) 무인 자동 수집 스크립트 (Playwright 기반)
  * 
  * [동작 방식]
  * - 사람 개입 없이 백그라운드(Headless)로 GFA에 접속하여 최신 성과 지표를 추출합니다.
