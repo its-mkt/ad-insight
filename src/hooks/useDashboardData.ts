@@ -562,9 +562,14 @@ function toQuoteRawRow(r: RawQuoteRawApiRow, id: string): QuoteRawRow {
 
 /** 아이티켓이 아닌 사이트의 데이터에 사이트를 표시한다 (견적 원장에는 사이트 열이 없다) */
 function withSite(d: DashboardData, site: SiteId): DashboardData {
-  setSalesSite(site);
   if (site === 'itket') return d;
   return { ...d, site, quotesRaw: d.quotesRaw.map((r) => ({ ...r, site })) };
+}
+
+/** 그 사이트의 응답을 화면 데이터로 — 판매·기기 등 전역 저장소가 사이트에 맞게 채워지도록 사이트를 먼저 맞춘다 */
+function fromSiteApi(j: RawApiPayload, site: SiteId): DashboardData {
+  setSalesSite(site);
+  return withSite(fromApi(j), site);
 }
 
 // 아이티켓은 견적 원장까지 있어야 쓴다 (원장 없는 옛 캐시 제외). 다른 사이트는 광고·견적 중 하나라도 있으면 쓴다
@@ -601,7 +606,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       setData((prevData) => {
         if (prevData.spend.length > 0 && prevData.quotesRaw.length > 0) return prevData;
         writeCachedPayload(localJ, site);
-        return fromApi(localJ);
+        return fromSiteApi(localJ, site);
       });
       setStatus('live');
     } catch {
@@ -630,7 +635,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       if (j.error) throw new Error(j.error);
       if (isStale()) return;
       liveLoaded.current = true;
-      setData(withSite(fromApi(j), site));
+      setData(fromSiteApi(j, site));
       setStatus('live');
       writeCachedPayload(j, site);
     } catch (e) {
@@ -655,7 +660,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     readCachedPayload(site).then(async (cached) => {
       if (liveLoaded.current || siteRef.current !== site) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
       if (isUsableCache(cached, site)) {
-        setData(withSite(fromApi(cached), site));
+        setData(fromSiteApi(cached, site));
         setStatus('live');
       } else {
         await tryLoadStaticFallback();

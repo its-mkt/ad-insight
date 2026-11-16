@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { SyncStatus } from '../types/dashboard';
+import type { SiteId, SyncStatus } from '../types/dashboard';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
@@ -39,6 +39,8 @@ interface DevicesViewProps {
   yearTotal?: boolean;
   /** 이 달까지만 보여 준다 — 로그인하지 않으면 진행 중인 달을 빼고 지난달까지 (빈 값이면 제한 없음) */
   untilMonth?: string;
+  /** 보고 있는 사이트 — GA4·고도몰 값을 그 사이트 것으로 그린다 */
+  site?: SiteId;
 }
 
 const TITLE = '기기별 통계';
@@ -66,8 +68,13 @@ const addDevices = (acc: Map<string, number>, v: Partial<Record<DeviceKey, numbe
 /** 표 제목 옆 보조 글자 — 고른 기간 중 일부 달만 수집됐으면 몇 달인지 밝힌다 */
 const coverText = (measured: number, total: number) => (measured === 0 ? PENDING : measured < total ? `${total}개월 중 ${measured}개월 수집` : '');
 
-export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth }) => {
+export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, site = 'itket' }) => {
   const yr = selectedMonth.slice(0, 4);
+  // 온코어는 견적 완료 화면이 없어(제출 후 알림 → 목록) GA4 로 견적 완료를 세지 않는다 — 추이·채널 표는 주문 완료로 보여 준다
+  const noEstimate = site === 'oncore';
+  const chConv: Ga4ConvId = noEstimate ? 'order' : 'estimate';
+  const chConvLabel = noEstimate ? '주문 완료' : '견적 완료';
+  const NO_EST = '측정 안 함';
   // GA4 수집 첫 달부터 이번 달까지
   const allMonths = useMemo(() => {
     const out: string[] = [];
@@ -85,11 +92,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     const months = [...new Set([...scope, ...prevScope, ...chartMonths])];
     // 아직 안 받은 달로 바꾸면 받는 동안 '수집 전' 대신 불러오는 중으로 보여 준다
     setGa4((g) => (g && months.every((m) => m in g) ? g : null));
-    loadGa4Devices(months).then((got) => alive && setGa4(got));
+    loadGa4Devices(months, site).then((got) => alive && setGa4(got));
     return () => {
       alive = false;
     };
-  }, [scope, prevScope, chartMonths]);
+  }, [scope, prevScope, chartMonths, site]);
 
   const periodLabel = allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : mLabel(selectedMonth);
   const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : '전월';
@@ -110,8 +117,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   // 기기 × 채널 (방문·견적 완료)
   const addChannelVisits = (acc: Map<string, number>, rows: NonNullable<Ga4DeviceMonth['channels']>) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.sessions));
   const chVisits = sumGa4(g, scope, (m) => m.channels, addChannelVisits);
-  const chVisitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.convChannels?.estimate != null), (m) => m.channels, addChannelVisits);
-  const chEst = sumGa4(g, scope, (m) => m.convChannels?.estimate ?? null, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.s)));
+  const chVisitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.convChannels?.[chConv] != null), (m) => m.channels, addChannelVisits);
+  const chEst = sumGa4(g, scope, (m) => m.convChannels?.[chConv] ?? null, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.s)));
   const channelNames = [...new Set([...chVisits.acc.keys()].map((k) => k.slice(k.indexOf('|') + 1)))].sort(
     (a, b) => sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${b}`) ?? 0) - sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${a}`) ?? 0)
   );
@@ -145,6 +152,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const saleTotal = sumBy(saleRows, (r) => r.orders);
   const saleKnown = saleRows.filter((r) => r.label !== '미수집');
   const saleCollected = saleKnown.length > 0;
+  // 그 사이트 고도몰 주문을 아직 하나도 받지 않았으면 판매 0건이 아니라 수집 전이다
+  const noOrders = GODOMALL_ORDER_LINES.length === 0;
 
   // 추이 차트 — 전체 기간은 연도별 합계
   const years = [...new Set(chartMonths.map((m) => m.slice(0, 4)))];
@@ -163,7 +172,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     };
   };
   const visitTrend = trend((m) => (Object.keys(m.sessions).length ? m.sessions : null));
-  const estimateTrend = trend((m) => m.conv?.estimate);
+  const estimateTrend = trend((m) => m.conv?.[chConv]);
 
   const loading = ga4 === null;
   const kpiValue = (n: number | undefined) => (loading ? '…' : visits.measured ? `${fmt(n ?? 0)}회` : PENDING);
@@ -172,7 +181,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     <View name="devices" title={TITLE}>
       <ViewHeader title={TITLE} description="PC·모바일·태블릿별 방문, 견적·주문 전환, 광고 성과와 판매를 한 화면에 봅니다" status={status} />
       <ViewNote>
-        ※ {periodLabel} 기준. 방문·전환은 GA4(견적 요청 완료·주문 완료 화면을 본 세션), 광고는 구글·네이버 API의 기기별 실적, 판매는 고도몰 주문 형태(PC·모바일·수기 주문) 그대로입니다.
+        ※ {periodLabel} 기준. 방문·전환은 GA4({noEstimate ? '주문 완료 화면을 본 세션 — 온코어는 견적 완료 화면이 없어 견적 전환은 세지 않습니다' : '견적 요청 완료·주문 완료 화면을 본 세션'}), 광고는 구글·네이버 API의 기기별 실적, 판매는 고도몰 주문 형태(PC·모바일·수기 주문) 그대로입니다.
         수집되지 않은 달은 0이 아니라 "{PENDING}"으로 두고, 다른 자료로 나눠 채우지 않습니다.
       </ViewNote>
 
@@ -194,7 +203,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                   items={[
                     ['비중', pctText(share(n ?? 0, visitTotal))],
                     // 괄호 안은 견적 전환율 (견적 완료 ÷ 방문)
-                    ['견적 완료', est === null ? PENDING : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
+                    ['견적 완료', noEstimate ? NO_EST : est === null ? PENDING : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
                     ['주문 완료', ord === null ? PENDING : `${fmt(ord)}회`],
                   ]}
                 />
@@ -209,7 +218,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             saleCollected ? (
               <KpiDetailItems items={saleRows.slice(0, 4).map((r): [string, string] => [r.label, `${fmt(r.orders)}건`])} />
             ) : (
-              <KpiDetailItems items={[['판매', `${fmt(saleTotal)}건`], ['기기', PENDING]]} />
+              <KpiDetailItems items={[['판매', noOrders ? PENDING : `${fmt(saleTotal)}건`], ['기기', PENDING]]} />
             )
           }
         />
@@ -226,11 +235,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
         <MultiChart
           id="chDeviceEstimates"
-          title={allPeriod ? '연도별 기기별 견적 완료' : '월별 기기별 견적 완료'}
+          title={`${allPeriod ? '연도별' : '월별'} 기기별 ${chConvLabel}`}
           labels={estimateTrend.labels}
           series={estimateTrend.series}
           unit="회"
-          emptyMessage={loading ? '불러오는 중입니다…' : `기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
+          emptyMessage={loading ? '불러오는 중입니다…' : noEstimate ? (visitTrend.labels.length ? '이 기간은 GA4 로 측정된 주문 완료가 없습니다.' : 'GA4 값이 없습니다.') : `기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
         />
       </div>
 
@@ -258,7 +267,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                 {tableDevices.map((d) => (
                   <React.Fragment key={d}>
                     <Th className="n">방문</Th>
-                    <Th className="n">견적 완료</Th>
+                    <Th className="n">{chConvLabel}</Th>
                     <Th className="n">전환율</Th>
                   </React.Fragment>
                 ))}
@@ -299,7 +308,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         ) : (
           <EmptyState message={loading ? '불러오는 중입니다…' : `기기 × 채널 유입은 ${PENDING}입니다.`} subMessage={loading ? undefined : 'GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다.'} />
         )}
-        <TableFootnote unit="회" basis="산출 근거: GA4 세션 · 견적 완료 = 견적 요청 완료 화면을 본 세션 · 전환율 = 견적 완료 ÷ 방문" sources={['출처: GA4 (itket-analytics 수집)']} />
+        <TableFootnote unit="회" basis={noEstimate ? '산출 근거: GA4 세션 · 주문 완료 = 주문 완료 화면을 본 세션 · 전환율 = 주문 완료 ÷ 방문' : '산출 근거: GA4 세션 · 견적 완료 = 견적 요청 완료 화면을 본 세션 · 전환율 = 견적 완료 ÷ 방문'} sources={[noEstimate ? '출처: 온코어 GA4 (itket-analytics 수집)' : '출처: GA4 (itket-analytics 수집)']} />
       </Card>
 
       <Card name="device-ads" id="device-ads" title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap>
@@ -396,7 +405,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             </tbody>
           </table>
         ) : (
-          <EmptyState message={`판매 ${fmt(saleTotal)}건의 기기 구분은 ${PENDING}입니다.`} subMessage="고도몰 주문 수집에 주문 형태(PC·모바일)를 반영한 뒤 주문 줄을 다시 만들면 지난 주문까지 채워집니다." />
+          noOrders ? (
+            <EmptyState message="이 사이트의 고도몰 주문은 수집 전입니다." subMessage="수집기 스크립트 속성에 이 사이트 고도몰 API 키를 넣으면 다음 수집부터 채워집니다." />
+          ) : (
+            <EmptyState message={`판매 ${fmt(saleTotal)}건의 기기 구분은 ${PENDING}입니다.`} subMessage="고도몰 주문 수집에 주문 형태(PC·모바일)를 반영한 뒤 주문 줄을 다시 만들면 지난 주문까지 채워집니다." />
+          )
         )}
         <TableFootnote unit="건·원" basis="산출 근거: 고도몰 결제완료 주문 (주문 1건에 제품이 여럿이어도 1건) · 수기 주문은 관리자가 직접 넣은 주문" sources={['출처: 고도몰 주문 API']} />
       </Card>

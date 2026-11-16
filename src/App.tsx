@@ -548,12 +548,9 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {/* 구매 상세·기기별 통계는 아이티켓 고도몰 주문·GA4 기준이라 다른 사이트에서는 연결 전 안내 */}
-              {viewReady && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
-                <OncoreView status={status} viewTitle={VIEW_TITLES[currentView]} />
-              )}
-              {!guestLocked && viewReady && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
-              {!guestLocked && viewReady && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
+              {/* 구매 상세·기기별 통계는 사이트마다 그 사이트의 고도몰 주문·GA4(온코어는 itket-analytics 의 온코어 수집)로 그린다 */}
+              {!guestLocked && viewReady && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
+              {!guestLocked && viewReady && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
               {viewReady && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}

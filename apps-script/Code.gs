@@ -13,7 +13,8 @@
  * 사이트별 프로젝트: 같은 Code.gs 를 사이트마다 따로 만든 Apps Script 프로젝트에 붙여넣는다.
  *  - 아이티켓: 스크립트 속성 없이 그대로 (기본값)
  *  - 온코어  : 스크립트 속성 SITE=oncore · SHEET_ID=<온코어 데이터 시트 ID> · QUOTE_SHEET_ID=<온코어 견적요청 DB 시트 ID>
- *              온코어는 견적·네이버 검색광고만 수집한다 (고도몰·GFA·커머스·다른 사이트 견적·전화문의는 아이티켓 전용).
+ *              온코어는 견적·네이버 검색광고와, 고도몰 키(GODO_PARTNER_KEY·GODO_USER_KEY)가 있으면 온코어 고도몰 주문을 수집한다
+ *              (GFA·커머스·다른 사이트 견적·전화문의·GA4 purchase 전송은 아이티켓 전용).
  *              네이버 키(NAVER_*)가 없으면 네이버 수집은 건너뛴다.
  */
 const PROPS = PropertiesService.getScriptProperties();
@@ -101,13 +102,14 @@ function syncAllBody_(t0) {
     console.log('- 네이버 검색광고: ' + statsEvery + '분 주기 대기 중 (마지막 ' + Utilities.formatDate(new Date(statsLast), 'Asia/Seoul', 'HH:mm') + ')');
   }
   // 온코어 등 아이티켓이 아닌 사이트는 견적만 수집한다 (나머지는 아이티켓 계정·시트 전용이라 돌리면 아이티켓 데이터가 섞인다)
-  const itketOnly = ['collectQuoteSites', 'collectQuotePhone', 'collectQuoteStatsExtra', 'collectGodoOrders', 'collectGfaEmail', 'collectCommerce'];
+  // 고도몰 주문은 사이트마다 키가 달라, 아이티켓이 아닌 사이트는 그 사이트 고도몰 키가 속성에 있을 때만 수집한다
+  const itketOnly = ['collectQuoteSites', 'collectQuotePhone', 'collectQuoteStatsExtra', 'collectGfaEmail', 'collectCommerce'];
   const rest = [
     ['견적 데이터', () => { if (PROPS.getProperty('QUOTE_SHEET_ID')) withQuoteLock_(collectQuotes); }, 'collectQuotes'],
     ['다른 사이트 견적 데이터', () => withQuoteLock_(collectQuoteSites), 'collectQuoteSites'],
     ['전화문의 데이터', () => { if (PROPS.getProperty('QUOTE_SHEET_ID')) collectQuotePhone(); }, 'collectQuotePhone'],
     ['통계용 추가 견적', () => withQuoteLock_(collectQuoteStatsExtra), 'collectQuoteStatsExtra'],
-    ['고도몰 주문', collectGodoOrders, 'collectGodoOrders'],
+    ['고도몰 주문', () => { if (IS_ITKET || hasGodoKeys_()) collectGodoOrders(); else console.log('- 고도몰 주문: 스크립트 속성에 고도몰 API 키가 없어 건너뜀'); }, 'collectGodoOrders'],
     // 구글은 2026-11-06 부터 Google Ads 스크립트(GoogleAdsScript.js, 매시간)가 g_* 시트를 통째로 쓴다.
     // 메일 CSV 수집은 캠페인·광고그룹 ID 없이 이름으로 합치고 g_meta 도 덮어써 그 데이터와 섞이므로 돌리지 않는다.
     // ['구글 광고 이메일 리포트', collectGoogleAdsEmail, 'collectGoogleAdsEmail'],
@@ -578,6 +580,9 @@ function debugKeywordHistory() {
   }
 }
 
+function hasGodoKeys_() {
+  return ['GODO_PARTNER_KEY', 'GODO_USER_KEY'].every((k) => String(PROPS.getProperty(k) || '').trim());
+}
 function hasNaverKeys_() {
   return ['NAVER_API_KEY', 'NAVER_SECRET', 'NAVER_CUSTOMER_ID'].every((k) => PROPS.getProperty(k));
 }
@@ -1912,7 +1917,8 @@ function godoOrders_(start, end) {
 }
 /** 고객별 일회성 결제 상품은 제품명에 고객·업체 이름이 들어가고 번호도 거래마다 재사용되므로, 이름을 내보내지 않고 한 줄로 묶는다 (공개 응답) */
 function godoSafeGoods_(no, name) {
-  const oneOff = ['9311', '9312', '9808'].includes(String(no)) || /님|결제\s*건|고객|주식회사|\(주\)|㈜|귀하|상담|견적|개별|별도|추가\s*결제|계약/.test(name);
+  // 9311·9312·9808 은 아이티켓 고도몰의 고객별 결제 상품 번호다 (다른 사이트는 같은 번호가 일반 제품일 수 있다)
+  const oneOff = (IS_ITKET && ['9311', '9312', '9808'].includes(String(no))) || /님|결제\s*건|고객|주식회사|\(주\)|㈜|귀하|상담|견적|개별|별도|추가\s*결제|계약/.test(name);
   return oneOff ? { no: 'one-off', name: '개별 결제 상품' } : { no: String(no), name };
 }
 /** 주문의 제품 줄. 금액 = (판매가+옵션가+텍스트옵션가)×수량 − 상품·회원·쿠폰 할인, 배송비 제외 */
@@ -2036,6 +2042,7 @@ function godoDailyRows_(orders, fromDate) {
  * 완료 화면을 거치지 않아 client_id 가 없는 주문은 주문번호로 만든 값으로 보낸다. GA4 는 72시간보다 오래된 시각을 받지 않으므로 그보다 늦게 보내면 71시간 전으로 기록한다.
  */
 function sendGa4Purchases_(ss, orders, inflowRows) {
+  if (!IS_ITKET) return 0; // 전송 대상이 아이티켓 GA4 스트림이라 다른 사이트 주문은 보내지 않는다
   const secret = String(PROPS.getProperty('GA4_MP_SECRET') || '').trim(), start = String(PROPS.getProperty('GA4_MP_START') || '').trim();
   if (!secret || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return 0;
   let sh = ss.getSheetByName('ga4_purchase_sent');

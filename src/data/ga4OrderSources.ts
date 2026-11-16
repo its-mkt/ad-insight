@@ -2,7 +2,9 @@
  * GA4 의 '주문 완료' 페이지(/order/order_end.php) 도달 세션을 유입 출처/매체별로 센 값 (itket-analytics 수집분).
  * 고도몰 결제완료 건수와 기준이 달라 참고값이다. 아래 값은 초기값이고, 최근 달은 화면에서 itket-analytics 수집본으로 덮는다 (loadLatestGa4OrderSources)
  */
+import type { SiteId } from '../types/dashboard';
 import { prevM, THIS_M } from '../utils/format';
+import { loadOncoreGa4Months } from './oncoreGa4';
 
 export let GA4_ORDER_SOURCES_AS_OF = '2026-11-09';
 
@@ -68,6 +70,57 @@ let latest: Promise<boolean> | null = null;
 /** 기준일이 있는 달부터 이번 달까지의 GA4 값을 한 번만 받는다. 값을 반영했으면 true, 실패하면 초기값을 그대로 둔다 */
 export function loadLatestGa4OrderSources(): Promise<boolean> {
   return (latest ??= fetchLatest());
+}
+
+/** 한 사이트의 GA4 주문 완료 출처 값 묶음 — 화면은 이 묶음만 보고 그린다 */
+export interface Ga4OrderSourceSet {
+  /** 달 → 출처/매체 → 주문 완료 세션 (측정된 달만) */
+  sources: Record<string, Record<string, number>>;
+  /** 마지막으로 받은 날 'YYYY-MM-DD' (없으면 '') */
+  asOf: string;
+  /** 서버 purchase 이벤트 기준인 달 (아이티켓만) */
+  purchaseMonths: Set<string>;
+  /** 달 중간부터 측정한 달 → 측정 시작일 */
+  partialStart: Record<string, { from: number }>;
+}
+
+/** 온코어 — itket-analytics collectOncore 가 모은 주문 완료 화면 세션 (purchase 전송 없음) */
+const ONCORE_SET: Ga4OrderSourceSet = { sources: {}, asOf: '', purchaseMonths: new Set(), partialStart: {} };
+
+interface OncoreMonth {
+  total?: { sessions?: number };
+  daily?: { date: string }[];
+  conv?: { byMedium?: { order?: { k: string; s: number }[] } };
+}
+
+let oncoreLatest: Promise<boolean> | null = null;
+function fetchOncore(): Promise<boolean> {
+  return loadOncoreGa4Months<OncoreMonth>().then((all) => {
+    const months = Object.keys(all).filter((m) => all[m]?.total?.sessions).sort();
+    months.forEach((m, i) => {
+      const file = all[m];
+      ONCORE_SET.sources[m] = Object.fromEntries((file.conv?.byMedium?.order ?? []).map((row) => [row.k, row.s]));
+      const days = file.daily ?? [];
+      // 측정을 시작한 첫 달이 1일부터가 아니면 그날부터 센다
+      if (i === 0 && days.length && +days[0].date.slice(8, 10) > 1) ONCORE_SET.partialStart[m] = { from: +days[0].date.slice(8, 10) };
+      const lastDay = days[days.length - 1]?.date;
+      if (lastDay && lastDay > ONCORE_SET.asOf) ONCORE_SET.asOf = lastDay;
+    });
+    if (!months.length) oncoreLatest = null; // 받지 못했으면 다음에 다시 묻는다
+    return months.length > 0;
+  });
+}
+
+/** 그 사이트의 GA4 주문 완료 출처 값 (그릴 때마다 부른다 — 받은 뒤 값이 바뀐다) */
+export function ga4OrderSourceSet(site: SiteId): Ga4OrderSourceSet {
+  if (site === 'oncore') return ONCORE_SET;
+  return { sources: GA4_ORDER_SOURCES, asOf: GA4_ORDER_SOURCES_AS_OF, purchaseMonths: GA4_PURCHASE_MONTHS, partialStart: GA4_PARTIAL_START };
+}
+
+/** 그 사이트의 최신 GA4 값을 한 번만 받는다. 값을 반영했으면 true */
+export function loadGa4OrderSources(site: SiteId): Promise<boolean> {
+  if (site === 'oncore') return (oncoreLatest ??= fetchOncore());
+  return loadLatestGa4OrderSources();
 }
 
 /** GA4 출처/매체 → 화면 이름 (견적 유입 매체와 같은 이름을 쓴다) */

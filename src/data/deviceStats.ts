@@ -4,7 +4,9 @@
  *  - 방문·전환: itket-analytics GA4 월별 파일의 devices · deviceChannels · conv.byDevice · conv.byDeviceChannel — loadGa4Devices
  *  - 판매: 고도몰 주문 줄(godo_order_lines)의 device(주문 형태) — godomallOrders.ts
  */
+import type { SiteId } from '../types/dashboard';
 import { THIS_M } from '../utils/format';
+import { loadOncoreGa4Months } from './oncoreGa4';
 
 export type DeviceKey = 'desktop' | 'mobile' | 'tablet' | 'other';
 
@@ -111,10 +113,10 @@ export interface Ga4DeviceMonth {
   sessions: Partial<Record<DeviceKey, number>>;
   /** 기기 × 기본 채널 그룹 세션 — 수집 전 파일이면 null */
   channels: { device: DeviceKey; channel: string; sessions: number }[] | null;
-  /** 기기별 전환 세션 (견적·주문 완료 화면) — 수집 전 파일이면 null */
-  conv: Record<Ga4ConvId, Partial<Record<DeviceKey, number>>> | null;
-  /** 기기 × 채널 전환 세션 — 수집 전 파일이면 null */
-  convChannels: Record<Ga4ConvId, { device: DeviceKey; channel: string; s: number }[]> | null;
+  /** 기기별 전환 세션 (견적·주문 완료 화면) — 수집 전 파일이면 null, 그 사이트가 세지 않는 전환(온코어 견적)은 키가 없다 */
+  conv: Partial<Record<Ga4ConvId, Partial<Record<DeviceKey, number>>>> | null;
+  /** 기기 × 채널 전환 세션 — 수집 전 파일이면 null, 세지 않는 전환은 키가 없다 */
+  convChannels: Partial<Record<Ga4ConvId, { device: DeviceKey; channel: string; s: number }[]>> | null;
 }
 
 interface Ga4MonthFile {
@@ -149,7 +151,7 @@ function parseGa4(file: Ga4MonthFile): Ga4DeviceMonth {
       : null,
     conv: byDevice
       ? (Object.fromEntries(
-          CONV_IDS.map((id) => {
+          CONV_IDS.filter((id) => byDevice[id]).map((id) => {
             const out: Partial<Record<DeviceKey, number>> = {};
             (byDevice[id] ?? []).forEach((r) => {
               const d = deviceKeyOf(r.k);
@@ -160,7 +162,7 @@ function parseGa4(file: Ga4MonthFile): Ga4DeviceMonth {
         ) as Ga4DeviceMonth['conv'])
       : null,
     convChannels: byDeviceChannel
-      ? (Object.fromEntries(CONV_IDS.map((id) => [id, (byDeviceChannel[id] ?? []).map((r) => ({ ...split(r.k), s: Number(r.s) || 0 }))])) as Ga4DeviceMonth['convChannels'])
+      ? (Object.fromEntries(CONV_IDS.filter((id) => byDeviceChannel[id]).map((id) => [id, (byDeviceChannel[id] ?? []).map((r) => ({ ...split(r.k), s: Number(r.s) || 0 }))])) as Ga4DeviceMonth['convChannels'])
       : null,
   };
 }
@@ -170,9 +172,13 @@ const ga4Cache = new Map<string, Promise<Ga4DeviceMonth | null>>();
 /** GA4 수집이 시작된 달 (itket-analytics config startMonth) */
 export const GA4_FIRST_MONTH = '2025-01';
 
-/** 고른 달들의 GA4 기기 자료를 받는다. 받지 못했거나 측정이 없는 달은 결과에 없다 (0 이 아니다) */
-export async function loadGa4Devices(months: string[]): Promise<Record<string, Ga4DeviceMonth>> {
+/** 고른 달들의 GA4 기기 자료를 받는다. 받지 못했거나 측정이 없는 달은 결과에 없다 (0 이 아니다). 온코어는 온코어 GA4 속성 값 */
+export async function loadGa4Devices(months: string[], site: SiteId = 'itket'): Promise<Record<string, Ga4DeviceMonth>> {
   const wanted = months.filter((m) => m >= GA4_FIRST_MONTH && m <= THIS_M);
+  if (site === 'oncore') {
+    const all = await loadOncoreGa4Months<Ga4MonthFile>();
+    return Object.fromEntries(wanted.filter((m) => all[m]?.total?.sessions).map((m) => [m, parseGa4(all[m])]));
+  }
   const got = await Promise.all(
     wanted.map((m) => {
       let p = ga4Cache.get(m);
