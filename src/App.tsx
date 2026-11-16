@@ -9,7 +9,7 @@ import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
 import { PeriodNav } from './components/common/PeriodNav';
 import { lastMonthOfYear, TOTAL_PERIOD_VIEWS } from './utils/allPeriod';
-import type { SearchTab } from './utils/search';
+import { parseScope, type SearchTab } from './utils/search';
 import { addRecentSearch, clearRecentSearches, loadFavoriteSearches, sameSearch, toggleFavoriteSearch } from './utils/recentSearches';
 import { Star } from 'lucide-react';
 import { SkeletonView } from './components/common/SkeletonView';
@@ -25,7 +25,7 @@ import { SearchView } from './views/SearchView';
 import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { UsageView } from './views/UsageView';
-import { trackPageview } from './lib/usage';
+import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
@@ -152,6 +152,9 @@ export const App: React.FC = () => {
   const isSearchView = currentView === 'search';
   // 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
   const [searchDay, setSearchDay] = useState<DayRange | null>(null);
+  // 이용 현황의 '최근 N일' — 이용 현황 전용이라 다른 메뉴의 기간에는 쓰지 않는다. 이용 현황에서 기간 선택 바를 건드리면 풀린다
+  const [usageRecent, setUsageRecent] = useState<DayRange | null>(null);
+  const usageRecentOn = currentView === 'usage' ? usageRecent : null;
   // 일·기간 — 일별 광고비 구간 안이면 그 기간의 광고비·견적으로 다시 모은 자료를 화면에 준다 (구간 밖이면 월 단위)
   // 최근 구간보다 앞선 날짜를 고르면 그 달의 일별 광고비를 추가로 받아 합친다
   const [dailyHist, setDailyHist] = useState<{ rows: SpendDailyRow[]; months: string[] }>({ rows: [], months: [] });
@@ -243,7 +246,15 @@ export const App: React.FC = () => {
     return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
   })();
 
-  // 일·기간 선택 — 기간 선택 바의 달력과 이용 현황의 '최근 N일' 이 함께 쓴다
+  // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다
+  const periodNavAction =
+    <A extends unknown[]>(fn: (...a: A) => void) =>
+    (...a: A) => {
+      if (currentView === 'usage') setUsageRecent(null);
+      fn(...a);
+    };
+
+  // 일·기간 선택 — 기간 선택 바의 달력 (모든 메뉴가 함께 쓴다)
   const selectDayRange = (r: DayRange | null) => {
     setSearchDay(r);
     if (!r) return;
@@ -300,6 +311,9 @@ export const App: React.FC = () => {
   // 이용 현황 기록 — 화면(검색은 검색어)이 바뀔 때마다 페이지뷰 1회. 방문은 서버에서 기기당 하루 1회로 센다
   useEffect(() => {
     trackPageview(currentView);
+    // 검색창의 카테고리 필터나 종합 요약의 카테고리 이름으로 연 카테고리 검색('카테고리: 1차 › 2차')도 카테고리를 고른 것으로 1회 센다
+    const scope = currentView === 'search' ? parseScope(searchQuery) : null;
+    if (scope?.cat1) trackCategoryOpen(scope.cat2 ? `${scope.cat1} > ${scope.cat2}` : scope.cat1);
   }, [currentView, currentView === 'search' ? searchQuery : '']);
 
   // 설정·연동(데이터 연결·어드민 관리·이용 현황)은 로그인한 관리자만. 로그아웃하면 종합 요약으로, 로그인 없이 주소(#data·#admin)로 들어오면 종합 요약 + 로그인 모달
@@ -425,25 +439,25 @@ export const App: React.FC = () => {
           {currentView !== 'data' && !oncorePending && (
             <PeriodNav
               years={availableYears}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
+              selectedYear={usageRecentOn ? usageRecentOn.to.slice(0, 4) : selectedYear}
+              selectedMonth={usageRecentOn ? usageRecentOn.to.slice(0, 7) : selectedMonth}
               minAvailableMonth={minAvailableMonth}
               maxAvailableMonth={maxAvailableMonth}
-              onSelectYear={setSelectedYear}
-              periodChanged={!!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
-              onResetPeriod={() => {
+              onSelectYear={periodNavAction(setSelectedYear)}
+              periodChanged={!!usageRecentOn || !!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
+              onResetPeriod={periodNavAction(() => {
                 clearPeriodModes();
                 setSelectedYear(String(THIS_Y));
                 setSelectedMonth(THIS_M);
-              }}
-              onSelectMonth={(m) => {
+              })}
+              onSelectMonth={periodNavAction((m: string) => {
                 clearPeriodModes();
                 setSelectedMonth(m);
-              }}
-              allPeriod={allPeriod}
-              onSelectAll={supportsTotal ? selectAllPeriod : undefined}
-              yearTotal={yearTotal}
-              dayRange={searchDay}
+              })}
+              allPeriod={usageRecentOn ? false : allPeriod}
+              onSelectAll={supportsTotal ? periodNavAction(selectAllPeriod) : undefined}
+              yearTotal={usageRecentOn ? false : yearTotal}
+              dayRange={usageRecentOn ?? searchDay}
               note={guestNote}
               maxDay={guest ? guestLastDay() : undefined}
               dayNote={
@@ -457,15 +471,15 @@ export const App: React.FC = () => {
                       : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
-              onSelectDayRange={selectDayRange}
+              onSelectDayRange={periodNavAction(selectDayRange)}
               onSelectYearTotal={
                 supportsTotal
-                  ? (m) => {
+                  ? periodNavAction((m: string) => {
                       setSearchDay(null);
                       setAllPeriodOn(false);
                       setYearTotalOn(true);
                       setSelectedMonth(m);
-                    }
+                    })
                   : undefined
               }
             />
@@ -548,12 +562,9 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {/* 구매 상세·기기별 통계는 아이티켓 고도몰 주문·GA4 기준이라 다른 사이트에서는 연결 전 안내 */}
-              {viewReady && site !== 'itket' && (currentView === 'purchases' || currentView === 'devices') && (
-                <OncoreView status={status} viewTitle={VIEW_TITLES[currentView]} />
-              )}
-              {!guestLocked && viewReady && site === 'itket' && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
-              {!guestLocked && viewReady && site === 'itket' && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} />}
+              {/* 구매 상세·기기별 통계는 사이트마다 그 사이트의 고도몰 주문·GA4(온코어는 itket-analytics 의 온코어 수집)로 그린다 */}
+              {!guestLocked && viewReady && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
+              {!guestLocked && viewReady && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
               {viewReady && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}
@@ -582,7 +593,13 @@ export const App: React.FC = () => {
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
               {currentView === 'usage' && authLoading && <SkeletonView title={VIEW_TITLES.usage} variant="table" />}
-              {currentView === 'usage' && isLoggedIn && <UsageView selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onSelectDayRange={selectDayRange} />}
+              {currentView === 'usage' && isLoggedIn && <UsageView
+                  selectedMonth={usageRecentOn ? usageRecentOn.to.slice(0, 7) : viewMonth}
+                  allPeriod={usageRecentOn ? false : allPeriod}
+                  yearTotal={usageRecentOn ? false : yearTotal}
+                  dayRange={usageRecentOn ?? searchDay}
+                  onSelectDayRange={setUsageRecent}
+                />}
             </main>
           </div>
         </div>

@@ -1,6 +1,6 @@
 <?php
 /**
- * its-ad-insight — 쇼핑몰 견적 접수 시 구글 시트 실시간 웹훅 전송 스니펫 (고도몰 5용)
+ * ad-insight — 쇼핑몰 견적 접수 시 구글 시트 실시간 웹훅 전송 스니펫 (고도몰 5용)
  * 
  * [적용 위치]
  * 고도몰 5 견적 저장 처리 파일 (예: module/Component/Board/BoardWrite.php 또는 견적 처리 컨트롤러/모델)

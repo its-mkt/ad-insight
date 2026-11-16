@@ -18,8 +18,18 @@ export const GODOMALL_ORDERS: Record<string, number> = {
   '2026-07': 13, '2026-08': 7, '2026-09': 11, '2026-10': 7, '2026-11': 3,
 };
 
-/** 수집 시트의 월별 건수를 반영한다. servedAt 은 응답 시각('YYYY-MM-DD HH:mm') */
+/** 위 초기값 — 다른 사이트를 보다가 아이티켓으로 돌아왔는데 시트 값이 없을 때 되살린다 */
+const ITKET_INITIAL = { ...GODOMALL_ORDERS };
+const ITKET_INITIAL_AS_OF = GODOMALL_ORDERS_AS_OF;
+
+/**
+ * 수집 시트의 월별 건수를 반영한다. servedAt 은 응답 시각('YYYY-MM-DD HH:mm').
+ * 아이티켓은 초기값 위에 덮고, 다른 사이트는 빈 값에서 시작한다 — 시트 값이 없으면 그 사이트는 '수집 전'이다 (setSalesSite 를 먼저 부른다)
+ */
 export function applyGodoOrders(rows: { month?: unknown; count?: unknown }[], servedAt?: string): void {
+  Object.keys(GODOMALL_ORDERS).forEach((month) => delete GODOMALL_ORDERS[month]);
+  if (salesSite === 'itket') Object.assign(GODOMALL_ORDERS, ITKET_INITIAL);
+  GODOMALL_ORDERS_AS_OF = salesSite === 'itket' ? ITKET_INITIAL_AS_OF : '';
   if (!rows.length) return;
   rows.forEach((r) => {
     const month = String(r.month ?? '').slice(0, 7);
@@ -170,7 +180,7 @@ export function applyGodoDaily(rows: { date?: unknown; paid?: unknown; reached?:
   dailyFirst = GODOMALL_DAILY.reduce((min, r) => (!min || r.date < min ? r.date : min), '');
 }
 
-/** 지금 보고 있는 사이트 — 고도몰 주문은 아이티켓 것이라 다른 사이트에서는 판매 건수를 내지 않는다 (useDashboardData 가 데이터와 함께 맞춘다) */
+/** 지금 보고 있는 사이트 — 고도몰 주문은 사이트마다 따로 수집한다. 받은 데이터를 반영하기 전에 맞춘다 (useDashboardData) */
 let salesSite: SiteId = 'itket';
 export function setSalesSite(site: SiteId): void {
   salesSite = site;
@@ -185,7 +195,6 @@ export const salesCutoff = () => SALES_CUTOFF;
 
 /** 달 목록('YYYY-MM')의 판매 건수 합 — 수집 범위 안의 달이 하나도 없으면 null */
 export function salesInMonths(months: string[]): number | null {
-  if (salesSite !== 'itket') return null;
   if (SALES_CUTOFF) {
     // 마지막 날이 든 달은 일별 판매로 1일~마지막 날만, 그 뒤 달은 세지 않는다
     const cm = SALES_CUTOFF.slice(0, 7);
@@ -197,7 +206,6 @@ export function salesInMonths(months: string[]): number | null {
 
 /** 날짜 범위('YYYY-MM-DD', 양끝 포함)의 판매 건수 합. 일별 값은 주문이 있는 날만 있으므로, 수집 시작일 이후 범위면 빈 날은 0건으로 본다 */
 export function salesInRange(from: string, to: string): number | null {
-  if (salesSite !== 'itket') return null;
   const first = dailyFirst;
   if (!first || to < first) return null;
   const end = SALES_CUTOFF && SALES_CUTOFF < to ? SALES_CUTOFF : to;

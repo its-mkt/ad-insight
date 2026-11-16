@@ -44,11 +44,29 @@ export const SkelTable: React.FC<{ rows?: number }> = ({ rows = 5 }) => (
   </div>
 );
 
-// 순위형 막대 카드 (카테고리별 소진 · 유입 매체 비중 등)
-const LIST_WIDTHS = ['90%', '70%', '55%', '40%', '28%', '18%'];
-const ListCard: React.FC = () => (
+/** KPI 카드 한 칸 자리표시 — 첫 로딩(SkeletonView)과 화면 안에서 값을 받는 동안 같이 쓴다 */
+export const SkelKpi: React.FC = () => (
+  <div className="kpi skel-kpi">
+    <Bar w="55%" h="0.75rem" />
+    <Bar w="70%" h="1.5rem" className="skel-kpi-v" />
+    <Bar w="40%" h="0.75rem" />
+  </div>
+);
+
+/** 차트 카드 자리표시 (제목 · 그래프 · 범례 자리) */
+export const SkelChartCard: React.FC = () => (
   <div className="card skel-card">
     <Bar w="40%" h="1rem" />
+    <Bar h="12rem" className="skel-chart" />
+    <Bar w="50%" h="0.75rem" />
+  </div>
+);
+
+// 순위형 막대 카드 (카테고리별 소진 · 유입 매체 비중 등)
+const LIST_WIDTHS = ['90%', '70%', '55%', '40%', '28%', '18%'];
+/** 순위형 막대 목록 자리표시 — 카드 안에 둔다 (유입 매체 비중 등) */
+export const SkelList: React.FC = () => (
+  <>
     {LIST_WIDTHS.map((w) => (
       <div key={w} className="skel-list">
         <Bar w="5.5rem" h="0.75rem" />
@@ -58,6 +76,12 @@ const ListCard: React.FC = () => (
         <Bar w="3rem" h="0.75rem" />
       </div>
     ))}
+  </>
+);
+const ListCard: React.FC = () => (
+  <div className="card skel-card">
+    <Bar w="40%" h="1rem" />
+    <SkelList />
   </div>
 );
 
@@ -86,20 +110,12 @@ export const SkeletonView: React.FC<SkeletonViewProps> = ({ title, variant = 'da
         <>
           <KpiSection>
             {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="kpi">
-                <Bar w="55%" h="0.75rem" />
-                <Bar w="70%" h="1.5rem" className="skel-kpi-v" />
-                <Bar w="40%" h="0.75rem" />
-              </div>
+              <SkelKpi key={i} />
             ))}
           </KpiSection>
           <div className="grid">
             {Array.from({ length: 2 }, (_, i) => (
-              <div key={i} className="card skel-card">
-                <Bar w="40%" h="1rem" />
-                <Bar h="12rem" className="skel-chart" />
-                <Bar w="50%" h="0.75rem" />
-              </div>
+              <SkelChartCard key={i} />
             ))}
           </div>
           <div className="grid">

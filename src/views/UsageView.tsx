@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ViewId } from '../types/dashboard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
-import { SkelTable } from '../components/common/SkeletonView';
+import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import { Muted } from '../components/common/Muted';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
 import { Th } from '../components/common/Th';
@@ -114,7 +114,7 @@ interface UsageViewProps {
   yearTotal?: boolean;
   /** 일·기간 선택 (켜져 있으면 월 선택보다 우선) */
   dayRange?: DayRange | null;
-  /** '최근 N일' 을 누르면 기간 선택 바의 일·기간을 바꾼다 */
+  /** '최근 N일' 을 누르면 이용 현황 전용 기간으로 바꾼다 (다른 메뉴의 기간은 그대로) */
   onSelectDayRange: (range: DayRange) => void;
 }
 
@@ -171,7 +171,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
       <>
         <KpiSection>
           {['방문', '이용 기기', '페이지뷰', '평균 체류시간'].map((l) => (
-            <KpiPlaceholder key={l} label={l} message="불러오는 중…" />
+            <SkelKpi key={l} />
           ))}
         </KpiSection>
         <Card name="usage-loading">
@@ -317,8 +317,8 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                 <tr>
                   <Th>카테고리</Th>
                   <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
-                  <Th className="n" tip="선택|카테고리 필터로 고르거나 표에서 카테고리 줄을 펼친 횟수">선택</Th>
-                  <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침은 시간을 세지 않음)">필터 체류</Th>
+                  <Th className="n" tip="선택|카테고리 필터로 고르거나, 표에서 카테고리 줄을 펼치거나, 카테고리로 검색한 횟수">선택</Th>
+                  <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침·카테고리 검색은 시간을 세지 않음)">필터 체류</Th>
                   <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
                 </tr>
               </thead>
@@ -362,7 +362,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           ) : (
             <EmptyState
               message="이 기간에 카테고리를 고른 기록이 없습니다."
-              subMessage={`카테고리 효율·키워드 화면의 카테고리 필터와 카테고리 효율 표의 줄 펼침을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
+              subMessage={`카테고리 효율·키워드 화면의 카테고리 필터, 카테고리 효율 표의 줄 펼침, 검색창 카테고리 필터·종합 요약 카테고리 이름으로 연 검색을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
             />
           )}
         </Card>

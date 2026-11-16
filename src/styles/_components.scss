@@ -1670,27 +1670,30 @@ table.kv th {
     margin-top: 0.5rem;
     max-width: 100%;
   }
+}
 
-  .kpi {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem; // 실제 KPI 높이(약 117px)에 맞춤
+// 아래 자리표시는 컴포넌트(SkelKpi · SkelList)에 붙은 스타일이라 첫 로딩 화면(.skel-view)이든 화면 안이든 같은 모양이다
+// KPI 칸 자리표시 (SkelKpi)
+.kpi.skel-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem; // 실제 KPI 높이(약 117px)에 맞춤
+}
+
+// 순위형 막대 목록 자리표시 (SkelList)
+.skel-list {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  > .skel {
+    flex: none;
   }
+}
 
-  .skel-list {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-
-    > .skel {
-      flex: none;
-    }
-  }
-
-  .skel-list-track {
-    flex: 1;
-    min-width: 0;
-  }
+.skel-list-track {
+  flex: 1;
+  min-width: 0;
 }
 
 // 화면 안 부분 자리표시 (표·카드) — 전체 화면 자리표시(.skel-view)와 함께 쓴다

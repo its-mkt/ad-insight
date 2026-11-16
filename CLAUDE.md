@@ -1,4 +1,4 @@
-# its-ad-insight 프로젝트 규칙
+# ad-insight 프로젝트 규칙
 
 ## UI 컴포넌트 재사용 규칙
 
@@ -53,7 +53,7 @@
 | 표 펼침 줄 앞 화살표(›) | `AccordionChevron` (`open`, `variant`, `placeholder`) — `ChevronRight` 를 직접 쓰지 않는다 |
 | 월별 표 한 줄 / 월 머리글 | `MonthRow`, `MonthHeadCells` |
 | 빈 상태 | `EmptyState` (`message`, `subMessage`) |
-| 로딩 자리표시 | `SkelBar`, `SkelRows`, `SkelTable`, `SkeletonView` |
+| 로딩 자리표시 | `SkelBar`, `SkelRows`, `SkelTable`, `SkeletonView` — 화면 안에서 값을 받는 동안은 KPI 칸 `SkelKpi` · 차트 카드 `SkelChartCard` · 막대 목록 `SkelList` (글자 "…"·"불러오는 중"·"수집 전"으로 대신하지 않는다) |
 | 알림 박스 | `Notice` |
 | 표 하단 출처·단위 | `TableFootnote` |
 | 드롭다운·월 선택·페이지 | `Dropdown`, `MonthPicker`, `PeriodNav`, `Pagination` |
