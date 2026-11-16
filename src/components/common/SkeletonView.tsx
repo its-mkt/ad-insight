@@ -46,7 +46,7 @@ export const SkelTable: React.FC<{ rows?: number }> = ({ rows = 5 }) => (
 
 /** KPI 카드 한 칸 자리표시 — 첫 로딩(SkeletonView)과 화면 안에서 값을 받는 동안 같이 쓴다 */
 export const SkelKpi: React.FC = () => (
-  <div className="kpi">
+  <div className="kpi skel-kpi">
     <Bar w="55%" h="0.75rem" />
     <Bar w="70%" h="1.5rem" className="skel-kpi-v" />
     <Bar w="40%" h="0.75rem" />
