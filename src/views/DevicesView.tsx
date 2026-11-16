@@ -13,6 +13,7 @@ import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { AdApiSource } from '../components/common/ExtLink';
+import { SkelChartCard, SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import {
   AD_DEVICE_FROM,
   AD_DEVICE_MONTHS,
@@ -170,7 +171,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const estimateTrend = trend((m) => m.conv?.estimate);
 
   const loading = ga4 === null;
-  const kpiValue = (n: number | undefined) => (loading ? '…' : visits.measured ? `${fmt(n ?? 0)}회` : PENDING);
+  const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : PENDING);
 
   return (
     <View name="devices" title={TITLE}>
@@ -182,6 +183,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
 
       <KpiSection id="kpiDevices">
         {KPI_DEVICES.map((d) => {
+          // GA4 값을 받는 동안은 공용 자리표시 (값·보조 줄을 '수집 전'으로 잘못 보이지 않게)
+          if (loading) return <SkelKpi key={d} />;
           const n = visits.acc.get(d);
           const est = estimates.measured ? estimates.acc.get(d) ?? 0 : null;
           const ord = orders.measured ? orders.acc.get(d) ?? 0 : null;
@@ -220,13 +223,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
       </KpiSection>
 
       <div className="grid">
+        {loading ? (
+          <>
+            <SkelChartCard />
+            <SkelChartCard />
+          </>
+        ) : (
+          <>
         <MultiChart
           id="chDeviceVisits"
           title={allPeriod ? '연도별 기기별 방문' : '월별 기기별 방문'}
           labels={visitTrend.labels}
           series={visitTrend.series}
           unit="회"
-          emptyMessage={loading ? '불러오는 중입니다…' : 'GA4 방문 값이 없습니다.'}
+          emptyMessage="GA4 방문 값이 없습니다."
         />
         <MultiChart
           id="chDeviceEstimates"
@@ -234,12 +244,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
           labels={estimateTrend.labels}
           series={estimateTrend.series}
           unit="회"
-          emptyMessage={loading ? '불러오는 중입니다…' : `기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
+          emptyMessage={`기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
         />
+          </>
+        )}
       </div>
 
-      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${coverText(chVisits.measured, scope.length) ? ` · ${coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
-        {chVisits.measured ? (
+      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
+        {loading ? (
+          <SkelTable rows={5} />
+        ) : chVisits.measured ? (
           <table className="stk" id="tbDeviceChannels">
             <colgroup>
               <col />
@@ -301,7 +315,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             </tbody>
           </table>
         ) : (
-          <EmptyState message={loading ? '불러오는 중입니다…' : `기기 × 채널 유입은 ${PENDING}입니다.`} subMessage={loading ? undefined : 'GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다.'} />
+          <EmptyState message={`기기 × 채널 유입은 ${PENDING}입니다.`} subMessage="GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다." />
         )}
         <TableFootnote unit="회" basis="산출 근거: GA4 세션 · 견적 완료 = 견적 요청 완료 화면을 본 세션 · 전환율 = 견적 완료 ÷ 방문" sources={['출처: GA4 (itket-analytics 수집)']} />
       </Card>

@@ -5,6 +5,7 @@ import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCar
 import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { Card } from '../components/common/Card';
 import { PendingTag } from '../components/common/Muted';
+import { SkelList } from '../components/common/SkeletonView';
 import { ViewNote } from '../components/common/Note';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
@@ -54,11 +55,17 @@ const peakCard = (months: string[]) => {
 export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, site = 'itket' }) => {
   // 최신 GA4 값을 받으면 다시 그린다
   const [, setGa4Loaded] = useState(0);
+  // GA4 값을 받는 중인지 — 받은 값이 아직 하나도 없으면 그동안 자리표시를 보여 준다
+  const [ga4Done, setGa4Done] = useState(false);
   useEffect(() => {
     let alive = true;
-    loadGa4OrderSources(site).then((changed) => {
-      if (changed && alive) setGa4Loaded((n) => n + 1);
-    });
+    setGa4Done(false);
+    loadGa4OrderSources(site)
+      .then((changed) => {
+        if (changed && alive) setGa4Loaded((n) => n + 1);
+      })
+      .catch(() => undefined)
+      .finally(() => alive && setGa4Done(true));
     return () => {
       alive = false;
     };
@@ -136,6 +143,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const sourceScope = isMonth ? `${sourcePeriod}${sourceStart}` : `${sourcePeriod} 중 측정된 ${measuredMonths.length}개월`;
   // GA4 기준일보다 뒤의 달은 측정이 없는 것이 아니라 값을 아직 받지 못한 것이다
   const ga4NotYet = isMonth && selectedMonth > ga.asOf.slice(0, 7);
+  const sourceLoading = !ga4Done && measuredMonths.length === 0;
   const sourceSubtitle = measuredMonths.length
     ? `(${sourceScope} · 판매 ${hasOrders ? `${fmt(measuredSales)}건` : '수집 전'} · GA4 측정 ${fmt(sourceTotal)}건${sourceCutoff})`
     : `(${sourcePeriod} · ${ga4NotYet ? '집계 전' : '미측정'})`;
@@ -208,8 +216,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
 
       <PurchasedGoodsTable months={allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth]} periodLabel={allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : `${monthName}${partial ? ` · ${AS_OF_DAY}일까지` : ''}`} />
 
-      <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceSubtitle}>
-        <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />
+      <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceLoading ? `(${sourcePeriod})` : sourceSubtitle}>
+        {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
         <ViewNote>
           ※ GA4 가 실제로 측정한 값 그대로입니다 ({purchaseBasis ? '결제 주문마다 보낸 구매 이벤트 수' : "'주문 완료' 화면 방문 수라 같은 고객이 다시 들어오면 한 주문이 여러 번 잡히고, 광고 차단 프로그램을 쓰면 빠집니다"}) · 판매는 고도몰에서 결제된 주문 수 · {ga.asOf || '–'} 수집
         </ViewNote>
