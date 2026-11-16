@@ -1,4 +1,4 @@
-# its-ad-insight 프로젝트 규칙
+# ad-insight 프로젝트 규칙
 
 ## UI 컴포넌트 재사용 규칙
 

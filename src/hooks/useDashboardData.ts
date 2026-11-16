@@ -640,7 +640,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       writeCachedPayload(j, site);
     } catch (e) {
       if (isStale()) return;
-      console.error('[its-ad-insight] 실데이터 동기화 오류 (화면 데이터 유지):', e);
+      console.error('[ad-insight] 실데이터 동기화 오류 (화면 데이터 유지):', e);
       setStatus((prev) => (prev === 'live' ? 'live' : 'error'));
       await tryLoadStaticFallback();
     } finally {

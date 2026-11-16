@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * its-ad-insight — 실시간 데이터 동기화 · 카테고리 매칭 · 통계 수식 무결성 검증 스크립트
+ * ad-insight — 실시간 데이터 동기화 · 카테고리 매칭 · 통계 수식 무결성 검증 스크립트
  *
  * 실행 방법:
  *   yarn verify         : 실시간 GAS 엔드포인트와 로컬 스냅샷을 대조하고 6대 통계 무결성을 검증
@@ -55,7 +55,7 @@ export function standardCategoryOf(campaign = '', adgroup = '') {
 async function main() {
   const shouldWrite = process.argv.includes('--write') || process.argv.includes('--sync');
   console.log('======================================================================');
-  console.log(' [its-ad-insight] 실시간 데이터 연동 · 카테고리 매칭 · 통계 무결성 검증');
+  console.log(' [ad-insight] 실시간 데이터 연동 · 카테고리 매칭 · 통계 무결성 검증');
   console.log('======================================================================\n');
 
   const fetchUrl = `${DEFAULT_URL}?key=${DEFAULT_KEY}`;
