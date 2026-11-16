@@ -114,7 +114,7 @@ interface UsageViewProps {
   yearTotal?: boolean;
   /** 일·기간 선택 (켜져 있으면 월 선택보다 우선) */
   dayRange?: DayRange | null;
-  /** '최근 N일' 을 누르면 기간 선택 바의 일·기간을 바꾼다 */
+  /** '최근 N일' 을 누르면 이용 현황 전용 기간으로 바꾼다 (다른 메뉴의 기간은 그대로) */
   onSelectDayRange: (range: DayRange) => void;
 }
 

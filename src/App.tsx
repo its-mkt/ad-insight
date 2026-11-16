@@ -152,6 +152,9 @@ export const App: React.FC = () => {
   const isSearchView = currentView === 'search';
   // 일·기간 선택 — 켜져 있으면 월 선택보다 우선한다 (견적은 날짜 그대로, 광고는 걸친 달 전체). 월·연도·전체를 고르면 풀린다
   const [searchDay, setSearchDay] = useState<DayRange | null>(null);
+  // 이용 현황의 '최근 N일' — 이용 현황 전용이라 다른 메뉴의 기간에는 쓰지 않는다. 이용 현황에서 기간 선택 바를 건드리면 풀린다
+  const [usageRecent, setUsageRecent] = useState<DayRange | null>(null);
+  const usageRecentOn = currentView === 'usage' ? usageRecent : null;
   // 일·기간 — 일별 광고비 구간 안이면 그 기간의 광고비·견적으로 다시 모은 자료를 화면에 준다 (구간 밖이면 월 단위)
   // 최근 구간보다 앞선 날짜를 고르면 그 달의 일별 광고비를 추가로 받아 합친다
   const [dailyHist, setDailyHist] = useState<{ rows: SpendDailyRow[]; months: string[] }>({ rows: [], months: [] });
@@ -243,7 +246,15 @@ export const App: React.FC = () => {
     return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
   })();
 
-  // 일·기간 선택 — 기간 선택 바의 달력과 이용 현황의 '최근 N일' 이 함께 쓴다
+  // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다
+  const periodNavAction =
+    <A extends unknown[]>(fn: (...a: A) => void) =>
+    (...a: A) => {
+      if (currentView === 'usage') setUsageRecent(null);
+      fn(...a);
+    };
+
+  // 일·기간 선택 — 기간 선택 바의 달력 (모든 메뉴가 함께 쓴다)
   const selectDayRange = (r: DayRange | null) => {
     setSearchDay(r);
     if (!r) return;
@@ -425,25 +436,25 @@ export const App: React.FC = () => {
           {currentView !== 'data' && !oncorePending && (
             <PeriodNav
               years={availableYears}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
+              selectedYear={usageRecentOn ? usageRecentOn.to.slice(0, 4) : selectedYear}
+              selectedMonth={usageRecentOn ? usageRecentOn.to.slice(0, 7) : selectedMonth}
               minAvailableMonth={minAvailableMonth}
               maxAvailableMonth={maxAvailableMonth}
-              onSelectYear={setSelectedYear}
-              periodChanged={!!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
-              onResetPeriod={() => {
+              onSelectYear={periodNavAction(setSelectedYear)}
+              periodChanged={!!usageRecentOn || !!searchDay || allPeriod || yearTotal || selectedMonth !== THIS_M}
+              onResetPeriod={periodNavAction(() => {
                 clearPeriodModes();
                 setSelectedYear(String(THIS_Y));
                 setSelectedMonth(THIS_M);
-              }}
-              onSelectMonth={(m) => {
+              })}
+              onSelectMonth={periodNavAction((m: string) => {
                 clearPeriodModes();
                 setSelectedMonth(m);
-              }}
-              allPeriod={allPeriod}
-              onSelectAll={supportsTotal ? selectAllPeriod : undefined}
-              yearTotal={yearTotal}
-              dayRange={searchDay}
+              })}
+              allPeriod={usageRecentOn ? false : allPeriod}
+              onSelectAll={supportsTotal ? periodNavAction(selectAllPeriod) : undefined}
+              yearTotal={usageRecentOn ? false : yearTotal}
+              dayRange={usageRecentOn ?? searchDay}
               note={guestNote}
               maxDay={guest ? guestLastDay() : undefined}
               dayNote={
@@ -457,15 +468,15 @@ export const App: React.FC = () => {
                       : `이 기간은 일별 광고비 수집 전이라 ${+searchDay.to.slice(5, 7)}월 전체 기준으로 표시됩니다`
                   : undefined
               }
-              onSelectDayRange={selectDayRange}
+              onSelectDayRange={periodNavAction(selectDayRange)}
               onSelectYearTotal={
                 supportsTotal
-                  ? (m) => {
+                  ? periodNavAction((m: string) => {
                       setSearchDay(null);
                       setAllPeriodOn(false);
                       setYearTotalOn(true);
                       setSelectedMonth(m);
-                    }
+                    })
                   : undefined
               }
             />
@@ -579,7 +590,13 @@ export const App: React.FC = () => {
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
               {currentView === 'usage' && authLoading && <SkeletonView title={VIEW_TITLES.usage} variant="table" />}
-              {currentView === 'usage' && isLoggedIn && <UsageView selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onSelectDayRange={selectDayRange} />}
+              {currentView === 'usage' && isLoggedIn && <UsageView
+                  selectedMonth={usageRecentOn ? usageRecentOn.to.slice(0, 7) : viewMonth}
+                  allPeriod={usageRecentOn ? false : allPeriod}
+                  yearTotal={usageRecentOn ? false : yearTotal}
+                  dayRange={usageRecentOn ?? searchDay}
+                  onSelectDayRange={setUsageRecent}
+                />}
             </main>
           </div>
         </div>
