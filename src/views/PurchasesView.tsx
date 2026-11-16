@@ -4,7 +4,6 @@ import { MultiChart } from '../components/charts/MultiChart';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { Card } from '../components/common/Card';
-import { EmptyState } from '../components/common/EmptyState';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
 import { View } from '../components/common/View';
@@ -35,6 +34,7 @@ const known = (month: string) => (month in GODOMALL_ORDERS ? countOf(month) : nu
 const totalOf = (months: string[]) => sumBy(months, countOf);
 const lastYearOf = (month: string) => ym(+month.slice(0, 4) - 1, +month.slice(5));
 const countText = (n: number) => `${fmt(n)}건`;
+const PENDING = '수집 전';
 const avgText = (n: number) => `${n.toFixed(1)}건`;
 
 // 수집 시점의 달은 그날까지의 값이다
@@ -44,6 +44,8 @@ const dailyOf = (month: string) => (month in GODOMALL_ORDERS ? countOf(month) / 
 /** 건수가 가장 많은 달 */
 const peakOf = (months: string[]) => months.reduce((best, m) => (countOf(m) > countOf(best) ? m : best), months[0]);
 const peakCard = (months: string[]) => {
+  // 고도몰 주문을 아직 수집하지 않은 사이트는 '수집 전'
+  if (!months.some((m) => m in GODOMALL_ORDERS)) return <KpiCard label="최다 판매 월" value={PENDING} />;
   const peak = peakOf(months);
   return <KpiCard label="최다 판매 월" value={countText(countOf(peak))} sub={`${peak.slice(0, 4)}년 ${mLabel(peak)}`} />;
 };
@@ -82,13 +84,14 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const isMonth = !allPeriod && !yearTotal;
 
   const labels = allPeriod ? YEARS.map((y) => `${y}년`) : ytd.map((_, i) => `${i + 1}월`);
-  const series = allPeriod
+  // 수집 전이면 그래프·표에 0 을 그리지 않고 공용 빈 상태로 둔다
+  const series = !hasOrders ? [] : allPeriod
     ? [{ k: '판매 건수', c: '--acc', v: YEARS.map((y) => totalOf(ALL_MONTHS.filter((m) => m.startsWith(y)))) }]
     : [{ k: `${yr}년`, c: '--acc', v: ytd.map(countOf) }];
 
   // 표는 항상 12칸으로 그려 기간을 바꿔도 월 칸 너비가 같다
   const monthKeys = Array.from({ length: 12 }, (_, i) => i + 1);
-  const tableSeries = (allPeriod ? [...YEARS].reverse() : [yr]).map((y) => ({ k: `${y}년`, c: '--acc', v: monthKeys.map((m) => (untilMonth && ym(y, m) > untilMonth ? 0 : countOf(ym(y, m)))) }));
+  const tableSeries = !hasOrders ? [] : (allPeriod ? [...YEARS].reverse() : [yr]).map((y) => ({ k: `${y}년`, c: '--acc', v: monthKeys.map((m) => (untilMonth && ym(y, m) > untilMonth ? 0 : countOf(ym(y, m)))) }));
 
   // 월 보기 — 쇼핑몰에서 결제된 주문의 값만 쓴다 (견적·광고비와 섞지 않는다)
   const monthName = mLabel(selectedMonth);
@@ -142,24 +145,17 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
       <ViewHeader title={TITLE} description="고도몰 기준 판매 건수" status={status} />
       <ViewNote>※ 고도몰 주문통계의 구매건수(결제완료일 기준) · {hasOrders ? `${GODOMALL_ORDERS_AS_OF} 수집` : '수집 전'}</ViewNote>
 
-      {!hasOrders && (
-        <Card name="purchases-pending" title="판매 건수">
-          <EmptyState message="이 사이트의 고도몰 주문은 수집 전입니다." subMessage="수집기 스크립트 속성에 이 사이트 고도몰 API 키(GODO_PARTNER_KEY·GODO_USER_KEY)를 넣으면 다음 수집부터 채워집니다." />
-        </Card>
-      )}
-
-      {hasOrders && (
       <KpiSection id="kpiPurchases">
         {allPeriod ? (
           <>
-            <KpiCard label="전체 기간 판매 건수" value={countText(totalOf(ALL_MONTHS))} sub={`${ALL_MONTHS[0]} ~ ${ALL_MONTHS[ALL_MONTHS.length - 1]}`} />
-            <KpiCard label="월 평균" value={avgText(totalOf(ALL_MONTHS) / ALL_MONTHS.length)} />
+            <KpiCard label="전체 기간 판매 건수" value={hasOrders ? countText(totalOf(ALL_MONTHS)) : PENDING} sub={hasOrders ? `${ALL_MONTHS[0]} ~ ${ALL_MONTHS[ALL_MONTHS.length - 1]}` : undefined} />
+            <KpiCard label="월 평균" value={hasOrders ? avgText(totalOf(ALL_MONTHS) / ALL_MONTHS.length) : PENDING} />
             {peakCard(ALL_MONTHS)}
           </>
         ) : yearTotal ? (
           <>
-            <KpiCard label={`${yr}년 판매 건수`} value={countText(ytdTotal)} cur={ytdTotal} prev={lastYtdTotal} cmpLabel="전년 동기" />
-            <KpiCard label="월 평균" value={avgText(ytdTotal / mm)} cur={ytdTotal / mm} prev={lastYtdTotal === null ? null : lastYtdTotal / mm} cmpLabel="전년 동기" />
+            <KpiCard label={`${yr}년 판매 건수`} value={hasOrders ? countText(ytdTotal) : PENDING} cur={hasOrders ? ytdTotal : null} prev={lastYtdTotal} cmpLabel="전년 동기" />
+            <KpiCard label="월 평균" value={hasOrders ? avgText(ytdTotal / mm) : PENDING} cur={hasOrders ? ytdTotal / mm : null} prev={lastYtdTotal === null ? null : lastYtdTotal / mm} cmpLabel="전년 동기" />
             {peakCard(ytd)}
           </>
         ) : (
@@ -167,13 +163,13 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
             {/* 진행 중인 달의 건수는 끝난 달과 맞비교하지 않는다. 일평균·비율은 기간이 달라도 비교할 수 있다 */}
             <KpiCard
               label={<>{monthName} 판매 건수{partial && <PendingTag />}</>}
-              value={countText(monthCount)}
-              {...(partial ? { sub: `${AS_OF_DAY}일까지 집계` } : { cur: monthCount, prev: known(pv), cmpLabel: '전월' })}
+              value={hasOrders ? countText(monthCount) : PENDING}
+              {...(partial ? { sub: `${AS_OF_DAY}일까지 집계` } : { cur: hasOrders ? monthCount : null, prev: known(pv), cmpLabel: '전월' })}
               detail={<KpiDetailItems items={[['전월', orDash(known(pv), countText)], ['전년 동월', orDash(known(lastYear), countText)]]} />}
             />
             <KpiCard
               label={<>{monthName} 일평균 판매{partial && <PendingTag />}</>}
-              value={orDash(dailyOf(selectedMonth), (v) => `${v.toFixed(2)}건`)}
+              value={hasOrders ? orDash(dailyOf(selectedMonth), (v) => `${v.toFixed(2)}건`) : PENDING}
               cur={dailyOf(selectedMonth)}
               prev={dailyOf(pv)}
               cmpLabel="전월"
@@ -189,29 +185,28 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
             />
             <KpiCard
               label={<>{monthName} 판매 금액{partial && <PendingTag />}</>}
-              value={orDash(curAmount, wonText)}
+              value={hasOrders ? orDash(curAmount, wonText) : PENDING}
               {...monthCompare(curAmount, amountOf(pv))}
               detail={<KpiDetailItems items={[['주문 1건당', curAmount !== null && monthCount > 0 ? wonText(curAmount / monthCount) : '–']]} />}
             />
             <KpiCard
               label={<>{monthName} 구매 개수{partial && <PendingTag />}</>}
-              value={orDash(curQty, qtyText)}
+              value={hasOrders ? orDash(curQty, qtyText) : PENDING}
               {...monthCompare(curQty, qtyOf(pv))}
               detail={<KpiDetailItems items={[['주문 1건당', curQty !== null && monthCount > 0 ? `${(curQty / monthCount).toFixed(1)}개` : '–']]} />}
             />
           </>
         )}
       </KpiSection>
-      )}
 
-      {hasOrders && !isMonth && (
+      {!isMonth && (
         <>
           <MultiChart id="chPurchases" title={allPeriod ? '연도별 판매 건수' : '월별 판매 건수'} labels={labels} series={series} unit="건" />
           <TrendTable id="purchases-table" title={allPeriod ? '연도·월별 판매 건수' : `${yr}년 월별 판매 건수`} nameLabel="연도" labels={monthKeys.map((m) => `${m}월`)} series={tableSeries} isFuture={(i, row) => (allPeriod ? row !== null && ym(row.slice(0, 4), i + 1) > AS_OF_MONTH : i >= mm)} />
         </>
       )}
 
-      {hasOrders && <PurchasedGoodsTable months={allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth]} periodLabel={allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : `${monthName}${partial ? ` · ${AS_OF_DAY}일까지` : ''}`} />}
+      <PurchasedGoodsTable months={allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth]} periodLabel={allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : `${monthName}${partial ? ` · ${AS_OF_DAY}일까지` : ''}`} />
 
       <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceSubtitle}>
         <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />
