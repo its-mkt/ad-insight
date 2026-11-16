@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ViewId } from '../types/dashboard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
+import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
-import { SkelTable } from '../components/common/SkeletonView';
+import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import { Muted } from '../components/common/Muted';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
 import { Th } from '../components/common/Th';
@@ -171,7 +171,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
       <>
         <KpiSection>
           {['방문', '이용 기기', '페이지뷰', '평균 체류시간'].map((l) => (
-            <KpiPlaceholder key={l} label={l} message="불러오는 중…" />
+            <SkelKpi key={l} />
           ))}
         </KpiSection>
         <Card name="usage-loading">
