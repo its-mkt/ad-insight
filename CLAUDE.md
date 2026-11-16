@@ -34,7 +34,7 @@
 | 탭 / 구간 선택 | `TabButton`, `SegmentedControl` |
 | 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
-| 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` |
+| 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` — 자체 필터를 쓰는 표도 이용 현황 기록은 `useTrackCategoryFilter(cat1, cat2)` |
 | 비로그인에 가리는 화면 안내 | `LoginGate` |
 | 마우스를 올리면 뜨는 설명 (요소 감싸기) | `Tooltip` (`common/Tooltip`, 표 머리글은 `Th` 의 `tip`) |
 | 더보기·접기 | `MoreButton`, `ShowMoreButton` |
@@ -47,7 +47,7 @@
 | 표 머리글 (정렬 없음/있음) | `Th`, `SortableTh` |
 | 표 숫자 칸 (오른쪽 정렬, 단위, 굵게, 빈 값 `–`) | `NumTd` |
 | 표 합계 줄 | `TotalRow` (`label`, 추가 클래스 `className`) |
-| 1차 > 2차 펼침 줄 | `TreeParentRow`, `TreeChildRow`, `childLabelOf` |
+| 1차 > 2차 펼침 줄 | `TreeParentRow` (이름 뒤 흐린 보조 글자는 `sub`), `TreeChildRow`, `childLabelOf` |
 | 강조색 그룹 펼침 줄 (키워드 표 광고그룹·구매 제품) | `GroupAccordionRow` (`title`, `icon`, `count`, `open`, `canOpen`, `tone`, `plain`), 하위 줄 `GroupChildRow` |
 | 아이콘 + 굵은 이름 + 흐린 보조 글자 한 줄 (매체 이름 칸 등) | `IconLabel` (`icon`, `title`, `sub`, `lead`) — 펼침 줄이면 `GroupAccordionRow` |
 | 표 펼침 줄 앞 화살표(›) | `AccordionChevron` (`open`, `variant`, `placeholder`) — `ChevronRight` 를 직접 쓰지 않는다 |

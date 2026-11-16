@@ -6,6 +6,7 @@ import { CATEGORY_HIERARCHY, QUOTE_SITES } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useSort } from '../../hooks/useSort';
 import { Card } from '../common/Card';
+import { useTrackCategoryFilter } from '../common/CategoryFilter';
 import { Dropdown } from '../common/Dropdown';
 import { FilterReset } from '../common/FilterReset';
 import { EmptyState } from '../common/EmptyState';
@@ -84,6 +85,8 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
   const [origin, setOrigin] = useState(ALL);
   const [cat1, setCat1] = useState(ALL);
   const [cat2, setCat2] = useState(ALL);
+  // 견적 목록의 카테고리 필터도 이용 현황 '카테고리별 이용'에 남긴다
+  useTrackCategoryFilter(cat1 === ALL ? '' : cat1, cat2 === ALL ? '' : cat2);
   const [source, setSource] = useState(ALL);
   const [rep, setRep] = useState(ALL);
   const [page, setPage] = useState(1);

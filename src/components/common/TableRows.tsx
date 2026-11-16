@@ -51,12 +51,14 @@ interface TreeParentRowProps {
   countUnit?: string;
   /** 이름 옆에 하위 항목 수를 보일지 (기본 true) — 같은 수가 다른 칸에 이미 있으면 끈다 */
   showCount?: boolean;
+  /** 이름·하위 항목 수 뒤에 구분선과 함께 붙는 흐린 보조 글자 (예: 기록된 화면 이름) */
+  sub?: React.ReactNode;
   /** 나머지 칸 */
   children: React.ReactNode;
 }
 
 /** 1차 항목 줄 — 하위 항목이 있으면 눌러서 펼친다 */
-export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount = 0, open = false, onToggle, countUnit = '개', showCount = true, children }) => {
+export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount = 0, open = false, onToggle, countUnit = '개', showCount = true, sub, children }) => {
   const expandable = childCount > 0;
   return (
     <tr
@@ -68,6 +70,7 @@ export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount 
         {expandable && <AccordionChevron variant="tree" open={open} />}
         <b>{label}</b>
         {expandable && showCount && <span className="kw-cat-child-count">{childCount}{countUnit}</span>}
+        {sub != null && <small className="tree-row-sub">{sub}</small>}
       </td>
       {children}
     </tr>
