@@ -341,6 +341,8 @@ export interface RawQuoteStatsExtraApiRow {
   category?: unknown;
   source?: unknown;
   sales_rep?: unknown;
+  /** 사이트·전화문의 시트의 접수 번호 (고객 정보 아님) */
+  sno?: unknown;
 }
 
 /** 전화문의 시트 한 행 (quotes_phone) */
