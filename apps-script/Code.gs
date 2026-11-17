@@ -1117,17 +1117,18 @@ function collectQuotePhone() {
 }
 /* ── 건수 통계용 추가 견적 ──
  * 다른 사이트 견적과 전화문의를 건수 통계에 함께 세도록 quotes_stats_extra 에 쓴다. 공개 응답에 나가므로 고객 정보는 넣지 않는다.
+ * sno 는 시트 접수 번호일 뿐 고객 정보가 아니라 넣는다 — 로그아웃 화면 견적 목록에도 번호가 보이게.
  * CPA·견적전환율은 quotes_monthly(아이티켓) 기준이라 여기 값이 들어가지 않는다. */
-const QUOTE_STATS_EXTRA_HEAD = ['date', 'origin', 'category', 'source', 'sales_rep'];
+const QUOTE_STATS_EXTRA_HEAD = ['date', 'origin', 'category', 'source', 'sales_rep', 'sno'];
 function collectQuoteStatsExtra() {
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
   const day = (x) => (x instanceof Date ? Utilities.formatDate(x, 'Asia/Seoul', 'yyyy-MM-dd') : String(x == null ? '' : x).trim().slice(0, 10));
   const rows = [QUOTE_STATS_EXTRA_HEAD];
   read_(ss, 'quotes_raw_sites').forEach((r) => {
-    if (quoteMonth_(day(r.date))) rows.push([day(r.date), String(r.site), String(r.category || '기타'), String(r.source || '미수집'), String(r.sales_rep || '')]);
+    if (quoteMonth_(day(r.date))) rows.push([day(r.date), String(r.site), String(r.category || '기타'), String(r.source || '미수집'), String(r.sales_rep || ''), String(r.sno || '')]);
   });
   read_(ss, 'quotes_phone').forEach((r) => {
-    if (quoteMonth_(day(r.received_at))) rows.push([day(r.received_at), 'phone', phoneCategory_(r.category, r.memo), String(r.source || '미수집'), String(r.sales_rep || '')]);
+    if (quoteMonth_(day(r.received_at))) rows.push([day(r.received_at), 'phone', phoneCategory_(r.category, r.memo), String(r.source || '미수집'), String(r.sales_rep || ''), String(r.sno || '')]);
   });
   put_(ss, 'quotes_stats_extra', rows);
 }

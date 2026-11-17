@@ -446,6 +446,7 @@ export function fromApi(j: RawApiPayload): DashboardData {
       .map((r, idx) => ({
         id: 'qx_' + (idx + 1),
         site: String(r.origin ?? '').trim(),
+        sno: String(r.sno ?? '').trim() || undefined,
         date: String(r.date ?? '').trim(),
         category: String(r.category ?? '').trim() || '기타',
         source: extraSourceOf(r),
