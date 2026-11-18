@@ -6,6 +6,8 @@ interface SkeletonViewProps {
   title: string;
   /** dashboard: KPI + 차트 2개 + 표 / table: 표 위주 화면 (키워드 · 데이터 연결) */
   variant?: 'dashboard' | 'table';
+  /** 로그인 전 둘러보기 — 불러오는 중이 아니라 가려 둔 자리라 깜빡이지 않고, 읽기 프로그램에도 그렇게 알린다 */
+  locked?: boolean;
 }
 
 /** 회색 자리표시 막대 (공용 .skel 색·깜빡임) */
@@ -93,10 +95,10 @@ const TableCard: React.FC<{ rows: number }> = ({ rows }) => (
 );
 
 /** 첫 데이터가 오기 전(캐시 없음) 실제 화면과 같은 틀로 회색 자리표시를 보여 준다 */
-export const SkeletonView: React.FC<SkeletonViewProps> = ({ title, variant = 'dashboard' }) => (
-  <div className="view on skel-view" aria-busy="true">
+export const SkeletonView: React.FC<SkeletonViewProps> = ({ title, variant = 'dashboard', locked }) => (
+  <div className={`view on skel-view${locked ? ' skel-locked' : ''}`} aria-busy={!locked}>
     <span className="sr-only" role="status">
-      {title} 데이터를 불러오는 중입니다.
+      {locked ? `${title} 데이터는 로그인하면 볼 수 있습니다.` : `${title} 데이터를 불러오는 중입니다.`}
     </span>
     <div className="mod-h" aria-hidden="true">
       <div>

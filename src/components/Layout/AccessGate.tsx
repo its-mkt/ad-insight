@@ -6,20 +6,35 @@ import { Button } from '../common/Button';
 import { SkelBar } from '../common/SkeletonView';
 import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
+import { GuestPreview } from './GuestPreview';
 
 /** 승인 대기 화면이 승인 여부를 다시 묻는 간격 */
 const PENDING_POLL_MS = 30 * 1000;
 
 type GateTab = 'login' | 'signup';
 
+interface GateCardProps {
+  icon: React.ReactNode;
+  title: string;
+  desc: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+/** 접속 카드 안쪽 — 아이콘·제목·설명·폼 */
+const GateCardBody: React.FC<GateCardProps> = ({ icon, title, desc, children }) => (
+  <>
+    <div className="gate-icon">{icon}</div>
+    <h2 id="access-gate-title">{title}</h2>
+    <p>{desc}</p>
+    {children}
+  </>
+);
+
 /** 접속 화면 한 장 — 가운데 카드 (로그인 모달과 같은 모양) */
-const GateCard: React.FC<{ icon: React.ReactNode; title: string; desc: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, desc, children }) => (
+const GateCard: React.FC<GateCardProps> = (props) => (
   <div className="login-backdrop access-gate">
     <div className="card login-modal" role="main" aria-labelledby="access-gate-title">
-      <div className="gate-icon">{icon}</div>
-      <h2 id="access-gate-title">{title}</h2>
-      <p>{desc}</p>
-      {children}
+      <GateCardBody {...props} />
     </div>
   </div>
 );
@@ -125,22 +140,25 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
     );
   }
 
+  // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn) {
     return (
-      <GateCard
-        icon={<Lock size="1.25rem" aria-hidden="true" />}
-        title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입 및 열람 요청'}
-        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
-      >
-        {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
-        {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
-        <p className="gate-switch">
-          {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
-          <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
-            {tab === 'login' ? '회원가입' : '로그인'}
-          </Button>
-        </p>
-      </GateCard>
+      <GuestPreview>
+        <GateCardBody
+          icon={<Lock size="1.25rem" aria-hidden="true" />}
+          title={tab === 'login' ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
+          desc={tab === 'login' ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
+        >
+          {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
+          {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
+          <p className="gate-switch">
+            {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
+            <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
+              {tab === 'login' ? '회원가입' : '로그인'}
+            </Button>
+          </p>
+        </GateCardBody>
+      </GuestPreview>
     );
   }
 

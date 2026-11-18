@@ -1465,6 +1465,43 @@ tr.kw-more-row td {
   background: var(--bg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+// 로그인 전 둘러보기 (Layout/GuestPreview) — 화면 틀 위 로그인 카드. 카드 안 모양은 접속 화면과 같다
+.guest-main {
+  position: relative;
+
+  // 가려 둔 자리 — 흐리게, 깜빡임 없이
+  .skel-locked {
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
+
+    .skel {
+      animation: none;
+    }
+  }
+}
+
+.guest-lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 4.5rem 1rem 1rem;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 20%, transparent), color-mix(in srgb, var(--bg) 85%, transparent) 18rem);
+
+  // 화면을 내려도 카드가 보이게
+  .card.login-modal {
+    position: sticky;
+    top: 5rem;
+    margin: 0;
+  }
+}
+
+.login-backdrop.access-gate,
+.guest-lock {
 
   // 로그인 버튼 밑 "계정이 없으신가요? 회원가입"
   p.gate-switch {

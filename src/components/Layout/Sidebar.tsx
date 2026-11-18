@@ -22,6 +22,8 @@ interface SidebarProps {
   /** 보고 있는 사이트 (아이티켓 / 온코어) */
   site: SiteId;
   onSiteChange: (site: SiteId) => void;
+  /** 로그인 전 둘러보기 — 수집 시각 배지를 빼고 버전만 둔다 */
+  preview?: boolean;
 }
 
 type DashboardId = 'ad-insight' | 'analytics';
@@ -127,6 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onReload,
   site,
   onSiteChange,
+  preview,
 }) => {
   const { isLoggedIn } = useAuth();
   // 계정 관리 메뉴 옆 승인 대기 건수 — 관리자로 로그인했을 때만 명단을 받는다
@@ -210,6 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
         {/* 마케팅팀 · 배포 날짜 기준 릴리즈 (같은 날 여러 번이면 -2, -3 …) */}
         <div className="sfoot">
+          {!preview && (
           <span className={`upd${live ? ' live' : ''}`} data-tip={updTip} data-tip-desc={updTip ? '' : undefined} data-tip-pos="top">
             {live ? (
               <span className="upd-body">
@@ -225,6 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             )}
           </span>
+          )}
           <span className="sfoot-ver">
             마케팅팀 ·{' '}
             <span className="rel" title={__APP_COMMIT__ ? `커밋 ${__APP_COMMIT__}` : undefined}>

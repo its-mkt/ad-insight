@@ -26,6 +26,7 @@ import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { UsageView } from './views/UsageView';
 import { MembersView } from './views/MembersView';
+import { applyTheme, getInitialDark } from './utils/theme';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
@@ -44,22 +45,6 @@ const cmpRangeText = (r: DayRange): string => {
 
 /** 브라우저 탭 제목 뒤에 붙는 서비스 이름 */
 const APP_TITLE = '아이티스 광고 인사이트';
-
-function getInitialDark(): boolean {
-  try {
-    const t = localStorage.getItem('theme');
-    if (t) {
-      document.documentElement.dataset.theme = t;
-      return t === 'dark';
-    }
-  } catch {
-    // ignore
-  }
-  const r = document.documentElement;
-  return r.dataset.theme
-    ? r.dataset.theme === 'dark'
-    : window.matchMedia('(prefers-color-scheme:dark)').matches;
-}
 
 export const App: React.FC = () => {
   // 사이드바에서 고른 사이트 — 주소 경로 앞부분(/itket·/oncore/…)이 기준이라 링크를 공유해도 같은 사이트로 열린다
@@ -383,15 +368,8 @@ export const App: React.FC = () => {
   }, []);
 
   const handleToggleTheme = () => {
-    const nextDark = !isDark;
-    const nextTheme = nextDark ? 'dark' : 'light';
-    document.documentElement.dataset.theme = nextTheme;
-    try {
-      localStorage.setItem('theme', nextTheme);
-    } catch {
-      // ignore
-    }
-    setIsDark(nextDark);
+    applyTheme(!isDark);
+    setIsDark(!isDark);
   };
 
   const handleOpenDrawer = () => {
