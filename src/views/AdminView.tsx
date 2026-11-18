@@ -6,7 +6,6 @@ import { SegmentedControl } from '../components/common/SegmentedControl';
 import { getCfg, quoteDetailsPending } from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { currentAccessToken } from '../lib/access';
-import { MemberApprovals } from '../components/admin/MemberApprovals';
 import { quoteKey } from '../utils/format';
 import { setUnsavedEdits } from '../utils/monthRollover';
 import type { DayRange } from '../utils/dayRange';
@@ -204,11 +203,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
         description="견적 접수 원본 리스트(Google 시트) 및 표준 카테고리 수동 지정 · 데이터 저장 관리"
         status="live"
       />
-
-      {/* 가입 요청 승인·열람 권한 해제 */}
-      <div className="admin-members">
-        <MemberApprovals />
-      </div>
 
       {/* 아래 카드 전체(제목·열·필터)가 바뀌는 전환이라 카드 밖 머리말 아래에 둔다 */}
       <div className="admin-channel">

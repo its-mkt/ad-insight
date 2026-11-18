@@ -1322,9 +1322,8 @@ tr.kw-more-row td {
 }
 
 // 가입 요청·열람 권한 카드 — 견적 관리 위에 둔다
-.admin-members {
-  margin-bottom: 1.5rem;
-
+// 계정 관리 화면 — 승인·거절·해제 버튼 칸
+.members-view {
   .member-actions {
     display: flex;
     gap: 0.375rem;
