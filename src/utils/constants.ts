@@ -46,6 +46,7 @@ export const VALID_VIEWS: ViewId[] = [
   'search',
   'data',
   'admin',
+  'members',
   'usage',
 ];
 
@@ -60,6 +61,7 @@ export const VIEW_TITLES: Record<ViewId, string> = {
   search: '검색 결과',
   data: '데이터 연결',
   admin: '어드민 관리',
+  members: '계정 관리',
   usage: '이용 현황',
 };
 

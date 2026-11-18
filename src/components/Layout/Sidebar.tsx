@@ -3,7 +3,8 @@ import type { DashboardData, SiteId, SyncStatus, ViewId } from '../../types/dash
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { SITE_ENABLED } from '../../utils/route';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, X } from 'lucide-react';
+import { Activity, ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, UserCog, X } from 'lucide-react';
+import { useMembers } from '../../hooks/useMembers';
 import { Button } from '../common/Button';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 
@@ -110,6 +111,7 @@ const NAV_ITEMS: NavItem[] = [
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'data', label: '데이터 연결', icon: <Database /> },
   { id: 'admin', label: '어드민 관리', icon: <Lock /> },
+  { id: 'members', label: '계정 관리', icon: <UserCog /> },
   { id: 'usage', label: '이용 현황', icon: <Activity /> },
 ];
 
@@ -127,6 +129,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSiteChange,
 }) => {
   const { isLoggedIn } = useAuth();
+  // 계정 관리 메뉴 옆 승인 대기 건수 — 관리자로 로그인했을 때만 명단을 받는다
+  const { pending } = useMembers(isLoggedIn);
   const live = status === 'live';
   const navButton = (item: NavItem) => {
     const isActive = currentView === item.id;
@@ -142,6 +146,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {item.icon}
         <span>{item.label}</span>
+        {item.id === 'members' && pending > 0 && (
+          <span className="nv-count" title={`승인 대기 ${pending}건`} aria-label={`승인 대기 ${pending}건`}>
+            {pending}
+          </span>
+        )}
       </button>
     );
   };

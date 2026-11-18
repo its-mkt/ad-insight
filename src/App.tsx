@@ -25,6 +25,7 @@ import { SearchView } from './views/SearchView';
 import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { UsageView } from './views/UsageView';
+import { MembersView } from './views/MembersView';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
@@ -88,8 +89,8 @@ export const App: React.FC = () => {
     setSite(next);
     window.history.pushState(null, '', routePath(next, currentView, searchQuery));
   };
-  // 로그인한 관리자만 보는 설정·운영 화면 (데이터 연결·어드민·이용 현황)
-  const loginOnlyView = currentView === 'data' || currentView === 'admin' || currentView === 'usage';
+  // 로그인한 관리자만 보는 설정·운영 화면 (데이터 연결·어드민·계정 관리·이용 현황)
+  const loginOnlyView = currentView === 'data' || currentView === 'admin' || currentView === 'members' || currentView === 'usage';
   // 수집기 웹앱이 아직 연결되지 않은 사이트는 데이터 화면 대신 안내만 보여 준다 (데이터 연결·어드민·이용 현황은 사이트와 상관없다)
   const oncorePending = site === 'oncore' && !siteConnected(site) && !loginOnlyView;
 
@@ -441,7 +442,8 @@ export const App: React.FC = () => {
             onLogin={() => setLoginOpen(true)}
             onSearch={() => setSearchOpen(true)}
           />
-          {currentView !== 'data' && !oncorePending && (
+          {/* 데이터 연결·계정 관리는 기간과 상관없는 화면이라 기간 바를 두지 않는다 */}
+          {currentView !== 'data' && currentView !== 'members' && !oncorePending && (
             <PeriodNav
               years={availableYears}
               selectedYear={usageRecentOn ? usageRecentOn.to.slice(0, 4) : selectedYear}
@@ -579,6 +581,8 @@ export const App: React.FC = () => {
               {currentView === 'admin' && isLoggedIn && (
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
+              {currentView === 'members' && authLoading && <SkeletonView title={VIEW_TITLES.members} variant="table" />}
+              {currentView === 'members' && isLoggedIn && <MembersView />}
               {currentView === 'usage' && authLoading && <SkeletonView title={VIEW_TITLES.usage} variant="table" />}
               {currentView === 'usage' && isLoggedIn && <UsageView
                   selectedMonth={usageRecentOn ? usageRecentOn.to.slice(0, 7) : viewMonth}
