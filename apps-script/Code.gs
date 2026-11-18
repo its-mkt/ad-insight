@@ -1600,7 +1600,8 @@ function deleteMember_(accessToken, email) {
 function deleteAuthUser_(email) {
   const key = PROPS.getProperty('SUPABASE_SERVICE_KEY');
   if (!key) return 'kept';
-  const headers = { apikey: key, Authorization: 'Bearer ' + key };
+  // 새 형식 비밀 키(sb_secret_…)는 apikey 머리글만 보낸다 (게이트웨이가 토큰을 만든다). 예전 service_role(JWT)는 Bearer 도 함께
+  const headers = /^sb_/.test(key) ? { apikey: key } : { apikey: key, Authorization: 'Bearer ' + key };
   try {
     for (let page = 1; page <= 20; page++) {
       const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users?per_page=200&page=' + page, { headers, muteHttpExceptions: true });
