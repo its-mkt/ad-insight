@@ -34,7 +34,6 @@ import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from '.
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
-import { LoginGate } from './components/common/LoginGate';
 
 /** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
 const cmpRangeText = (r: DayRange): string => {
@@ -216,13 +215,13 @@ export const App: React.FC = () => {
     }
   }, [isSyncing, status, maxAvailableMonth, selectedMonth]);
 
-  // 비로그인 — 월 합계로만 받는 화면(키워드·구매·기기)은 진행 중인 달을 가리고, 합계는 지난달까지만 센다
+  // 비로그인 — 진행 중인 달은 어제까지만 보여 준다. 구매·기기의 월 보기는 어제까지 다시 센 값을 보여 주고(guestCutDay),
+  // 연도 합계·전체 기간은 달 합계끼리 더하므로 지난달까지만 센다
+  const guestCutDay = guest ? guestLastDay() : undefined;
   const guestUntil = guest ? prevM(THIS_M) : undefined;
   const monthlyOnlyView = currentView === 'keywords' || currentView === 'purchases' || currentView === 'devices';
-  // 연도 합계는 지난달이 같은 해일 때만 지난달까지로 줄여 보여 준다 (1월이면 가린다)
+  // 연도 합계는 지난달이 같은 해일 때만 지난달까지로 줄여 보여 준다 (1월이면 1월 1일~어제)
   const guestYearMonth = guestUntil && yearTotal && viewMonth === THIS_M && guestUntil.slice(0, 4) === THIS_M.slice(0, 4) ? guestUntil : undefined;
-  // 키워드 연도 합계는 당월 키워드가 이미 빠져 있어 그대로 보여 준다
-  const guestLocked = guest && monthlyOnlyView && !allPeriod && viewMonth === THIS_M && (!yearTotal || (currentView !== 'keywords' && !guestYearMonth));
   const monthlyViewMonth = currentView !== 'keywords' && guestYearMonth ? guestYearMonth : viewMonth;
   // 일·기간, '전체', 연도 합계 선택을 모두 푼다 (달을 고르거나 기간을 되돌릴 때)
   const clearPeriodModes = () => {
@@ -230,25 +229,25 @@ export const App: React.FC = () => {
     setAllPeriodOn(false);
     setYearTotalOn(false);
   };
-  const showPrevMonth = () => {
-    const pm = prevM(THIS_M);
-    clearPeriodModes();
-    setSelectedYear(pm.slice(0, 4));
-    setSelectedMonth(pm);
-  };
   const guestNote = (() => {
     if (!guestClip?.range || oncorePending) return undefined;
     if (!(allPeriod || viewMonth === THIS_M)) return undefined;
     const to = guestClip.range.to;
     const m = +to.slice(5, 7);
     const dropped = guestClip.droppedMedia.length ? ` (${guestClip.droppedMedia.join('·')} 당월 금액 제외)` : '';
-    // 키워드 화면의 합계는 광고비(어제까지)와 함께 보지만 키워드 성과 자체는 당월이 빠진다
+    const until = `${m}월은 ${+to.slice(8, 10)}일(어제)까지 반영`;
+    // 키워드는 네이버만 어제까지로 수집되고, 구글 키워드·소재 성과는 달 합계에 오늘 값이 섞여 당월이 빠진다
+    // 구매·기기는 어제까지 다시 셀 수 없는 달 합계(GA4·구글 기기별 광고)만 당월이 빠지고, 연도 합계·전체 기간은 지난달까지다
     const head =
-      monthlyOnlyView && currentView !== 'keywords'
-        ? `${m}월은 마감 후 반영`
-        : currentView === 'keywords'
-          ? `키워드·소재 성과의 ${m}월은 마감 후 반영`
-          : `${m}월은 ${+to.slice(8, 10)}일(어제)까지 반영${dropped}`;
+      currentView === 'keywords'
+        ? `${m}월 키워드는 네이버만 ${+to.slice(8, 10)}일(어제)까지 반영 (구글 키워드·소재 성과는 마감 후 반영)`
+        : monthlyOnlyView && (allPeriod || guestYearMonth)
+          ? `${m}월은 마감 후 반영`
+          : currentView === 'purchases'
+            ? `${until} (GA4 유입 값은 마감 후 반영)`
+            : currentView === 'devices'
+              ? `${until} (GA4 방문·전환과 구글 광고는 마감 후 반영)`
+              : `${until}${dropped}`;
     return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
   })();
 
@@ -529,25 +528,7 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                 />
               )}
-              {guestLocked && viewReady && (
-                <LoginGate
-                  name={currentView}
-                  title={currentView === 'keywords' ? '키워드 · 소재 성과' : VIEW_TITLES[currentView]}
-                  description={
-                    currentView === 'keywords'
-                      ? '광고그룹별 검색 키워드 입찰/품질/전환 지표 및 배너·확장 소재 현황'
-                      : currentView === 'purchases'
-                        ? '고도몰 기준 판매 건수'
-                        : 'PC·모바일·태블릿별 방문, 견적·주문 전환, 광고 성과와 판매를 한 화면에 봅니다'
-                  }
-                  status={status}
-                  message={`진행 중인 ${+THIS_M.slice(5, 7)}월 값은 로그인 후 볼 수 있습니다`}
-                  subMessage="매체마다 수집 시각이 달라 진행 중인 달의 월 합계는 서로 맞지 않을 수 있어, 마감된 달만 공개합니다"
-                  onLogin={() => setLoginOpen(true)}
-                  alt={{ label: `${+prevM(THIS_M).slice(5, 7)}월 보기`, onClick: showPrevMonth }}
-                />
-              )}
-              {!guestLocked && viewReady && currentView === 'keywords' && (
+              {viewReady && currentView === 'keywords' && (
                 <KeywordsView period={period}
                   data={viewData}
                   categoryMap={categoryMap}
@@ -569,8 +550,8 @@ export const App: React.FC = () => {
                 />
               )}
               {/* 구매 상세·기기별 통계는 사이트마다 그 사이트의 고도몰 주문·GA4(온코어는 itket-analytics 의 온코어 수집)로 그린다 */}
-              {!guestLocked && viewReady && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
-              {!guestLocked && viewReady && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} site={site} />}
+              {viewReady && currentView === 'purchases' && <PurchasesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} cutoffDay={guestCutDay} site={site} />}
+              {viewReady && currentView === 'devices' && <DevicesView status={status} selectedMonth={monthlyViewMonth} allPeriod={allPeriod} yearTotal={yearTotal} untilMonth={guestUntil} cutoffDay={guestCutDay} site={site} />}
               {viewReady && currentView === 'search' && (
                 <SearchView
                   key={`${searchQuery}|${searchTab || ''}`}

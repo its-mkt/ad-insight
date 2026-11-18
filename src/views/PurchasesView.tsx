@@ -12,9 +12,9 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { PurchasedGoodsTable } from '../components/quotes/PurchasedGoodsTable';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../data/ga4OrderSources';
-import { GODOMALL_DAILY, GODOMALL_GOODS, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF } from '../data/godomallOrders';
+import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, salesCutoff, salesInMonths } from '../data/godomallOrders';
 import { daysOfMonth } from '../utils/dayRange';
-import { fmt, mLabel, prevM, sumBy, ym } from '../utils/format';
+import { fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 
 interface PurchasesViewProps {
   status: SyncStatus;
@@ -23,24 +23,34 @@ interface PurchasesViewProps {
   yearTotal?: boolean;
   /** 이 달까지만 보여 준다 — 로그인하지 않으면 진행 중인 달을 빼고 지난달까지 (빈 값이면 제한 없음) */
   untilMonth?: string;
+  /** 이 날까지만 보여 준다 — 로그인하지 않으면 어제. 판매·제품은 이날까지 다시 세고, 오늘 값이 섞인 진행 중인 달의 GA4 월 합계는 마감 후 반영으로 둔다 (빈 값이면 제한 없음) */
+  cutoffDay?: string;
   /** 보고 있는 사이트 — 고도몰 주문·GA4 값을 그 사이트 것으로 그린다 */
   site?: SiteId;
 }
 
 const TITLE = '구매 상세';
 
-const countOf = (month: string) => GODOMALL_ORDERS[month] ?? 0;
-/** 수집 범위 밖의 달은 비교하지 않는다 */
-const known = (month: string) => (month in GODOMALL_ORDERS ? countOf(month) : null);
+/** 수집 범위 밖의 달은 비교하지 않는다. 판매를 세는 마지막 날이 있으면(비로그인) 그 달은 1일~그날만 센다 */
+const known = (month: string) => salesInMonths([month]);
+const countOf = (month: string) => known(month) ?? 0;
 const totalOf = (months: string[]) => sumBy(months, countOf);
 const lastYearOf = (month: string) => ym(+month.slice(0, 4) - 1, +month.slice(5));
 const countText = (n: number) => `${fmt(n)}건`;
 const PENDING = '수집 전';
 const avgText = (n: number) => `${n.toFixed(1)}건`;
 
+/** 판매를 센 마지막 날 — 수집일, 비로그인이면 어제까지 */
+const asOfDate = () => {
+  const cut = salesCutoff();
+  return cut && cut < GODOMALL_ORDERS_AS_OF ? cut : GODOMALL_ORDERS_AS_OF;
+};
 // 수집 시점의 달은 그날까지의 값이다
-const elapsedDays = (month: string) => (month === GODOMALL_ORDERS_AS_OF.slice(0, 7) ? +GODOMALL_ORDERS_AS_OF.slice(8, 10) : daysOfMonth(month));
-const dailyOf = (month: string) => (month in GODOMALL_ORDERS ? countOf(month) / elapsedDays(month) : null);
+const elapsedDays = (month: string) => (month === asOfDate().slice(0, 7) ? +asOfDate().slice(8, 10) : daysOfMonth(month));
+const dailyOf = (month: string) => {
+  const n = known(month);
+  return n === null ? null : n / elapsedDays(month);
+};
 
 /** 건수가 가장 많은 달 */
 const peakOf = (months: string[]) => months.reduce((best, m) => (countOf(m) > countOf(best) ? m : best), months[0]);
@@ -52,7 +62,7 @@ const peakCard = (months: string[]) => {
 };
 
 /** 고도몰 주문통계의 구매건수 (결제완료일 기준) */
-export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, site = 'itket' }) => {
+export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, cutoffDay, site = 'itket' }) => {
   // 최신 GA4 값을 받으면 다시 그린다
   const [, setGa4Loaded] = useState(0);
   // GA4 값을 받는 중인지 — 받은 값이 아직 하나도 없으면 그동안 자리표시를 보여 준다
@@ -77,8 +87,9 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   // 그 사이트 고도몰 주문을 아직 수집하지 않았으면 0건이 아니라 '수집 전'으로 둔다
   const hasOrders = ALL_MONTHS.length > 0;
   const YEARS = [...new Set(ALL_MONTHS.map((m) => m.slice(0, 4)))];
-  const AS_OF_MONTH = GODOMALL_ORDERS_AS_OF.slice(0, 7);
-  const AS_OF_DAY = +GODOMALL_ORDERS_AS_OF.slice(8, 10);
+  const AS_OF = asOfDate();
+  const AS_OF_MONTH = AS_OF.slice(0, 7);
+  const AS_OF_DAY = +AS_OF.slice(8, 10);
   const yr = selectedMonth.slice(0, 4);
   const mm = +selectedMonth.slice(5, 7);
   const ytd = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
@@ -104,9 +115,16 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const monthName = mLabel(selectedMonth);
   const pv = prevM(selectedMonth);
   const lastYear = lastYearOf(selectedMonth);
-  const partial = selectedMonth === AS_OF_MONTH;
-  const amountOf = (mo: string) => (mo in GODOMALL_GOODS ? sumBy(GODOMALL_GOODS[mo], (g) => g.amount) : null);
-  const qtyOf = (mo: string) => (mo in GODOMALL_GOODS ? sumBy(GODOMALL_GOODS[mo], (g) => g.qty) : null);
+  // 비로그인 매월 1일처럼 마지막 날이 그 달 말일이면 끝난 달이다
+  const partial = selectedMonth === AS_OF_MONTH && !(AS_OF === cutoffDay && AS_OF_DAY === daysOfMonth(AS_OF_MONTH));
+  const amountOf = (mo: string) => {
+    const goods = goodsInMonth(mo);
+    return goods ? sumBy(goods, (g) => g.amount) : null;
+  };
+  const qtyOf = (mo: string) => {
+    const goods = goodsInMonth(mo);
+    return goods ? sumBy(goods, (g) => g.qty) : null;
+  };
   const orDash = (v: number | null, text: (n: number) => string) => (v === null ? '–' : text(v));
   const wonText = (v: number) => `${fmt(v)}원`;
   const qtyText = (v: number) => `${fmt(v)}개`;
@@ -118,7 +136,9 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   // 유입 매체별 구매 참고값 — GA4 가 실제로 측정한 '주문 완료' 화면 방문 수를 그대로 그린다 (추정·보정 없음).
   // 판매는 비교용으로 GA4 가 측정한 기간에 결제된 건수만 센다. 측정 시작일이 있는 달은 고도몰 일별 실측값으로 그 날부터 센다
   const scopeMonths = allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth];
-  const measuredMonths = scopeMonths.filter((mo) => mo in ga.sources);
+  // GA4 는 달 합계로만 받아 진행 중인 달에는 오늘 값이 섞여 있다 — 마지막 날이 있으면(비로그인) 그 달은 마감 후 반영
+  const ga4LiveHidden = (mo: string) => !!cutoffDay && mo === THIS_M;
+  const measuredMonths = scopeMonths.filter((mo) => mo in ga.sources && !ga4LiveHidden(mo));
   const purchaseBasis = measuredMonths.length > 0 && measuredMonths.every((mo) => ga.purchaseMonths.has(mo));
   const sourceCounts = new Map<string, number>();
   measuredMonths.forEach((mo) =>
@@ -143,10 +163,11 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const sourceScope = isMonth ? `${sourcePeriod}${sourceStart}` : `${sourcePeriod} 중 측정된 ${measuredMonths.length}개월`;
   // GA4 기준일보다 뒤의 달은 측정이 없는 것이 아니라 값을 아직 받지 못한 것이다
   const ga4NotYet = isMonth && selectedMonth > ga.asOf.slice(0, 7);
-  const sourceLoading = !ga4Done && measuredMonths.length === 0;
+  const ga4Closed = isMonth && ga4LiveHidden(selectedMonth);
+  const sourceLoading = !ga4Done && !ga4Closed && measuredMonths.length === 0;
   const sourceSubtitle = measuredMonths.length
     ? `(${sourceScope} · 판매 ${hasOrders ? `${fmt(measuredSales)}건` : '수집 전'} · GA4 측정 ${fmt(sourceTotal)}건${sourceCutoff})`
-    : `(${sourcePeriod} · ${ga4NotYet ? '집계 전' : '미측정'})`;
+    : `(${sourcePeriod} · ${ga4Closed ? '마감 후 반영' : ga4NotYet ? '집계 전' : '미측정'})`;
 
   return (
     <View name="purchases" title={TITLE}>
@@ -217,7 +238,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
       <PurchasedGoodsTable months={allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth]} periodLabel={allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : `${monthName}${partial ? ` · ${AS_OF_DAY}일까지` : ''}`} />
 
       <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceLoading ? `(${sourcePeriod})` : sourceSubtitle}>
-        {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
+        {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4Closed ? '진행 중인 달의 GA4 주문 완료 값은 달 합계로만 받아 오늘 값이 섞여 있어, 마감 후 반영합니다.' : ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
         <ViewNote>
           ※ GA4 가 실제로 측정한 값 그대로입니다 ({purchaseBasis ? '결제 주문마다 보낸 구매 이벤트 수' : "'주문 완료' 화면 방문 수라 같은 고객이 다시 들어오면 한 주문이 여러 번 잡히고, 광고 차단 프로그램을 쓰면 빠집니다"}) · 판매는 고도몰에서 결제된 주문 수 · {ga.asOf || '–'} 수집
         </ViewNote>

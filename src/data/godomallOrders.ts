@@ -204,6 +204,32 @@ export function salesInMonths(months: string[]): number | null {
   return months.some((m) => m in GODOMALL_ORDERS) ? months.reduce((sum, m) => sum + (GODOMALL_ORDERS[m] ?? 0), 0) : null;
 }
 
+/** 판매를 세는 마지막 날 안에 결제된 주문 줄인지 (마지막 날이 없으면 모두) */
+export const lineInCutoff = (line: GodoOrderLine): boolean => !SALES_CUTOFF || line.paid.slice(0, 10) <= SALES_CUTOFF;
+
+/**
+ * 그 달의 제품별 판매 — 판매를 세는 마지막 날이 든 달은 주문 줄(결제일)로 1일~마지막 날만 다시 모으고, 그 뒤 달은 없다(undefined).
+ * 주문 줄은 제품 월 합계와 같은 주문에서 주문 × 제품마다 한 줄씩 만들므로 같은 값이 나온다 (이름은 월 합계의 것을 쓴다)
+ */
+export function goodsInMonth(month: string): GodoGoodsRow[] | undefined {
+  const rows = GODOMALL_GOODS[month];
+  if (!SALES_CUTOFF || !rows) return rows;
+  const cm = SALES_CUTOFF.slice(0, 7);
+  if (month < cm) return rows;
+  if (month > cm || !GODOMALL_ORDER_LINES.length) return undefined;
+  const names = new Map(rows.map((r) => [r.no, r.name]));
+  const agg = new Map<string, GodoGoodsRow>();
+  GODOMALL_ORDER_LINES.forEach((l) => {
+    if (l.month !== month || !lineInCutoff(l)) return;
+    const cur = agg.get(l.goodsNo) ?? { no: l.goodsNo, name: names.get(l.goodsNo) ?? l.goodsNo, orders: 0, qty: 0, amount: 0 };
+    cur.orders += 1;
+    cur.qty += l.qty;
+    cur.amount += l.amount;
+    agg.set(l.goodsNo, cur);
+  });
+  return [...agg.values()];
+}
+
 /** 날짜 범위('YYYY-MM-DD', 양끝 포함)의 판매 건수 합. 일별 값은 주문이 있는 날만 있으므로, 수집 시작일 이후 범위면 빈 날은 0건으로 본다 */
 export function salesInRange(from: string, to: string): number | null {
   const first = dailyFirst;

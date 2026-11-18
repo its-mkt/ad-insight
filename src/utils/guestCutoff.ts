@@ -5,7 +5,8 @@ import { inDayRange, toDayKey, type DayRange } from './dayRange';
  * 로그인하지 않은 사람에게는 진행 중인 달을 "어제까지"만 보여 준다.
  * 매체마다 수집 시각이 달라 오늘 값끼리 맞지 않는 시간차를 오해하지 않게 하려는 것이다 (사용자 요청 2026-11-11).
  * - 일별로 쌓이는 값(구글·네이버 광고비, 견적 접수, 고도몰 판매)은 1일~어제로 다시 모은다
- * - 월 합계로만 받는 값(키워드·소재 성과, 일별 자료가 없는 매체 광고비)은 당월을 뺀다
+ * - 월 합계로만 받는 값(구글 키워드·소재 성과, 일별 자료가 없는 매체 광고비)은 당월을 뺀다.
+ *   네이버 키워드는 수집할 때 1일~어제로만 묻기 때문에 당월도 그대로 둔다 (apps-script collectNaverStats_)
  */
 
 /** 일별 자료로 다시 모을 수 있는 매체 */
@@ -81,7 +82,7 @@ export function clipForGuest(data: DashboardData, today = todayKey()): GuestClip
       quotesSites: beforeToday(data.quotesSites),
       quotesPhone: beforeToday(data.quotesPhone),
       quotesExtra: beforeToday(data.quotesExtra),
-      keywords: data.keywords.filter((r) => r.month !== month),
+      keywords: data.keywords.filter((r) => r.month !== month || r.media === 'Naver'),
       adStats: (data.adStats || []).filter((r) => r.month !== month),
     },
   };
