@@ -1303,8 +1303,8 @@ function doGet(e) {
   if (!isAdmin) {
     // 공개 화면은 고객 이름·회사·이메일·연락처를 일부만 보여 준다 (원문은 관리자에게만). 저장한 관리자 계정은 쓰지 않는다
     out.quotes_raw = (out.quotes_raw || []).map(maskQuoteRow_);
-    out.quotes_raw_sites = sheetRowsCached_(ss, 'quotes_raw_sites').map(maskQuoteRow_);
-    out.quotes_phone = sheetRowsCached_(ss, 'quotes_phone').map(maskQuoteRow_);
+    out.quotes_raw_sites = read_(ss, 'quotes_raw_sites').map(maskQuoteRow_); // 운영 편집기(Head)와 같게 read_ 로 읽는다
+    out.quotes_phone = read_(ss, 'quotes_phone').map(maskQuoteRow_);
     out.manual_categories = (out.manual_categories || []).map(({ updated_by, ...rest }) => rest);
   }
   return json_(out);
@@ -1336,7 +1336,7 @@ function maskPerson_(v) {
   if (/^[가-힣]+$/.test(s)) return chars.length === 2 ? chars[0] + '*' : chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
   return chars[0] + MASK_;
 }
-/** (주)아이티켓 → (주)아이***, 서울대학교 → 서***대학교 — 앞 글자 1/3(최소 1자)과 기관 종류만 남긴다 */
+/** (주)아이티켓 → (주)아***, 서울대학교 → 서***대학교 — 앞 글자 1/3(최소 1자)과 기관 종류만 남긴다 */
 function maskCompany_(v) {
   const s = String(v == null ? '' : v).trim();
   if (!s) return '';
@@ -1355,7 +1355,8 @@ function maskEmail_(v) {
   const s = String(v == null ? '' : v).trim();
   if (!s) return '';
   const at = s.lastIndexOf('@');
-  if (at < 1) return maskPhone_(s); // 이메일 칸에 전화번호 등이 적힌 경우
+  // @ 가 없는 값 — 전화번호면 번호처럼, 아이디·도메인 조각이면 앞 2자만 남긴다
+  if (at < 1) return (s.match(/d/g) || []).length >= 7 ? maskPhone_(s) : Array.from(s).slice(0, Math.min(2, s.length - 1)).join('') + MASK_;
   const local = s.slice(0, at), domain = s.slice(at + 1).toLowerCase();
   const head = Array.from(local).slice(0, Math.min(2, Math.max(1, local.length - 1))).join('');
   if (FREE_MAIL_.includes(domain)) return head + MASK_ + '@' + domain;
