@@ -71,6 +71,11 @@ export const MemberApprovals: React.FC = () => {
       tableWrap
     >
       {error && <Notice tone="warn">{error}</Notice>}
+      {pending > 0 && (
+        <Notice tone="warn">
+          가입할 때 이메일 인증을 하지 않으므로, 승인 전에 요청자에게 팀즈·전화로 본인이 요청했는지 확인해 주세요. 확인되지 않으면 거절합니다.
+        </Notice>
+      )}
       <table className="stk">
         <thead>
           <tr>

@@ -1430,6 +1430,8 @@ const AUTH_SHEET_ID = '1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg';
 const MEMBER_HEAD_ = ['email', 'name', 'team', 'status', 'requested_at', 'decided_at', 'decided_by'];
 const MEMBER_STATUSES_ = ['pending', 'approved', 'rejected', 'revoked'];
 const ACCESS_NOTIFY_TO_ = 'itsmkt1307@gmail.com'; // 가입 요청 메일 알림 받는 곳 (Teams 는 스크립트 속성 TEAMS_WEBHOOK_URL — 마케팅팀 채널)
+// 가입 시 이메일 인증을 하지 않으므로(Supabase Confirm email 끔) 승인 전 본인 확인이 유일한 관문이다
+const ACCESS_VERIFY_NOTE_ = '승인 전 본인 확인: 이메일 인증 없이 가입되므로 요청자에게 팀즈·전화로 본인이 요청했는지 확인한 뒤 승인해 주세요. 확인되지 않으면 거절합니다.';
 const ACCESS_CACHE_SEC_ = 300;
 
 /** 로그인 토큰 → 이메일 (소문자). 토큰이 없거나 틀리면 '' */
@@ -1542,7 +1544,8 @@ function notifyAccessRequest_(email, name, team) {
         payload: JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: {
           $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4',
           body: [{ type: 'TextBlock', text: '광고 인사이트 가입 요청', weight: 'Bolder', size: 'Medium' },
-            { type: 'FactSet', facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }] }],
+            { type: 'FactSet', facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }] },
+            { type: 'TextBlock', text: ACCESS_VERIFY_NOTE_, wrap: true, isSubtle: true, size: 'Small' }],
           actions: [{ type: 'Action.OpenUrl', title: '승인하러 가기', url }],
         } }] }),
       });
@@ -1550,7 +1553,7 @@ function notifyAccessRequest_(email, name, team) {
   }
   try {
     GmailApp.sendEmail(ACCESS_NOTIFY_TO_, '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
-      text + '\n\n관리자 화면에서 승인하거나 거절해 주세요.\n' + url);
+      text + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n관리자 화면에서 승인하거나 거절해 주세요.\n' + url);
   } catch (err) { console.warn('가입 요청 메일 실패: ' + err.message); }
 }
 /** 관리자 — 가입 요청 목록 */
