@@ -16,8 +16,10 @@ interface MembersState {
   /** 아직 한 번도 받지 않았으면 null */
   rows: MemberRow[] | null;
   error: string;
-  /** 승인·거절·해제를 보내는 중인 이메일 */
+  /** 승인·거절·해제·삭제를 보내는 중인 이메일 */
   busy: string;
+  /** 삭제 결과 안내 (명단만 지웠을 때 등) */
+  notice: string;
 }
 
 // 승인 대기를 맨 위로, 그다음 최근 요청 순
@@ -27,7 +29,7 @@ const ORDER: Record<MemberStatus, number> = { pending: 0, approved: 1, rejected:
  * 가입 요청 명단 — 계정 관리 화면과 사이드바 승인 대기 뱃지가 같은 명단을 쓴다.
  * 한 곳에서 승인·거절하면 다른 곳도 바로 바뀌도록 화면 밖(모듈)에 한 벌만 둔다
  */
-let state: MembersState = { rows: null, error: '', busy: '' };
+let state: MembersState = { rows: null, error: '', busy: '', notice: '' };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -67,6 +69,30 @@ export async function decideMember(email: string, status: Exclude<MemberStatus, 
 }
 
 /**
+ * 이용자 삭제 (해제와 별도) — 명단에서 지우고, 웹앱에 Supabase 관리자 키가 있으면 로그인 계정도 지운다.
+ * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
+ */
+export async function deleteMember(email: string): Promise<void> {
+  setState({ busy: email, notice: '' });
+  const res = await postMemberAction<{ account?: string }>({ action: 'deleteMember', access_token: await currentAccessToken(), email }).catch(
+    () => ({ error: 'network' }) as { error: string; account?: string }
+  );
+  setState({ busy: '' });
+  if (res.error) {
+    setState({ error: res.error === 'admin_protected' ? '관리자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
+    return;
+  }
+  const notice: Record<string, string> = {
+    deleted: `${email} 을(를) 명단과 로그인 계정에서 삭제했습니다.`,
+    missing: `${email} 을(를) 명단에서 삭제했습니다. (로그인 계정은 없었습니다)`,
+    kept: `${email} 을(를) 명단에서 삭제했습니다. 로그인 계정은 남아 있어, 로그인하면 승인 요청 화면만 보입니다.`,
+    failed: `${email} 을(를) 명단에서 삭제했지만 로그인 계정은 지우지 못했습니다.`,
+  };
+  setState({ notice: notice[res.account || 'kept'] || notice.kept });
+  await loadMembers();
+}
+
+/**
  * 가입 요청 명단 상태. enabled 일 때 아직 받지 않았으면 한 번 받는다 (관리자에게만 켠다)
  */
 export function useMembers(enabled = true): MembersState & { pending: number } {
@@ -74,7 +100,7 @@ export function useMembers(enabled = true): MembersState & { pending: number } {
   useEffect(() => {
     if (enabled && !state.rows && !loading) void loadMembers();
     // 로그아웃하면 받아 둔 명단을 지운다
-    if (!enabled && state.rows) setState({ rows: null, error: '' });
+    if (!enabled && state.rows) setState({ rows: null, error: '', notice: '' });
   }, [enabled]);
   return { ...snap, pending: snap.rows?.filter((r) => r.status === 'pending').length || 0 };
 }

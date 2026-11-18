@@ -1576,6 +1576,49 @@ function decideMember_(accessToken, email, status) {
   CacheService.getScriptCache().remove('acc:' + email); // 바로 반영 (다른 사이트 프로젝트는 캐시가 따로라 최대 5분 뒤)
   return { success: true, email, status };
 }
+/**
+ * 관리자 — 이용자 삭제 (해제와 별도). 명단(members 탭) 줄을 지우고, 스크립트 속성 SUPABASE_SERVICE_KEY 가 있으면
+ * 로그인 계정(Supabase)도 지운다. 관리자(admins 탭) 계정은 지우지 않는다.
+ * account: deleted(계정까지 삭제) · kept(키가 없어 명단만 삭제) · missing(계정 없음) · failed(계정 삭제 실패)
+ */
+function deleteMember_(accessToken, email) {
+  const acc = accessOf_(accessToken);
+  if (acc.role !== 'admin') return { error: 'forbidden' };
+  email = String(email || '').trim().toLowerCase();
+  const ss = authSheet_();
+  if (adminEmails_(ss).includes(email)) return { error: 'admin_protected' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const m = memberRows_(ss).find((r) => r.email === email);
+    if (m) membersSheet_(ss).deleteRow(m.row);
+    CacheService.getScriptCache().remove('acc:' + email);
+    return { success: true, email, listed: !!m, account: deleteAuthUser_(email) };
+  } finally { lock.releaseLock(); }
+}
+/** Supabase 로그인 계정 삭제 — 관리자 키(service_role)는 스크립트 속성 SUPABASE_SERVICE_KEY 에만 둔다 */
+function deleteAuthUser_(email) {
+  const key = PROPS.getProperty('SUPABASE_SERVICE_KEY');
+  if (!key) return 'kept';
+  const headers = { apikey: key, Authorization: 'Bearer ' + key };
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users?per_page=200&page=' + page, { headers, muteHttpExceptions: true });
+      if (res.getResponseCode() !== 200) return 'failed';
+      const users = JSON.parse(res.getContentText()).users || [];
+      const u = users.find((x) => String(x.email || '').toLowerCase() === email);
+      if (u) {
+        const del = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users/' + u.id, { method: 'delete', headers, muteHttpExceptions: true });
+        return del.getResponseCode() < 300 ? 'deleted' : 'failed';
+      }
+      if (users.length < 200) return 'missing';
+    }
+    return 'missing';
+  } catch (err) {
+    console.error('로그인 계정 삭제 실패: ' + err.message);
+    return 'failed';
+  }
+}
 
 /* ── 견적 실시간 웹훅 수신 ──
  * 캐드코리아·ZbyHP·온코어 등 쇼핑몰에서 고객이 견적 제출 시 호출하여 구글 시트에 실시간 적재.
@@ -1621,6 +1664,7 @@ function memberPost_(e) {
   if (data.action === 'requestAccess') return json_(requestAccess_(data));
   if (data.action === 'listMembers') return json_(listMembers_(data.access_token));
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
+  if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));
   return null;
 }
 function doPostBody_(e) {
