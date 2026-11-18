@@ -61,7 +61,7 @@ const SignUpForm: React.FC<{ onSent: (needsEmailConfirm: boolean) => void }> = (
       <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
       {error && <GateError message={error} />}
       <button type="submit" className="btn acc btn-login" data-btn="signup-submit" disabled={submitting}>
-        {submitting ? '보내는 중...' : '회원가입'}
+        {submitting ? '보내는 중...' : '회원가입 및 열람 요청'}
       </button>
     </form>
   );
@@ -138,7 +138,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
       return (
         <GateCard
           icon={<Clock size="1.25rem" aria-hidden="true" />}
-          title="회원가입 요청을 보냈습니다"
+          title="회원가입 및 열람 요청을 보냈습니다"
           desc={
             sent.confirm
               ? '받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 관리자가 승인하면 데이터를 볼 수 있습니다.'
@@ -154,8 +154,8 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
     return (
       <GateCard
         icon={<Lock size="1.25rem" aria-hidden="true" />}
-        title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입'}
-        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '가입하면 관리자에게 승인 요청이 갑니다. 승인되면 데이터를 볼 수 있습니다.'}
+        title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입 및 열람 요청'}
+        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
       >
         {tab === 'login' ? <LoginForm /> : <SignUpForm onSent={(confirm) => setSent({ confirm })} />}
         {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
