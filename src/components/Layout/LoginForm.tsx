@@ -15,26 +15,45 @@ export const GateError: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
+/** 이 브라우저에서 지난번 로그인한 이메일 (편의용 — 읽지 못해도 빈 칸으로 시작한다) */
+const LOGIN_PREF_KEY = 'adi_login_pref';
+const readLastEmail = (): string => {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOGIN_PREF_KEY) || '{}');
+    return typeof v.email === 'string' ? v.email : '';
+  } catch {
+    return '';
+  }
+};
+const saveLastEmail = (email: string) => {
+  try {
+    localStorage.setItem(LOGIN_PREF_KEY, JSON.stringify({ email }));
+  } catch {
+    // 저장하지 못해도 로그인에는 영향 없다
+  }
+};
+
 interface EmailCodeFormProps {
-  /** login: 가입된 이메일만 · signup: 이름·소속도 받고 처음 쓰는 이메일은 계정을 만든 뒤 열람 승인을 요청 */
-  mode: 'login' | 'signup';
-  /** 인증번호 확인까지 끝나면 부른다 (로그인한 이메일) */
+  /** signup: 이름·소속·비밀번호를 받고 메일 인증 뒤 계정을 만들어 열람 승인을 요청 · reset: 가입된 이메일로 인증 뒤 새 비밀번호로 바꾸고 로그인 */
+  mode: 'signup' | 'reset';
+  /** 인증까지 끝나면 부른다 (인증한 이메일) */
   onDone?: (email: string) => void;
-  /** 처음 채워 둘 이메일 (지난번 로그인한 이메일) */
+  /** 처음 채워 둘 이메일 */
   initialEmail?: string;
 }
 
 /**
- * 이메일 인증번호 로그인 (Supabase OTP) — 비밀번호 없이, 메일로 받은 6자리 번호로 로그인한다.
- * 메일함 주인만 번호를 받으므로 실제 이메일만 가입되고, 비밀번호를 잊을 일이 없다 (2026-11-18 사용자 결정).
- * 1단계: (이름·소속) 이메일 → 인증번호 보내기, 2단계: 인증번호 입력.
+ * 이메일 인증번호 폼 (Supabase OTP) — 로그인은 비밀번호로 하고, 인증번호는 메일 주인 확인에만 쓴다 (2026-11-18 사용자 결정).
+ * 회원가입: 이름·소속·이메일·비밀번호 → 인증번호 → 가입 및 열람 요청. 비밀번호 찾기: 이메일 → 인증번호·새 비밀번호 → 로그인.
  */
 export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, initialEmail = '' }) => {
-  const { sendEmailCode, verifyEmailCode } = useAuth();
+  const { sendEmailCode, verifyEmailCode, resetPasswordWithCode } = useAuth();
   const signup = mode === 'signup';
   const [name, setName] = useState('');
   const [team, setTeam] = useState('');
   const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
   const [code, setCode] = useState('');
   const [sentTo, setSentTo] = useState('');
   const [wait, setWait] = useState(0);
@@ -47,10 +66,14 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, init
     return () => clearTimeout(t);
   }, [wait]);
 
-  const info = signup ? { name, team } : undefined;
+  const info = signup ? { name, team, password } : undefined;
 
   const send = async () => {
     setError('');
+    if (signup && password !== password2) {
+      setError('비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
     setSubmitting(true);
     const res = await sendEmailCode(email, info);
     setSubmitting(false);
@@ -65,14 +88,24 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, init
 
   const verify = async (value = code) => {
     setError('');
+    if (!signup && password !== password2) {
+      setError('새 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
     setSubmitting(true);
-    const res = await verifyEmailCode(sentTo, value, info);
+    const res = signup ? await verifyEmailCode(sentTo, value, info) : await resetPasswordWithCode(sentTo, value, password);
     setSubmitting(false);
     if (res.error) setError(res.error);
     else onDone?.(sentTo);
   };
 
   const err = error ? ' err' : '';
+  const passwordFields = (label: string) => (
+    <>
+      <TextInput className={`gate-input${err}`} type="password" name="new-password" autoComplete="new-password" placeholder={`${label} (6자 이상)`} value={password} onChange={(e) => setPassword(e.target.value)} />
+      <TextInput className={`gate-input${err}`} type="password" name="new-password2" autoComplete="new-password" placeholder={`${label} 확인`} value={password2} onChange={(e) => setPassword2(e.target.value)} />
+    </>
+  );
 
   if (!sentTo) {
     return (
@@ -90,9 +123,10 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, init
           </>
         )}
         <TextInput className={`gate-input${err}`} type="email" name="email" autoComplete="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus={!signup} />
+        {signup && passwordFields('비밀번호')}
         {error && <GateError message={error} />}
-        <button type="submit" className="btn acc btn-login" data-btn={signup ? 'signup-send-code' : 'login-send-code'} disabled={submitting}>
-          {submitting ? '보내는 중...' : '인증번호 받기'}
+        <button type="submit" className="btn acc btn-login" data-btn={signup ? 'signup-send-code' : 'reset-send-code'} disabled={submitting}>
+          {submitting ? '보내는 중...' : signup ? '이메일 인증번호 받기' : '인증번호 받기'}
         </button>
       </form>
     );
@@ -120,14 +154,15 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, init
         onChange={(e) => {
           const v = e.target.value.replace(/\D/g, '').slice(0, 6);
           setCode(v);
-          // 6자리를 다 넣으면(붙여넣기 포함) 버튼을 누르지 않아도 바로 확인한다
-          if (v.length === 6 && !submitting) void verify(v);
+          // 회원가입은 6자리를 다 넣으면(붙여넣기 포함) 버튼을 누르지 않아도 바로 확인한다 (비밀번호 찾기는 새 비밀번호를 함께 받는다)
+          if (signup && v.length === 6 && !submitting) void verify(v);
         }}
         autoFocus
       />
+      {!signup && passwordFields('새 비밀번호')}
       {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn={signup ? 'signup-verify' : 'login-verify'} disabled={submitting}>
-        {submitting ? '확인 중...' : signup ? '회원가입 및 열람 요청' : '로그인'}
+      <button type="submit" className="btn acc btn-login" data-btn={signup ? 'signup-verify' : 'reset-verify'} disabled={submitting}>
+        {submitting ? '확인 중...' : signup ? '회원가입 및 열람 요청' : '비밀번호 바꾸고 로그인'}
       </button>
       <div className="gate-code-actions">
         <Button variant="link" data-btn="code-resend" disabled={wait > 0 || submitting} onClick={() => void send()}>
@@ -148,7 +183,7 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ mode, onDone, init
   );
 };
 
-/** 비밀번호 로그인 폼 — 비밀번호가 있는 계정(관리자 등)용. 브라우저에 저장한 비밀번호가 자동으로 채워진다 */
+/** 비밀번호 로그인 폼 — 브라우저에 저장한 비밀번호가 자동으로 채워진다 */
 const PasswordLoginForm: React.FC<{ initialEmail?: string; onDone?: (email: string) => void }> = ({ initialEmail = '', onDone }) => {
   const { loginWithPassword } = useAuth();
   const [loginId, setLoginId] = useState(initialEmail);
@@ -182,31 +217,11 @@ const PasswordLoginForm: React.FC<{ initialEmail?: string; onDone?: (email: stri
         autoFocus={!!initialEmail}
       />
       {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn="login-password-submit" disabled={submitting}>
+      <button type="submit" className="btn acc btn-login" data-btn="login-submit" disabled={submitting}>
         {submitting ? '확인 중...' : '로그인'}
       </button>
     </form>
   );
-};
-
-type LoginMethod = 'code' | 'password';
-
-/** 이 브라우저에서 지난번 로그인한 방식·이메일 (편의용 — 읽지 못해도 인증번호 방식으로 시작한다) */
-const LOGIN_PREF_KEY = 'adi_login_pref';
-const readLoginPref = (): { method: LoginMethod; email: string } => {
-  try {
-    const v = JSON.parse(localStorage.getItem(LOGIN_PREF_KEY) || '{}');
-    return { method: v.method === 'password' ? 'password' : 'code', email: typeof v.email === 'string' ? v.email : '' };
-  } catch {
-    return { method: 'code', email: '' };
-  }
-};
-const saveLoginPref = (method: LoginMethod, email: string) => {
-  try {
-    localStorage.setItem(LOGIN_PREF_KEY, JSON.stringify({ method, email }));
-  } catch {
-    // 저장하지 못해도 로그인에는 영향 없다
-  }
 };
 
 interface LoginFormProps {
@@ -216,27 +231,23 @@ interface LoginFormProps {
 
 /**
  * 로그인 폼 — 접속 화면(AccessGate)과 관리자 로그인 모달이 함께 쓴다.
- * 기본은 이메일 인증번호, 비밀번호가 있는 계정(관리자 등)은 '비밀번호로 로그인'으로 바꿔 매번 메일을 열지 않아도 된다.
- * 지난번 로그인한 방식·이메일을 기억해 다음에 그대로 연다. 개발 서버에서는 테스트 관리자 버튼도 보인다.
+ * 이메일·비밀번호로만 로그인하고(2026-11-18 사용자 결정), 비밀번호를 잊으면 '비밀번호 찾기'에서 메일 인증번호로 새로 정한다.
+ * 이 브라우저에서 지난번 로그인한 이메일을 기억해 채워 둔다. 개발 서버에서는 테스트 관리자 버튼도 보인다.
  */
 export const LoginForm: React.FC<LoginFormProps> = ({ onDone }) => {
   const { loginAsDevAdmin } = useAuth();
-  const [pref] = useState(readLoginPref);
-  const [method, setMethod] = useState<LoginMethod>(pref.method);
-  const done = (m: LoginMethod) => (email: string) => {
-    saveLoginPref(m, email);
+  const [lastEmail] = useState(readLastEmail);
+  const [resetting, setResetting] = useState(false);
+  const done = (email: string) => {
+    saveLastEmail(email);
     onDone?.();
   };
   return (
     <>
-      {method === 'password' ? (
-        <PasswordLoginForm key="password" initialEmail={pref.email} onDone={done('password')} />
-      ) : (
-        <EmailCodeForm key="code" mode="login" initialEmail={pref.email} onDone={done('code')} />
-      )}
+      {resetting ? <EmailCodeForm key="reset" mode="reset" initialEmail={lastEmail} onDone={done} /> : <PasswordLoginForm key="password" initialEmail={lastEmail} onDone={done} />}
       <p className="gate-method">
-        <Button variant="link" data-btn={method === 'password' ? 'login-use-code' : 'login-use-password'} onClick={() => setMethod(method === 'password' ? 'code' : 'password')}>
-          {method === 'password' ? '인증번호로 로그인' : '비밀번호로 로그인'}
+        <Button variant="link" data-btn={resetting ? 'login-back' : 'login-forgot'} onClick={() => setResetting(!resetting)}>
+          {resetting ? '로그인으로 돌아가기' : '비밀번호를 잊으셨나요?'}
         </Button>
       </p>
       {/* 개발 환경 전용 즉시 로그인 */}

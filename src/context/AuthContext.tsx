@@ -18,6 +18,8 @@ export interface AuthUser {
 export interface SignUpInfo {
   name: string;
   team: string;
+  /** 로그인에 쓸 비밀번호 — 메일 인증 직후 계정에 정한다 */
+  password: string;
 }
 
 interface AuthContextType {
@@ -34,10 +36,12 @@ interface AuthContextType {
   canView: boolean;
   /** 이메일로 6자리 인증번호를 보낸다 — signup 을 주면 처음 쓰는 이메일도 계정을 만든다(회원가입), 없으면 가입된 이메일만 */
   sendEmailCode: (email: string, signup?: SignUpInfo) => Promise<{ error?: string }>;
-  /** 이메일(gmail 은 아이디만)·비밀번호로 로그인한다 — 비밀번호가 있는 계정(관리자 등)만 */
+  /** 이메일(gmail 은 아이디만)·비밀번호로 로그인한다 */
   loginWithPassword: (loginId: string, password: string) => Promise<{ error?: string }>;
-  /** 인증번호로 로그인한다 — signup 이면 로그인 직후 관리자에게 열람 승인을 요청한다 */
+  /** 인증번호를 확인한다 — signup 이면 비밀번호를 정하고 관리자에게 열람 승인을 요청한다 */
   verifyEmailCode: (email: string, code: string, signup?: SignUpInfo) => Promise<{ error?: string }>;
+  /** 비밀번호 찾기 — 메일 인증번호를 확인한 뒤 새 비밀번호로 바꾸고 로그인한다 */
+  resetPasswordWithCode: (email: string, code: string, newPassword: string) => Promise<{ error?: string }>;
   /** 로그인한 계정으로 승인을 (다시) 요청한다 — 요청 기록이 없거나 거절·해제된 경우 */
   requestAccess: (name: string, team: string) => Promise<{ error?: string }>;
   /** 열람 권한을 다시 확인한다 (승인됐는지 볼 때) */
@@ -73,6 +77,13 @@ const codeErrorText = (message: string): string => {
   if (/expired|invalid/i.test(message)) return '인증번호가 맞지 않거나 시간이 지났습니다. 다시 받아 주세요.';
   if (/rate|too many|seconds/i.test(message)) return '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.';
   return '처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
+};
+
+/** 비밀번호 정하기(updateUser) 오류 → 화면 문구 */
+const passwordErrorText = (message: string): string => {
+  if (/different from the old|same/i.test(message)) return '지금 쓰는 비밀번호와 다른 비밀번호로 정해 주세요.';
+  if (/weak|short|at least|characters/i.test(message)) return '비밀번호가 너무 쉽거나 짧습니다. 6자 이상으로 다시 정해 주세요.';
+  return '비밀번호를 정하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
 };
 
 // 개발 서버 전용 테스트 세션 (운영 빌드에서는 무시)
@@ -170,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const mail = toLoginEmail(email);
     if (!isEmail(mail)) return { error: '이메일 주소를 확인해 주세요.' };
     if (signup && (!signup.name.trim() || !signup.team.trim())) return { error: '이름과 소속을 입력해 주세요.' };
+    if (signup && signup.password.length < 6) return { error: '비밀번호는 6자 이상으로 정해 주세요.' };
     const { error } = await supabase.auth.signInWithOtp({
       email: mail,
       options: {
@@ -191,7 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) {
       console.error('Login error:', error.message);
       if (/rate|too many/i.test(error.message)) return { error: '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.' };
-      return { error: '이메일 또는 비밀번호가 맞지 않습니다. 비밀번호가 없는 계정은 인증번호로 로그인해 주세요.' };
+      return { error: '이메일 또는 비밀번호가 맞지 않습니다. 잊으셨으면 "비밀번호를 잊으셨나요?"에서 새로 정해 주세요.' };
     }
     return {};
   };
@@ -205,10 +217,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: codeErrorText(error?.message || 'invalid') };
     }
     if (!signup) return {};
+    // 인증으로 로그인된 세션에서 비밀번호를 정한다 — 다음부터 비밀번호로 로그인한다
+    const pw = await supabase.auth.updateUser({ password: signup.password });
+    if (pw.error) {
+      console.error('Set password error:', pw.error.message);
+      return { error: passwordErrorText(pw.error.message) };
+    }
     // 인증된 로그인 토큰으로 열람 승인을 요청한다 — 웹앱이 토큰의 이메일로 명단에 올린다
     const req = await postMemberAction({ action: 'requestAccess', access_token: data.session.access_token, email: data.session.user.email, name: signup.name.trim(), team: signup.team.trim() }).catch(() => ({ error: 'network' }));
     if (req.error) return { error: req.error === 'too_many' ? '요청이 많아 잠시 막혔습니다. 한 시간 뒤 다시 시도해 주세요.' : '로그인은 됐지만 열람 요청을 보내지 못했습니다. 잠시 뒤 다시 요청해 주세요.' };
     refreshRole();
+    return {};
+  };
+
+  const resetPasswordWithCode = async (email: string, code: string, newPassword: string): Promise<{ error?: string }> => {
+    const token = code.replace(/\D/g, '');
+    if (token.length < 6) return { error: '메일로 받은 6자리 인증번호를 입력해 주세요.' };
+    if (newPassword.length < 6) return { error: '새 비밀번호는 6자 이상으로 정해 주세요.' };
+    const { data, error } = await supabase.auth.verifyOtp({ email: toLoginEmail(email), token, type: 'email' });
+    if (error || !data.session) {
+      console.error('Verify code error:', error?.message);
+      return { error: codeErrorText(error?.message || 'invalid') };
+    }
+    const pw = await supabase.auth.updateUser({ password: newPassword });
+    if (pw.error) {
+      console.error('Reset password error:', pw.error.message);
+      return { error: passwordErrorText(pw.error.message) + ' (로그인은 됐습니다)' };
+    }
     return {};
   };
 
@@ -258,6 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendEmailCode,
         loginWithPassword,
         verifyEmailCode,
+        resetPasswordWithCode,
         requestAccess,
         refreshRole,
         loginAsDevAdmin,
