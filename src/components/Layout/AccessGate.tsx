@@ -3,7 +3,7 @@ import { Clock, Lock, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
-import { SkelBar } from '../common/SkeletonView';
+import { SkeletonView } from '../common/SkeletonView';
 import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
@@ -132,11 +132,17 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
 
+  // 권한 확인 중 — 대부분 승인된 사람이므로 잠금 카드 대신 대시보드 모양 로딩을 보여 준다 (화면이 열릴 때 들썩이지 않게)
   if (loading) {
     return (
-      <GateCard icon={<Lock size="1.25rem" aria-hidden="true" />} title="아이티스 광고 인사이트" desc="접속 권한을 확인하고 있습니다.">
-        <SkelBar w="100%" h="2.625rem" />
-      </GateCard>
+      <div className="access-loading">
+        <div className="access-loading-bar" aria-hidden="true" />
+        <p className="access-loading-status" role="status">
+          <Lock size="0.875rem" aria-hidden="true" />
+          접속 권한을 확인하고 있습니다
+        </p>
+        <SkeletonView title="아이티스 광고 인사이트" />
+      </div>
     );
   }
 
