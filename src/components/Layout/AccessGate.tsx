@@ -98,7 +98,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
       <GateCard
         icon={<Lock size="1.25rem" aria-hidden="true" />}
         title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입 및 열람 요청'}
-        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다. 이메일로 받은 인증번호로 로그인합니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
+        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
       >
         {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
         {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
