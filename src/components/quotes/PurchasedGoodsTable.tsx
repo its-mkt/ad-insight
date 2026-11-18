@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { toggledSet } from '../../utils/toggleSet';
 import {
-  GODOMALL_GOODS,
   GODOMALL_ORDER_CUSTOMERS,
   GODOMALL_ORDER_LINES,
+  goodsInMonth,
+  lineInCutoff,
   orderStatusLabel,
   settleLabel,
   type GodoGoodsRow,
@@ -35,7 +36,7 @@ interface PurchasedGoodsTableProps {
 function goodsOf(months: string[]): GodoGoodsRow[] {
   const merged = new Map<string, GodoGoodsRow>();
   [...months].sort().forEach((month) => {
-    (GODOMALL_GOODS[month] ?? []).forEach((row) => {
+    (goodsInMonth(month) ?? []).forEach((row) => {
       const cur = merged.get(row.no);
       merged.set(row.no, cur ? { ...row, orders: cur.orders + row.orders, qty: cur.qty + row.qty, amount: cur.amount + row.amount } : row);
     });
@@ -54,7 +55,7 @@ function inflowOf(months: string[]): Map<string, [string, number][]> {
   GODOMALL_ORDER_LINES.forEach((line) => {
     const source = recordedSource(line);
     const key = `${line.goodsNo}|${line.key}`;
-    if (!source || !inScope.has(line.month) || counted.has(key)) return;
+    if (!source || !inScope.has(line.month) || !lineInCutoff(line) || counted.has(key)) return;
     counted.add(key);
     const bySource = counts.get(line.goodsNo) ?? new Map<string, number>();
     bySource.set(source, (bySource.get(source) ?? 0) + 1);
@@ -75,7 +76,7 @@ function orderLinesOf(months: string[]): Map<string, GodoOrderLine[]> {
   const inScope = new Set(months);
   const byGoods = new Map<string, GodoOrderLine[]>();
   GODOMALL_ORDER_LINES.forEach((line) => {
-    if (!inScope.has(line.month)) return;
+    if (!inScope.has(line.month) || !lineInCutoff(line)) return;
     const list = byGoods.get(line.goodsNo) ?? [];
     list.push(line);
     byGoods.set(line.goodsNo, list);

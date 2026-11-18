@@ -29,7 +29,7 @@ import {
   type Ga4ConvId,
   type Ga4DeviceMonth,
 } from '../data/deviceStats';
-import { GODOMALL_ORDER_LINES } from '../data/godomallOrders';
+import { GODOMALL_ORDER_LINES, lineInCutoff } from '../data/godomallOrders';
 import { monthsUpTo, sameMonthsLastYear } from '../utils/allPeriod';
 import { ctrText, fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 
@@ -40,6 +40,8 @@ interface DevicesViewProps {
   yearTotal?: boolean;
   /** 이 달까지만 보여 준다 — 로그인하지 않으면 진행 중인 달을 빼고 지난달까지 (빈 값이면 제한 없음) */
   untilMonth?: string;
+  /** 이 날까지만 보여 준다 — 로그인하지 않으면 어제. 판매는 이날까지 결제된 주문만, 오늘 값이 섞인 진행 중인 달의 월 합계(GA4·구글 광고)는 마감 후 반영으로 둔다 (빈 값이면 제한 없음) */
+  cutoffDay?: string;
   /** 보고 있는 사이트 — GA4·고도몰 값을 그 사이트 것으로 그린다 (화면 구성·문구는 사이트와 상관없이 같다) */
   site?: SiteId;
 }
@@ -48,6 +50,7 @@ const TITLE = '기기별 통계';
 /** KPI 로 보여 주는 기기 — GA4 의 기타(스마트 TV 등)는 거의 없어 표에서만 보인다 */
 const KPI_DEVICES: DeviceKey[] = ['desktop', 'mobile', 'tablet'];
 const PENDING = '수집 전';
+const CLOSED = '마감 후 반영';
 const pctText = (n: number | null) => (n === null ? '–' : `${n.toFixed(1)}%`);
 const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : null);
 
@@ -69,7 +72,7 @@ const addDevices = (acc: Map<string, number>, v: Partial<Record<DeviceKey, numbe
 /** 표 제목 옆 보조 글자 — 고른 기간 중 일부 달만 수집됐으면 몇 달인지 밝힌다 */
 const coverText = (measured: number, total: number) => (measured === 0 ? PENDING : measured < total ? `${total}개월 중 ${measured}개월 수집` : '');
 
-export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, site = 'itket' }) => {
+export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, cutoffDay, site = 'itket' }) => {
   const yr = selectedMonth.slice(0, 4);
   // GA4 수집 첫 달부터 이번 달까지
   const allMonths = useMemo(() => {
@@ -97,7 +100,14 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const periodLabel = allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : mLabel(selectedMonth);
   const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : '전월';
   const partial = scope.includes(THIS_M);
-  const g = ga4 ?? {};
+  // 달 합계로만 받는 값(GA4·구글 기기별 광고)은 진행 중인 달에 오늘 값이 섞여 있다 — 마지막 날이 있으면(비로그인) 그 달은 빼고 마감 후 반영으로 둔다
+  const liveHidden = !!cutoffDay && partial;
+  const g = useMemo(() => {
+    const all = ga4 ?? {};
+    return cutoffDay ? Object.fromEntries(Object.entries(all).filter(([mo]) => mo !== THIS_M)) : all;
+  }, [ga4, cutoffDay]);
+  /** GA4 값이 없을 때의 글자 */
+  const gaWait = liveHidden ? CLOSED : PENDING;
 
   // GA4 방문·전환
   const pickSessions = (m: Ga4DeviceMonth) => (Object.keys(m.sessions).length ? m.sessions : null);
@@ -121,7 +131,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const tableDevices = KPI_DEVICES;
 
   // 광고 — 매체마다 기기 자료가 있는 달만
-  const adMonths = (media: 'Google' | 'Naver') => scope.filter((m) => AD_DEVICE_MONTHS[media].has(m));
+  // 네이버는 어제까지의 일별 값을 쌓으므로 진행 중인 달도 그대로 쓴다
+  const adMonths = (media: 'Google' | 'Naver') => scope.filter((m) => AD_DEVICE_MONTHS[media].has(m) && !(media === 'Google' && liveHidden && m === THIS_M));
+  const googleClosed = liveHidden && AD_DEVICE_MONTHS.Google.has(THIS_M) && adMonths('Google').length === 0;
   const adRows = (['Google', 'Naver'] as const).flatMap((media) => {
     const months = new Set(adMonths(media));
     return DEVICE_KEYS.map((device) => {
@@ -132,12 +144,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const adTotal = { cost: sumBy(adRows, (r) => r.cost), imp: sumBy(adRows, (r) => r.imp), clk: sumBy(adRows, (r) => r.clk), conv: sumBy(adRows, (r) => r.conv) };
   // 네이버는 날마다 쌓아 첫 수집일이 고른 기간 안이면 그날부터의 값이다
   const naverFrom = AD_DEVICE_FROM.Naver && scope.includes(AD_DEVICE_FROM.Naver.slice(0, 7)) ? ` (${+AD_DEVICE_FROM.Naver.slice(5, 7)}/${+AD_DEVICE_FROM.Naver.slice(8, 10)}부터)` : '';
-  const adCover = [`구글 ${coverText(adMonths('Google').length, scope.length) || '수집됨'}`, `네이버 ${coverText(adMonths('Naver').length, scope.length) || '수집됨'}${adMonths('Naver').length ? naverFrom : ''}`].join(' · ');
+  const adCover = [`구글 ${googleClosed ? CLOSED : coverText(adMonths('Google').length, scope.length) || '수집됨'}`, `네이버 ${coverText(adMonths('Naver').length, scope.length) || '수집됨'}${adMonths('Naver').length ? naverFrom : ''}`].join(' · ');
 
   // 판매 — 고도몰 주문 형태별 주문 수·금액 (주문 키로 한 번만 센다)
   const scopeSet = new Set(scope);
   const saleByLabel = new Map<string, { orders: Set<string>; amount: number }>();
-  GODOMALL_ORDER_LINES.filter((l) => scopeSet.has(l.month)).forEach((l) => {
+  GODOMALL_ORDER_LINES.filter((l) => scopeSet.has(l.month) && lineInCutoff(l)).forEach((l) => {
     const label = orderDeviceLabel(l.device);
     const cur = saleByLabel.get(label) ?? { orders: new Set<string>(), amount: 0 };
     cur.orders.add(l.key);
@@ -171,7 +183,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const estimateTrend = trend((m) => m.conv?.estimate);
 
   const loading = ga4 === null;
-  const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : PENDING);
+  const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : gaWait);
 
   return (
     <View name="devices" title={TITLE}>
@@ -201,8 +213,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                   items={[
                     ['비중', pctText(share(n ?? 0, visitTotal))],
                     // 괄호 안은 견적 전환율 (견적 완료 ÷ 방문)
-                    ['견적 완료', est === null ? PENDING : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
-                    ['주문 완료', ord === null ? PENDING : `${fmt(ord)}회`],
+                    ['견적 완료', est === null ? gaWait : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
+                    ['주문 완료', ord === null ? gaWait : `${fmt(ord)}회`],
                   ]}
                 />
               }
@@ -250,7 +262,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         )}
       </div>
 
-      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
+      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${liveHidden && !chVisits.measured ? CLOSED : coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
         {loading ? (
           <SkelTable rows={5} />
         ) : chVisits.measured ? (
@@ -292,7 +304,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                     return (
                       <React.Fragment key={d}>
                         <NumTd value={v} />
-                        <NumTd value={e} fallback={PENDING} />
+                        <NumTd value={e} fallback={gaWait} />
                         <NumTd>{e === null ? '–' : pctText(share(e, chVisitsForEst.acc.get(`${d}|${ch}`) ?? 0))}</NumTd>
                       </React.Fragment>
                     );
@@ -306,7 +318,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                   return (
                     <React.Fragment key={d}>
                       <NumTd value={v} bold />
-                      <NumTd value={e} fallback={PENDING} bold />
+                      <NumTd value={e} fallback={gaWait} bold />
                       <NumTd bold>{e === null ? '–' : pctText(share(e, sumBy(channelNames, (ch) => chVisitsForEst.acc.get(`${d}|${ch}`) ?? 0)))}</NumTd>
                     </React.Fragment>
                   );
@@ -314,6 +326,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
               </TotalRow>
             </tbody>
           </table>
+        ) : liveHidden ? (
+          <EmptyState message="진행 중인 달의 GA4 값은 달 합계로만 받아 오늘 값이 섞여 있어, 마감 후 반영합니다." />
         ) : (
           <EmptyState message={`기기 × 채널 유입은 ${PENDING}입니다.`} subMessage="GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다." />
         )}
@@ -371,7 +385,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             </tbody>
           </table>
         ) : (
-          <EmptyState message={`기기별 광고 성과는 ${PENDING}입니다.`} subMessage="구글 광고 스크립트와 네이버 수집에 기기별 수집을 반영하면 채워집니다." />
+          <EmptyState message={googleClosed ? `진행 중인 달의 구글 기기별 광고는 ${CLOSED}합니다.` : `기기별 광고 성과는 ${PENDING}입니다.`} subMessage="구글 광고 스크립트와 네이버 수집에 기기별 수집을 반영하면 채워집니다." />
         )}
         <TableFootnote
           unit="원·회"
