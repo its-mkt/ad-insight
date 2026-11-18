@@ -10,7 +10,9 @@ interface HeaderProfileMenuProps {
 }
 
 export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin }) => {
-  const { user, isLoggedIn, loading, logout } = useAuth();
+  const { user, isLoggedIn, isSignedIn, loading, logout } = useAuth();
+  // 승인된 일반 계정도 로그인한 상태라 프로필·로그아웃을 보여 준다 (관리자 표시만 다르다)
+  const roleLabel = isLoggedIn ? '관리자' : '열람';
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,19 +35,19 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin })
       {/* 헤더 프로필 트리거 버튼 */}
       <button
         type="button"
-        className={`btn ic header-profile-btn${isLoggedIn ? ' on' : ''}`}
+        className={`btn ic header-profile-btn${isSignedIn ? ' on' : ''}`}
         id="btn-profile"
         data-btn="profile"
-        onClick={() => (isLoggedIn ? setOpen((v) => !v) : onLogin())}
+        onClick={() => (isSignedIn ? setOpen((v) => !v) : onLogin())}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={isLoggedIn ? '사용자 프로필' : '관리자 로그인'}
-        title={isLoggedIn ? `${user?.name || user?.email} (관리자)` : '관리자 로그인'}
+        aria-label={isSignedIn ? '사용자 프로필' : '관리자 로그인'}
+        title={isSignedIn ? `${user?.name || user?.email} (${roleLabel})` : '관리자 로그인'}
       >
-        {isLoggedIn ? (
+        {isSignedIn ? (
           <>
             <span className="pm-avatar">{avatar}</span>
-            <span className="pm-name">{user?.name || '관리자'}</span>
+            <span className="pm-name">{user?.name || roleLabel}</span>
           </>
         ) : (
           <>
@@ -56,7 +58,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin })
       </button>
 
       {/* 팝오버 메뉴 */}
-      {open && isLoggedIn && (
+      {open && isSignedIn && (
         <div role="dialog" className="pm-pop">
           {(
             /* 로그인된 상태 */
@@ -64,7 +66,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin })
               <div className="pm-user">
                 <div className="pm-avatar lg">{avatar}</div>
                 <div className="pm-user-info">
-                  <div className="pm-user-name">{user?.name || '관리자'}</div>
+                  <div className="pm-user-name">{user?.name || roleLabel}</div>
                   <div className="pm-user-email">{user?.email}</div>
                 </div>
               </div>

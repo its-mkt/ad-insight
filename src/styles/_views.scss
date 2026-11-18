@@ -1321,6 +1321,18 @@ tr.kw-more-row td {
   margin-bottom: 1rem;
 }
 
+// 가입 요청·열람 권한 카드 — 견적 관리 위에 둔다
+.admin-members {
+  margin-bottom: 1.5rem;
+
+  .member-actions {
+    display: flex;
+    gap: 0.375rem;
+    justify-content: flex-end;
+    white-space: nowrap;
+  }
+}
+
 // 로그인 모달 바탕 — 지금 화면 위 전체를 덮는다 (헤더 .top z-index 5 보다 위)
 .login-backdrop {
   position: fixed;
@@ -1433,6 +1445,34 @@ tr.kw-more-row td {
     font-size: 0.875rem;
     font-weight: 700;
     border: none;
+  }
+}
+
+// 접속 관문(AccessGate) — 로그인 모달과 같은 카드를 바탕 없이 화면 전체에 띄운다
+.login-backdrop.access-gate {
+  background: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  // 로그인 버튼 밑 "계정이 없으신가요? 회원가입"
+  p.gate-switch {
+    margin: 1rem 0 0;
+    font-size: 0.8125rem;
+  }
+
+  .gate-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .gate-account {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    color: var(--sub);
   }
 }
 

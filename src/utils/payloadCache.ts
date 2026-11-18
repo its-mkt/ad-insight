@@ -61,6 +61,27 @@ export async function readCachedPayload(site: SiteId = 'itket'): Promise<RawApiP
   }
 }
 
+/** 저장해 둔 응답을 모두 지운다 — 로그아웃하거나 열람 권한이 없을 때 이전 사용자의 데이터가 남지 않게 */
+export async function clearCachedPayloads(): Promise<void> {
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    // 저장 공간을 쓸 수 없는 브라우저 — 지울 것도 없다
+  }
+}
+
 /** 브라우저에는 공개 데이터만 남긴다 — 관리자 응답의 고객 정보는 저장하지 않는다 */
 function toPublicPayload(payload: RawApiPayload): RawApiPayload {
   const { quotes_raw_sites: _sites, quotes_phone: _phone, godo_order_customers: _customers, ...rest } = payload;

@@ -28,6 +28,7 @@ import { quoteCategoryOf } from '../utils/categoryText';
 import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
+import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../lib/access';
 
 export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
@@ -229,7 +230,7 @@ export const quoteDetailsPending = (data: Pick<DashboardData, 'quotesSites' | 'q
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
 export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): Promise<SpendDailyRow[]> {
   const c = getCfg(site);
-  const res = await fetch(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`);
+  const res = await fetch(withAccessToken(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`, await currentAccessToken()));
   const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
   if (j.error) throw new Error(j.error);
   // fromApi 를 거치면 판매·기기 등 전역 저장소가 빈 값으로 덮이므로 일별 행만 따로 만든다
@@ -627,12 +628,12 @@ export function useDashboardData(site: SiteId = 'itket') {
 
     try {
       const fetchUrl = `${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}`;
-      // 로그인한 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins 탭을 확인)
-      const { data: auth } = await supabase.auth.getSession();
-      const token = auth.session?.access_token;
-      const res = await fetch(token ? `${fetchUrl}&access_token=${encodeURIComponent(token)}` : fetchUrl);
+      // 승인된 계정에만 데이터가, 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins·members 명단을 확인)
+      const res = await fetch(withAccessToken(fetchUrl, await currentAccessToken()));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as RawApiPayload;
+      // 쓰는 도중 승인이 해제되거나 로그인이 만료되면 권한을 다시 확인해 로그인 화면으로 돌린다
+      if (j.error === 'login_required') window.dispatchEvent(new Event(ACCESS_CHANGED_EVENT));
       if (j.error) throw new Error(j.error);
       if (isStale()) return;
       liveLoaded.current = true;
