@@ -74,7 +74,7 @@ function setup() {
 function syncAll() {
   const t0 = Date.now();
   console.log('=== [its-ad-insight] 전체 매체 통합 동기화 시작 ===');
-  try { syncAllBody_(t0); } finally { saveApiCount_(); warmApiCache_(); }
+  try { syncAllBody_(t0); } finally { saveApiCount_(); warmApiSnapshots_(t0); }
 }
 function syncAllBody_(t0) {
   // 네이버는 하루 UrlFetch 한도(2만 회)를 지키려고 둘로 나눈다.
@@ -1298,16 +1298,54 @@ function doGet(e) {
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
   if (e.parameter.daily) return json_(dailyHistResponse_(ss, e.parameter.daily, out));
   const isAdmin = isAdminToken_(ss, e.parameter.access_token);
+  // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다)
+  return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ── 대시보드 응답 스냅숏 ──
+ * doGet 응답 본문(served 제외)을 관리자용·공개용 두 벌로 만들어 스크립트 캐시에 gzip 으로 둔다.
+ * 키에 API_CACHE_V 가 들어가 syncAll 이 끝나거나 doPost 로 데이터가 바뀌면(bumpApiCache_) 새로 만든다. */
+const API_SNAPSHOT_TTL_SEC = 6 * 60 * 60; // CacheService 최대 보관 시간
+function apiSnapshotKey_(isAdmin) { return 'snap:' + (PROPS.getProperty('API_CACHE_V') || '0') + ':' + (isAdmin ? 'admin' : 'public'); }
+/** 스냅숏 본문 — '{"served":…,' 뒤에 붙는 나머지 (첫 '{' 를 뺀 JSON). 없으면 지금 만든다 */
+function apiSnapshot_(isAdmin) {
+  const hit = cacheGetText_(apiSnapshotKey_(isAdmin));
+  return hit || buildApiSnapshots_()[isAdmin ? 'admin' : 'public'];
+}
+/** 시트를 한 번 읽어 관리자용·공개용 본문을 만들고 캐시에 둔다 */
+function buildApiSnapshots_() {
+  const admin = apiPayload_(SpreadsheetApp.openById(CFG.SHEET_ID));
+  const bodies = { admin: JSON.stringify(admin).slice(1), public: JSON.stringify(publicPayloadOf_(admin)).slice(1) };
+  cachePutText_(apiSnapshotKey_(true), bodies.admin, API_SNAPSHOT_TTL_SEC);
+  cachePutText_(apiSnapshotKey_(false), bodies.public, API_SNAPSHOT_TTL_SEC);
+  return bodies;
+}
+/** syncAll 끝 — 새 데이터 기준으로 버전을 올리고 미리 만든다 (Google Ads 스크립트는 g_* 를 직접 써서 따로 알리지 않는다) */
+function warmApiSnapshots_(t0) {
+  bumpApiCache_();
+  if (Date.now() - t0 > 5 * 60 * 1000) { console.warn('- 응답 스냅숏: 실행 시간이 모자라 첫 요청 때 만듦'); return; }
+  try { buildApiSnapshots_(); console.log('✓ 응답 스냅숏 갱신'); } catch (err) { console.warn('응답 스냅숏 갱신 실패: ' + err.message); }
+}
+/** 관리자용 응답 본문 — 시트 전부 */
+function apiPayload_(ss) {
+  const out = {};
   out.daily_hist_months = { Google: dailyHistMonths_(ss, CFG.DAILY_HIST.google), Naver: dailyHistMonths_(ss, CFG.DAILY_HIST.naver) };
-  CFG.SHEETS.forEach((n) => { if (isAdmin || !CFG.ADMIN_ONLY_SHEETS.includes(n)) out[n] = sheetRowsCached_(ss, n); });
-  if (!isAdmin) {
+  CFG.SHEETS.forEach((n) => { out[n] = sheetRowsCached_(ss, n); });
+  return out;
+}
+/** 관리자용 본문 → 공개용 본문 (관리자 전용 시트는 빼고, 고객 정보는 가린다) */
+function publicPayloadOf_(admin) {
+  const out = Object.assign({}, admin);
+  CFG.ADMIN_ONLY_SHEETS.forEach((n) => { delete out[n]; });
+  {
     // 공개 화면은 고객 이름·회사·이메일·연락처를 일부만 보여 준다 (원문은 관리자에게만). 저장한 관리자 계정은 쓰지 않는다
     out.quotes_raw = (out.quotes_raw || []).map(maskQuoteRow_);
-    out.quotes_raw_sites = read_(ss, 'quotes_raw_sites').map(maskQuoteRow_); // 운영 편집기(Head)와 같게 read_ 로 읽는다
-    out.quotes_phone = read_(ss, 'quotes_phone').map(maskQuoteRow_);
+    out.quotes_raw_sites = (admin.quotes_raw_sites || []).map(maskQuoteRow_);
+    out.quotes_phone = (admin.quotes_phone || []).map(maskQuoteRow_);
     out.manual_categories = (out.manual_categories || []).map(({ updated_by, ...rest }) => rest);
   }
-  return json_(out);
+  return out;
 }
 
 /* ── 공개 응답용 개인정보 가리기 ──
@@ -1433,6 +1471,9 @@ function saveOrderInflow_(data) {
 }
 
 function doPost(e) {
+  try { return doPostBody_(e); } finally { bumpApiCache_(); } // 견적 수신·카테고리 저장 뒤 응답 스냅숏을 새로 만들게
+}
+function doPostBody_(e) {
   try {
     const raw = e && e.postData && e.postData.contents;
     if (!raw) return json_({ error: 'empty_body' });
@@ -1765,33 +1806,39 @@ function formatCellDate_(d, colKey) {
  * syncAll 이 끝날 때마다 데워 두므로 방문자는 대부분 캐시를 맞는다. 캐시 오류는 모두 삼키고 시트를 직접 읽는다. */
 const API_CACHE_TTL_SEC = 20 * 60;
 function sheetRowsCached_(ss, name) {
-  const cache = CacheService.getScriptCache();
   const base = 'api:' + (PROPS.getProperty('API_CACHE_V') || '0') + ':' + name;
-  try {
-    const n = Number(cache.get(base + ':n'));
-    if (n) {
-      const got = cache.getAll(Array.from({ length: n }, (_, i) => base + ':' + i));
-      let b64 = '';
-      for (let i = 0; i < n; i++) { const part = got[base + ':' + i]; if (part == null) { b64 = ''; break; } b64 += part; }
-      if (b64) return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip')).getDataAsString());
-    }
-  } catch (err) { console.warn('캐시 읽기 실패(' + name + '): ' + err.message); }
+  const hit = cacheGetText_(base);
+  if (hit) {
+    try { return JSON.parse(hit); } catch (err) { console.warn('캐시 읽기 실패(' + name + '): ' + err.message); }
+  }
   const rows = read_(ss, name);
+  cachePutText_(base, JSON.stringify(rows), API_CACHE_TTL_SEC);
+  return rows;
+}
+/** 스크립트 캐시에서 긴 글자를 꺼낸다 (gzip·base64 를 90KB 조각으로 나눠 둔 것). 없거나 조각이 빠졌으면 '' */
+function cacheGetText_(base) {
   try {
-    const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(rows), 'application/json')).getBytes());
+    const cache = CacheService.getScriptCache();
+    const n = Number(cache.get(base + ':n'));
+    if (!n) return '';
+    const got = cache.getAll(Array.from({ length: n }, (_, i) => base + ':' + i));
+    let b64 = '';
+    for (let i = 0; i < n; i++) { const part = got[base + ':' + i]; if (part == null) return ''; b64 += part; }
+    return Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip')).getDataAsString();
+  } catch (err) { console.warn('캐시 읽기 실패(' + base + '): ' + err.message); return ''; }
+}
+/** 긴 글자를 gzip·base64 로 줄여 90KB 조각으로 스크립트 캐시에 둔다 (CacheService 는 키 하나에 100KB 까지) */
+function cachePutText_(base, text, ttlSec) {
+  try {
+    const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(text, 'application/json')).getBytes());
     const CHUNK = 90000, n = Math.max(1, Math.ceil(b64.length / CHUNK)), put = {};
     for (let i = 0; i < n; i++) put[base + ':' + i] = b64.slice(i * CHUNK, (i + 1) * CHUNK);
     put[base + ':n'] = String(n);
-    cache.putAll(put, API_CACHE_TTL_SEC);
-  } catch (err) { console.warn('캐시 저장 실패(' + name + '): ' + err.message); }
-  return rows;
+    CacheService.getScriptCache().putAll(put, ttlSec);
+  } catch (err) { console.warn('캐시 저장 실패(' + base + '): ' + err.message); }
 }
 /** 시트를 새로 썼을 때 호출 — 이전 캐시 키는 쓰이지 않고 TTL 로 사라진다 */
 function bumpApiCache_() { PROPS.setProperty('API_CACHE_V', String(Date.now())); }
-/** 수집이 끝난 직후 호출 — 첫 방문자가 느린 시트 읽기를 맞지 않게 미리 채운다 */
-function warmApiCache_() {
-  try { const ss = SpreadsheetApp.openById(CFG.SHEET_ID); CFG.SHEETS.forEach((n) => sheetRowsCached_(ss, n)); } catch (err) { console.warn('캐시 예열 실패: ' + err.message); }
-}
 function read_(ss, name) {
   const sh = ss.getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return [];
