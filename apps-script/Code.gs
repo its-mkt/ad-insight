@@ -1505,9 +1505,11 @@ function accessOf_(accessToken) {
 /** 예전 이름 — 관리자인지만 볼 때 */
 function isAdminToken_(ss, accessToken) { return accessOf_(accessToken).role === 'admin'; }
 
-/** 가입 요청 — 화면이 Supabase 가입 직후 보낸다. 이미 요청·승인된 이메일이면 그대로 둔다 */
+/** 열람 요청 — 화면이 인증번호 확인 직후 로그인 토큰과 함께 보낸다. 이미 요청·승인된 이메일이면 그대로 둔다 */
 function requestAccess_(data) {
-  const email = String(data.email || '').trim().toLowerCase();
+  // 이메일 인증번호로 로그인한 토큰의 이메일만 받는다 — 남의 이메일로 요청하지 못하게 (2026-11-18 인증번호 로그인 전환)
+  const email = tokenEmail_(data.access_token);
+  if (!email) return { error: 'login_required' };
   const name = String(data.name || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40);
   const team = String(data.team || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 60);
   if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email) || !name || !team) return { error: 'bad_request' };

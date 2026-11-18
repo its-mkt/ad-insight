@@ -2585,3 +2585,30 @@ tr.kw-more-row td {
   gap: 0.5rem;
   padding-bottom: 1.5rem;
 }
+
+// 이메일 인증번호 2단계 — 보낸 주소 안내·인증번호 칸·다시 보내기/이메일 바꾸기
+.card.login-modal {
+  p.gate-code-sent {
+    margin: 0;
+    font-size: 0.8125rem;
+    text-align: left;
+    word-break: break-all;
+
+    strong {
+      color: var(--ink);
+    }
+  }
+
+  .gate-input.gate-code {
+    text-align: center;
+    font-size: 1.125rem;
+    letter-spacing: 0.4em;
+  }
+
+  .gate-code-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+  }
+}

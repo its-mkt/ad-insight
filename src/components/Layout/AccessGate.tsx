@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkelBar } from '../common/SkeletonView';
-import { GateError, LoginForm } from './LoginForm';
+import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
 
 type GateTab = 'login' | 'signup';
 
@@ -27,45 +27,6 @@ const NameTeamFields: React.FC<{ name: string; team: string; onName: (v: string)
     <TextInput className={`gate-input${err ? ' err' : ''}`} name="team" autoComplete="organization" placeholder="소속 (회사·팀)" value={team} onChange={(e) => onTeam(e.target.value)} />
   </>
 );
-
-/** 가입 요청 폼 — Supabase 가입 후 관리자에게 승인 요청을 보낸다 */
-const SignUpForm: React.FC<{ onSent: (needsEmailConfirm: boolean) => void }> = ({ onSent }) => {
-  const { signUp } = useAuth();
-  const [name, setName] = useState('');
-  const [team, setTeam] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [password2, setPassword2] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (password !== password2) {
-      setError('비밀번호 확인이 일치하지 않습니다.');
-      return;
-    }
-    setSubmitting(true);
-    const res = await signUp({ name, team, email, password });
-    setSubmitting(false);
-    if (res.error) setError(res.error);
-    else onSent(!!res.needsEmailConfirm);
-  };
-
-  return (
-    <form className="gate-form" onSubmit={handleSubmit}>
-      <NameTeamFields name={name} team={team} onName={setName} onTeam={setTeam} err={!!error} />
-      <TextInput className={`gate-input${error ? ' err' : ''}`} type="email" name="email" autoComplete="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password" autoComplete="new-password" placeholder="비밀번호 (6자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
-      {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn="signup-submit" disabled={submitting}>
-        {submitting ? '보내는 중...' : '회원가입 및 열람 요청'}
-      </button>
-    </form>
-  );
-};
 
 /** 로그인한 계정으로 승인을 (다시) 요청 — 요청 기록이 없거나 거절·해제된 경우 */
 const RequestAgainForm: React.FC = () => {
@@ -120,7 +81,6 @@ const GateActions: React.FC<{ recheck?: boolean }> = ({ recheck }) => {
 export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loading, isSignedIn, role, canView, refreshRole } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
-  const [sent, setSent] = useState<null | { confirm: boolean }>(null);
 
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
@@ -134,30 +94,13 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   if (!isSignedIn) {
-    if (sent) {
-      return (
-        <GateCard
-          icon={<Clock size="1.25rem" aria-hidden="true" />}
-          title="회원가입 및 열람 요청을 보냈습니다"
-          desc={
-            sent.confirm
-              ? '받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 관리자가 승인하면 데이터를 볼 수 있습니다.'
-              : '관리자가 승인하면 로그인해서 데이터를 볼 수 있습니다.'
-          }
-        >
-          <button type="button" className="btn acc btn-login" data-btn="gate-to-login" onClick={() => { setSent(null); setTab('login'); }}>
-            로그인 화면으로
-          </button>
-        </GateCard>
-      );
-    }
     return (
       <GateCard
         icon={<Lock size="1.25rem" aria-hidden="true" />}
         title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입 및 열람 요청'}
-        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
+        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다. 이메일로 받은 인증번호로 로그인합니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
       >
-        {tab === 'login' ? <LoginForm /> : <SignUpForm onSent={(confirm) => setSent({ confirm })} />}
+        {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
         {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
         <p className="gate-switch">
           {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
