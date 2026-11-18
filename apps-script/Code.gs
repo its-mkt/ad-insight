@@ -1538,7 +1538,13 @@ function notifyAccessRequest_(email, name, team) {
     try {
       UrlFetchApp.fetch(hook, {
         method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-        payload: JSON.stringify({ text: text + '\n\n승인: ' + url }),
+        // Teams 워크플로 웹훅 형식 (온코어 견적 알림과 같은 Adaptive Card)
+        payload: JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: {
+          $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4',
+          body: [{ type: 'TextBlock', text: '광고 인사이트 가입 요청', weight: 'Bolder', size: 'Medium' },
+            { type: 'FactSet', facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }] }],
+          actions: [{ type: 'Action.OpenUrl', title: '승인하러 가기', url }],
+        } }] }),
       });
     } catch (err) { console.warn('Teams 알림 실패: ' + err.message); }
   }
