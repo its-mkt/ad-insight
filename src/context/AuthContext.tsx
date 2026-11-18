@@ -14,12 +14,10 @@ export interface AuthUser {
   isDevAdmin?: boolean;
 }
 
-/** 가입 요청 입력값 */
-export interface SignUpInput {
+/** 회원가입 및 열람 요청 때 함께 적는 값 */
+export interface SignUpInfo {
   name: string;
   team: string;
-  email: string;
-  password: string;
 }
 
 interface AuthContextType {
@@ -34,9 +32,10 @@ interface AuthContextType {
   role: AccessRole | null;
   /** 데이터를 볼 수 있는지 (관리자·승인된 계정) */
   canView: boolean;
-  loginWithPassword: (loginId: string, password: string) => Promise<{ error?: string }>;
-  /** 가입 + 관리자에게 승인 요청. 메일 인증이 켜져 있으면 needsEmailConfirm */
-  signUp: (input: SignUpInput) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
+  /** 이메일로 6자리 인증번호를 보낸다 — signup 을 주면 처음 쓰는 이메일도 계정을 만든다(회원가입), 없으면 가입된 이메일만 */
+  sendEmailCode: (email: string, signup?: SignUpInfo) => Promise<{ error?: string }>;
+  /** 인증번호로 로그인한다 — signup 이면 로그인 직후 관리자에게 열람 승인을 요청한다 */
+  verifyEmailCode: (email: string, code: string, signup?: SignUpInfo) => Promise<{ error?: string }>;
   /** 로그인한 계정으로 승인을 (다시) 요청한다 — 요청 기록이 없거나 거절·해제된 경우 */
   requestAccess: (name: string, team: string) => Promise<{ error?: string }>;
   /** 열람 권한을 다시 확인한다 (승인됐는지 볼 때) */
@@ -57,6 +56,8 @@ const toLoginEmail = (loginId: string) => {
   return id.includes('@') ? id : `${id}@${LOGIN_EMAIL_DOMAIN}`;
 };
 
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+
 const toAuthUser = (sessionUser: Session['user']): AuthUser => ({
   id: sessionUser.id,
   email: sessionUser.email || '',
@@ -64,12 +65,12 @@ const toAuthUser = (sessionUser: Session['user']): AuthUser => ({
   team: sessionUser.user_metadata?.team,
 });
 
-/** Supabase 가입 오류 → 화면 문구 */
-const signUpErrorText = (message: string): string => {
-  if (/password/i.test(message)) return '비밀번호는 6자 이상으로 입력해 주세요.';
-  if (/rate|too many|seconds/i.test(message)) return '요청이 많아 잠시 막혔습니다. 몇 분 뒤 다시 시도해 주세요.';
-  if (/invalid.*email|email.*invalid/i.test(message)) return '이메일 주소를 확인해 주세요.';
-  return '가입하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
+/** 인증번호 보내기·확인 오류 → 화면 문구 */
+const codeErrorText = (message: string): string => {
+  if (/signups not allowed|user not found/i.test(message)) return '가입된 이메일이 아닙니다. 아래 "회원가입 및 열람 요청"을 먼저 해 주세요.';
+  if (/expired|invalid/i.test(message)) return '인증번호가 맞지 않거나 시간이 지났습니다. 다시 받아 주세요.';
+  if (/rate|too many|seconds/i.test(message)) return '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.';
+  return '처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
 };
 
 // 개발 서버 전용 테스트 세션 (운영 빌드에서는 무시)
@@ -163,43 +164,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!roleLoading && role && !canView) void clearCachedPayloads();
   }, [roleLoading, role, canView]);
 
-  const loginWithPassword = async (loginId: string, password: string): Promise<{ error?: string }> => {
-    if (!loginId.trim() || !password) {
-      return { error: '이메일과 비밀번호를 입력해주세요.' };
-    }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: toLoginEmail(loginId),
-      password,
+  const sendEmailCode = async (email: string, signup?: SignUpInfo): Promise<{ error?: string }> => {
+    const mail = toLoginEmail(email);
+    if (!isEmail(mail)) return { error: '이메일 주소를 확인해 주세요.' };
+    if (signup && (!signup.name.trim() || !signup.team.trim())) return { error: '이름과 소속을 입력해 주세요.' };
+    const { error } = await supabase.auth.signInWithOtp({
+      email: mail,
+      options: {
+        shouldCreateUser: !!signup,
+        data: signup ? { name: signup.name.trim(), team: signup.team.trim() } : undefined,
+        emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
+      },
     });
     if (error) {
-      console.error('Login error:', error.message);
-      if (/confirm/i.test(error.message)) return { error: '가입 메일의 인증 링크를 먼저 눌러 주세요.' };
-      return { error: '이메일 또는 비밀번호가 일치하지 않습니다.' };
+      console.error('Send code error:', error.message);
+      return { error: codeErrorText(error.message) };
     }
     return {};
   };
 
-  const signUp = async ({ name, team, email, password }: SignUpInput): Promise<{ error?: string; needsEmailConfirm?: boolean }> => {
-    const mail = email.trim().toLowerCase();
-    if (!name.trim() || !team.trim() || !mail || !password) return { error: '이름·소속·이메일·비밀번호를 모두 입력해 주세요.' };
-    const { data, error } = await supabase.auth.signUp({
-      email: mail,
-      password,
-      options: { data: { name: name.trim(), team: team.trim() }, emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
-    });
-    if (error) {
-      console.error('Sign-up error:', error.message);
-      return { error: signUpErrorText(error.message) };
+  const verifyEmailCode = async (email: string, code: string, signup?: SignUpInfo): Promise<{ error?: string }> => {
+    const token = code.replace(/\D/g, '');
+    if (token.length < 6) return { error: '메일로 받은 6자리 인증번호를 입력해 주세요.' };
+    const { data, error } = await supabase.auth.verifyOtp({ email: toLoginEmail(email), token, type: 'email' });
+    if (error || !data.session) {
+      console.error('Verify code error:', error?.message);
+      return { error: codeErrorText(error?.message || 'invalid') };
     }
-    const req = await postMemberAction({ action: 'requestAccess', email: mail, name: name.trim(), team: team.trim() }).catch(() => ({ error: 'network' }));
-    if (req.error) return { error: req.error === 'too_many' ? '요청이 많아 잠시 막혔습니다. 한 시간 뒤 다시 시도해 주세요.' : '가입은 됐지만 승인 요청을 보내지 못했습니다. 로그인한 뒤 다시 요청해 주세요.' };
-    if (!data.session) return { needsEmailConfirm: true };
+    if (!signup) return {};
+    // 인증된 로그인 토큰으로 열람 승인을 요청한다 — 웹앱이 토큰의 이메일로 명단에 올린다
+    const req = await postMemberAction({ action: 'requestAccess', access_token: data.session.access_token, email: data.session.user.email, name: signup.name.trim(), team: signup.team.trim() }).catch(() => ({ error: 'network' }));
+    if (req.error) return { error: req.error === 'too_many' ? '요청이 많아 잠시 막혔습니다. 한 시간 뒤 다시 시도해 주세요.' : '로그인은 됐지만 열람 요청을 보내지 못했습니다. 잠시 뒤 다시 요청해 주세요.' };
+    refreshRole();
     return {};
   };
 
   const requestAccess = async (name: string, team: string): Promise<{ error?: string }> => {
     if (!user?.email || !name.trim() || !team.trim()) return { error: '이름과 소속을 입력해 주세요.' };
-    const req = await postMemberAction({ action: 'requestAccess', email: user.email, name: name.trim(), team: team.trim() }).catch(() => ({ error: 'network' }));
+    const req = await postMemberAction({ action: 'requestAccess', access_token: await currentAccessToken(), email: user.email, name: name.trim(), team: team.trim() }).catch(() => ({ error: 'network' }));
     if (req.error) return { error: '승인 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     refreshRole();
     return {};
@@ -240,8 +242,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSignedIn: !!user,
         role,
         canView,
-        loginWithPassword,
-        signUp,
+        sendEmailCode,
+        verifyEmailCode,
         requestAccess,
         refreshRole,
         loginAsDevAdmin,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -6,7 +6,7 @@ import { StatusBadge, type StatusLevel } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
 import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
-import { decideMember, loadMembers, useMembers, type MemberStatus } from '../../hooks/useMembers';
+import { decideMember, deleteMember, loadMembers, useMembers, type MemberStatus } from '../../hooks/useMembers';
 
 const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> = {
   pending: { label: '승인 대기', level: 'warn' },
@@ -18,10 +18,13 @@ const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> =
 /**
  * 가입 요청·열람 권한 관리 — 관리자만 보인다 (계정 관리 화면).
  * 명단은 데이터 시트 members 탭이고, 승인·거절·해제는 웹앱이 관리자 토큰을 확인한 뒤 바꾼다.
- * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers)
+ * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers).
+ * 삭제는 해제와 따로 둔다 — 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
  */
 export const MemberApprovals: React.FC = () => {
-  const { rows, error, busy, pending } = useMembers();
+  const { rows, error, busy, pending, notice } = useMembers();
+  // 삭제를 한 번 누른 줄 — 같은 줄에서 "삭제 확인"을 눌러야 지운다
+  const [confirmDel, setConfirmDel] = useState('');
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
 
   return (
@@ -33,9 +36,10 @@ export const MemberApprovals: React.FC = () => {
       tableWrap
     >
       {error && <Notice tone="warn">{error}</Notice>}
+      {notice && <Notice tone="ok">{notice}</Notice>}
       {pending > 0 && (
         <Notice tone="warn">
-          가입할 때 이메일 인증을 하지 않으므로, 승인 전에 요청자에게 팀즈·전화로 본인이 요청했는지 확인해 주세요. 확인되지 않으면 거절합니다.
+          이메일 인증번호로 이메일 주인은 확인됐습니다. 승인 전에 요청자가 열람해도 되는 사람인지 팀즈·전화로 확인해 주세요. 확인되지 않으면 거절합니다.
         </Notice>
       )}
       <table className="stk">
@@ -80,6 +84,28 @@ export const MemberApprovals: React.FC = () => {
                   {r.status === 'approved' && (
                     <Button size="sm" disabled={busy === r.email} onClick={() => void decide(r.email, 'revoked')}>
                       해제
+                    </Button>
+                  )}
+                  {confirmDel === r.email ? (
+                    <>
+                      <Button
+                        size="sm"
+                        className="btn-danger"
+                        disabled={busy === r.email}
+                        onClick={() => {
+                          setConfirmDel('');
+                          void deleteMember(r.email);
+                        }}
+                      >
+                        삭제 확인
+                      </Button>
+                      <Button size="sm" disabled={busy === r.email} onClick={() => setConfirmDel('')}>
+                        취소
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" className="btn-danger-ghost" disabled={busy === r.email} onClick={() => setConfirmDel(r.email)}>
+                      삭제
                     </Button>
                   )}
                 </td>
