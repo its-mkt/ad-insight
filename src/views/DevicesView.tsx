@@ -29,7 +29,7 @@ import {
   type Ga4ConvId,
   type Ga4DeviceMonth,
 } from '../data/deviceStats';
-import { GODOMALL_ORDER_LINES, lineInCutoff } from '../data/godomallOrders';
+import { GODOMALL_ORDER_LINES, GODOMALL_ORDERS, lineInCutoff } from '../data/godomallOrders';
 import { monthsUpTo, sameMonthsLastYear } from '../utils/allPeriod';
 import { ctrText, fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 
@@ -161,7 +161,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const saleKnown = saleRows.filter((r) => r.label !== '미수집');
   const saleCollected = saleKnown.length > 0;
   // 그 사이트 고도몰 주문을 아직 하나도 받지 않았으면 판매 0건이 아니라 수집 전이다
-  const noOrders = GODOMALL_ORDER_LINES.length === 0;
+  const noOrders = GODOMALL_ORDER_LINES.length === 0 && Object.keys(GODOMALL_ORDERS).length === 0;
+  // 고른 달이 모두 수집됐고 결제 주문이 0건이면 '수집 전'이 아니라 0건이다 (월별 건수 기준)
+  const noSales = !noOrders && scope.every((m) => GODOMALL_ORDERS[m] === 0);
 
   // 추이 차트 — 전체 기간은 연도별 합계
   const years = [...new Set(chartMonths.map((m) => m.slice(0, 4)))];
@@ -223,12 +225,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         })}
         <KpiCard
           label={<>{periodLabel} 판매 (고도몰){partial && <PendingTag />}</>}
-          value={saleCollected ? `${fmt(saleTotal)}건` : PENDING}
+          value={saleCollected || noSales ? `${fmt(saleTotal)}건` : PENDING}
           detail={
             saleCollected ? (
               <KpiDetailItems items={saleRows.slice(0, 4).map((r): [string, string] => [r.label, `${fmt(r.orders)}건`])} />
             ) : (
-              <KpiDetailItems items={[['판매', noOrders ? PENDING : `${fmt(saleTotal)}건`], ['기기', PENDING]]} />
+              <KpiDetailItems items={noSales ? [['판매', '0건']] : [['판매', noOrders ? PENDING : `${fmt(saleTotal)}건`], ['기기', PENDING]]} />
             )
           }
         />
@@ -394,7 +396,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
       </Card>
 
-      <Card name="device-sales" id="device-sales" title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected ? '' : ` · 기기 ${PENDING}`})`} tableWrap>
+      <Card name="device-sales" id="device-sales" title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected || noSales ? '' : ` · 기기 ${PENDING}`})`} tableWrap>
         {saleCollected ? (
           <table className="stk" id="tbDeviceSales">
             <colgroup>
@@ -428,7 +430,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             </tbody>
           </table>
         ) : (
-          <EmptyState message={noOrders ? `고도몰 판매는 ${PENDING}입니다.` : `판매 ${fmt(saleTotal)}건의 기기 구분은 ${PENDING}입니다.`} subMessage="고도몰 주문 수집에 주문 형태(PC·모바일)를 반영한 뒤 주문 줄을 다시 만들면 지난 주문까지 채워집니다." />
+          noSales ? (
+            <EmptyState message="이 기간에 결제된 고도몰 주문이 없습니다." />
+          ) : (
+            <EmptyState message={noOrders ? `고도몰 판매는 ${PENDING}입니다.` : `판매 ${fmt(saleTotal)}건의 기기 구분은 ${PENDING}입니다.`} subMessage="고도몰 주문 수집에 주문 형태(PC·모바일)를 반영한 뒤 주문 줄을 다시 만들면 지난 주문까지 채워집니다." />
+          )
         )}
         <TableFootnote unit="건·원" basis="산출 근거: 고도몰 결제완료 주문 (주문 1건에 제품이 여럿이어도 1건) · 수기 주문은 관리자가 직접 넣은 주문" sources={['출처: 고도몰 주문 API']} />
       </Card>
