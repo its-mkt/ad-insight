@@ -54,6 +54,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEV_ADMIN_KEY = 'adi_dev_admin_session';
 
+/** 계정별 마지막 열람 권한 — 다음 접속 때 권한 확인(2~4초)을 기다리지 않고 바로 연다. 12시간 지나면 다시 기다린다 */
+const ROLE_CACHE_KEY = 'adi_access_role';
+const ROLE_CACHE_MS = 12 * 3600 * 1000;
+const readRoleCache = (uid: string): AccessRole | null => {
+  try {
+    const c = JSON.parse(localStorage.getItem(ROLE_CACHE_KEY) || 'null') as { uid: string; role: AccessRole; at: number } | null;
+    return c && c.uid === uid && Date.now() - c.at < ROLE_CACHE_MS && canViewRole(c.role) ? c.role : null;
+  } catch {
+    return null;
+  }
+};
+/** 볼 수 있는 권한만 기억한다 (승인 대기·거절·해제는 매번 확인) */
+const writeRoleCache = (uid: string, role: AccessRole | null) => {
+  try {
+    if (role && canViewRole(role)) localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role, at: Date.now() }));
+    else localStorage.removeItem(ROLE_CACHE_KEY);
+  } catch {
+    // 저장 공간을 못 쓰면 매번 확인한다
+  }
+};
+
 // 아이디만 입력하면 이 도메인을 붙여 Supabase Auth 이메일로 사용 (예전 관리자 계정 호환)
 const LOGIN_EMAIL_DOMAIN = 'gmail.com';
 
@@ -141,7 +162,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [refreshRole]);
 
-  // 3. 계정이 바뀌거나 다시 확인을 요청하면 열람 권한을 웹앱에 묻는다 (토큰 갱신처럼 계정이 그대로면 묻지 않는다)
+  // 3. 계정이 바뀌거나 다시 확인을 요청하면 열람 권한을 웹앱에 묻는다 (토큰 갱신처럼 계정이 그대로면 묻지 않는다).
+  //    웹앱 확인은 2~4초 걸리므로, 이 계정이 최근에 받은 권한이 있으면 그 권한으로 바로 화면을 열고 뒤에서 다시 확인한다.
+  //    데이터는 웹앱이 토큰으로 따로 막으므로 기억한 권한이 틀려도 데이터가 새지 않는다 (해제되면 다시 확인 후 잠김)
   const userKey = user ? `${user.id}|${user.isDevAdmin ? 'dev' : ''}` : '';
   useEffect(() => {
     if (sessionLoading) return;
@@ -156,14 +179,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoleLoading(false);
       return;
     }
-    setRoleLoading(true);
+    const uid = userKey.split('|')[0];
+    const remembered = readRoleCache(uid);
+    if (remembered) {
+      setRole(remembered);
+      setRoleLoading(false);
+    } else setRoleLoading(true);
     currentAccessToken()
       .then(fetchAccessRole)
-      .then(async (next) => {
+      .then((next) => {
         if (!alive) return;
         // 만료된 로그인은 지우고 로그인 화면으로 (setTimeout: 인증 콜백 안에서 Supabase 를 다시 부르면 멈출 수 있다)
         if (next === 'invalid') setTimeout(() => supabase.auth.signOut(), 0);
+        // 확인에 실패(null)했는데 기억한 권한이 있으면 그대로 둔다 — 웹앱 일시 장애로 잠기지 않게
+        if (next === null && remembered) return;
         setRole(next);
+        writeRoleCache(uid, next);
       })
       .finally(() => alive && setRoleLoading(false));
     return () => {
@@ -276,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
+    writeRoleCache('', null);
     await clearCachedPayloads();
     await supabase.auth.signOut();
     setUser(null);

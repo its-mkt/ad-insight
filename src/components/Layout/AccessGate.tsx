@@ -1,21 +1,40 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, Lock, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
-import { SkelBar } from '../common/SkeletonView';
+import { SkeletonView } from '../common/SkeletonView';
 import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
+import { currentAccessToken, fetchAccessRole } from '../../lib/access';
+import { GuestPreview } from './GuestPreview';
+
+/** 승인 대기 화면이 승인 여부를 다시 묻는 간격 */
+const PENDING_POLL_MS = 30 * 1000;
 
 type GateTab = 'login' | 'signup';
 
+interface GateCardProps {
+  icon: React.ReactNode;
+  title: string;
+  desc: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+/** 접속 카드 안쪽 — 아이콘·제목·설명·폼 */
+const GateCardBody: React.FC<GateCardProps> = ({ icon, title, desc, children }) => (
+  <>
+    <div className="gate-icon">{icon}</div>
+    <h2 id="access-gate-title">{title}</h2>
+    <p>{desc}</p>
+    {children}
+  </>
+);
+
 /** 접속 화면 한 장 — 가운데 카드 (로그인 모달과 같은 모양) */
-const GateCard: React.FC<{ icon: React.ReactNode; title: string; desc: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, desc, children }) => (
+const GateCard: React.FC<GateCardProps> = (props) => (
   <div className="login-backdrop access-gate">
     <div className="card login-modal" role="main" aria-labelledby="access-gate-title">
-      <div className="gate-icon">{icon}</div>
-      <h2 id="access-gate-title">{title}</h2>
-      <p>{desc}</p>
-      {children}
+      <GateCardBody {...props} />
     </div>
   </div>
 );
@@ -57,20 +76,48 @@ const RequestAgainForm: React.FC = () => {
 };
 
 /** 로그아웃·다시 확인 버튼 줄 */
-const GateActions: React.FC<{ recheck?: boolean }> = ({ recheck }) => {
-  const { logout, refreshRole, user } = useAuth();
+const GateActions: React.FC = () => {
+  const { logout, user } = useAuth();
   return (
     <div className="gate-actions">
       {user?.email && <span className="gate-account">{user.email}</span>}
-      {recheck && (
-        <button type="button" className="btn" data-btn="access-recheck" onClick={refreshRole}>
-          승인 여부 다시 확인
-        </button>
-      )}
       <button type="button" className="btn" data-btn="gate-logout" onClick={() => void logout()}>
         로그아웃
       </button>
     </div>
+  );
+};
+
+/**
+ * 승인 대기 상태 줄 — 30초마다, 그리고 이 탭으로 돌아올 때 승인 여부를 조용히 묻는다.
+ * 승인(또는 거절·해제)되면 그때만 권한을 다시 확인해 화면을 바꾼다 (평소에는 확인 중 화면으로 깜빡이지 않게 직접 묻는다)
+ */
+const PendingWatch: React.FC = () => {
+  const { refreshRole } = useAuth();
+  const [checkedAt, setCheckedAt] = useState(() => new Date());
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      const next = await fetchAccessRole(await currentAccessToken());
+      if (!alive) return;
+      setCheckedAt(new Date());
+      if (next && next !== 'pending') refreshRole();
+    };
+    const timer = window.setInterval(() => void check(), PENDING_POLL_MS);
+    const onVisible = () => document.visibilityState === 'visible' && void check();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshRole]);
+  const hm = checkedAt.toTimeString().slice(0, 5);
+  return (
+    <p className="gate-pending" role="status">
+      <span className="gate-pending-dot" aria-hidden="true" />
+      승인 여부를 자동으로 확인하고 있습니다 · {hm} 확인
+    </p>
   );
 };
 
@@ -85,37 +132,57 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
 
+  // 권한 확인 중 — 대부분 승인된 사람이므로 잠금 카드 대신 대시보드 모양 로딩을 보여 준다 (화면이 열릴 때 들썩이지 않게)
   if (loading) {
     return (
-      <GateCard icon={<Lock size="1.25rem" aria-hidden="true" />} title="아이티스 광고 인사이트" desc="접속 권한을 확인하고 있습니다.">
-        <SkelBar w="100%" h="2.625rem" />
-      </GateCard>
+      <div className="access-loading">
+        <div className="access-loading-bar" aria-hidden="true" />
+        <p className="access-loading-status" role="status">
+          <Lock size="0.875rem" aria-hidden="true" />
+          접속 권한을 확인하고 있습니다
+        </p>
+        <SkeletonView title="아이티스 광고 인사이트" />
+      </div>
     );
   }
 
+  // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn) {
     return (
-      <GateCard
-        icon={<Lock size="1.25rem" aria-hidden="true" />}
-        title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입 및 열람 요청'}
-        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
-      >
-        {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
-        {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
-        <p className="gate-switch">
-          {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
-          <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
-            {tab === 'login' ? '회원가입' : '로그인'}
-          </Button>
-        </p>
-      </GateCard>
+      <GuestPreview>
+        <GateCardBody
+          icon={<Lock size="1.25rem" aria-hidden="true" />}
+          title={tab === 'login' ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
+          desc={tab === 'login' ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
+        >
+          {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
+          {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
+          <p className="gate-switch">
+            {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
+            <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
+              {tab === 'login' ? '회원가입' : '로그인'}
+            </Button>
+          </p>
+        </GateCardBody>
+      </GuestPreview>
     );
   }
 
   if (role === 'pending') {
     return (
-      <GateCard icon={<Clock size="1.25rem" aria-hidden="true" />} title="승인을 기다리고 있습니다" desc="관리자가 가입 요청을 확인하고 있습니다. 승인되면 바로 볼 수 있습니다.">
-        <GateActions recheck />
+      <GateCard
+        icon={<Clock size="1.25rem" aria-hidden="true" />}
+        title="승인을 기다리고 있습니다"
+        desc={
+          <>
+            관리자가 가입 요청을 확인하고 있습니다.
+            <br />
+            승인되면 이 화면이 자동으로 열립니다.
+          </>
+        }
+      >
+        <PendingWatch />
+        <GateActions />
       </GateCard>
     );
   }
