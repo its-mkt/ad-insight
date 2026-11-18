@@ -1301,11 +1301,81 @@ function doGet(e) {
   out.daily_hist_months = { Google: dailyHistMonths_(ss, CFG.DAILY_HIST.google), Naver: dailyHistMonths_(ss, CFG.DAILY_HIST.naver) };
   CFG.SHEETS.forEach((n) => { if (isAdmin || !CFG.ADMIN_ONLY_SHEETS.includes(n)) out[n] = sheetRowsCached_(ss, n); });
   if (!isAdmin) {
-    // 공개 화면은 고객 이름·회사·이메일과 저장한 관리자 계정을 쓰지 않는다
-    out.quotes_raw = (out.quotes_raw || []).map(({ name, company, email, ...rest }) => rest);
+    // 공개 화면은 고객 이름·회사·이메일·연락처를 일부만 보여 준다 (원문은 관리자에게만). 저장한 관리자 계정은 쓰지 않는다
+    out.quotes_raw = (out.quotes_raw || []).map(maskQuoteRow_);
+    out.quotes_raw_sites = read_(ss, 'quotes_raw_sites').map(maskQuoteRow_); // 운영 편집기(Head)와 같게 read_ 로 읽는다
+    out.quotes_phone = read_(ss, 'quotes_phone').map(maskQuoteRow_);
     out.manual_categories = (out.manual_categories || []).map(({ updated_by, ...rest }) => rest);
   }
   return json_(out);
+}
+
+/* ── 공개 응답용 개인정보 가리기 ──
+ * 어떤 견적인지(업종·문의 내용)는 알 수 있게 두고, 누구인지는 알 수 없게 일부를 * 로 바꾼다.
+ * 별표 개수는 원래 길이를 드러내지 않도록 고정(***)한다. */
+const MASK_ = '***';
+// 기관 종류가 드러나는 앞뒤 말 — 남겨 두면 "어떤 곳의 견적인지" 짐작할 수 있다
+const ORG_PREFIX_ = /^(\(주\)|\(유\)|\(재\)|\(사\)|㈜|주식회사|유한회사|재단법인|사단법인)\s*/;
+const ORG_SUFFIX_ = /\s*(\(주\)|㈜|주식회사|대학교|대학|대학원|고등학교|중학교|초등학교|학교|연구원|연구소|병원|의원|공사|공단|재단|협회|센터|시청|구청|군청|도청)$/;
+function maskQuoteRow_(r) {
+  const out = Object.assign({}, r);
+  if ('name' in r) out.name = maskPerson_(r.name);
+  if ('company' in r) out.company = maskCompany_(r.company);
+  if ('email' in r) out.email = maskEmail_(r.email);
+  if ('phone' in r) out.phone = maskPhone_(r.phone);
+  if ('subject' in r) out.subject = maskFreeText_(r.subject);
+  if ('memo' in r) out.memo = maskFreeText_(r.memo);
+  return out;
+}
+/** 홍길동 → 홍*동, 홍길 → 홍*, John → J*** */
+function maskPerson_(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const chars = Array.from(s);
+  if (chars.length === 1) return '*';
+  if (/^[가-힣]+$/.test(s)) return chars.length === 2 ? chars[0] + '*' : chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
+  return chars[0] + MASK_;
+}
+/** (주)아이티켓 → (주)아***, 서울대학교 → 서***대학교 — 앞 글자 1/3(최소 1자)과 기관 종류만 남긴다 */
+function maskCompany_(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const pre = (s.match(ORG_PREFIX_) || [''])[0];
+  let core = s.slice(pre.length);
+  const suf = (core.match(ORG_SUFFIX_) || [''])[0];
+  core = core.slice(0, core.length - suf.length).trim();
+  if (!core || /^(개인|개인고객|일반|없음|미상|-)$/.test(core)) return s; // 기관 종류만 적혔거나 이름이 아닌 값은 가릴 것이 없다
+  const chars = Array.from(core);
+  const keep = Math.max(1, Math.floor(chars.length / 3));
+  return pre + chars.slice(0, keep).join('') + MASK_ + suf;
+}
+/** abcd@itket.co.kr → ab***@i***.co.kr, 무료 메일은 도메인을 그대로 둔다 */
+const FREE_MAIL_ = ['gmail.com', 'naver.com', 'daum.net', 'hanmail.net', 'kakao.com', 'nate.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'];
+function maskEmail_(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const at = s.lastIndexOf('@');
+  // @ 가 없는 값 — 전화번호면 번호처럼, 아이디·도메인 조각이면 앞 2자만 남긴다
+  if (at < 1) return (s.match(/d/g) || []).length >= 7 ? maskPhone_(s) : Array.from(s).slice(0, Math.min(2, s.length - 1)).join('') + MASK_;
+  const local = s.slice(0, at), domain = s.slice(at + 1).toLowerCase();
+  const head = Array.from(local).slice(0, Math.min(2, Math.max(1, local.length - 1))).join('');
+  if (FREE_MAIL_.includes(domain)) return head + MASK_ + '@' + domain;
+  const labels = domain.split('.');
+  return head + MASK_ + '@' + (labels.length > 1 ? labels[0].charAt(0) + MASK_ + '.' + labels.slice(1).join('.') : MASK_);
+}
+/** 010-1234-5678 → 010-****-5678 — 앞 3자리·끝 4자리만 남기고 숫자를 가린다 */
+function maskPhone_(v) {
+  const s = String(v == null ? '' : v).trim();
+  const total = (s.match(/\d/g) || []).length;
+  if (total < 7) return s.replace(/\d/g, '*');
+  let seen = 0;
+  return s.replace(/\d/g, (d) => (++seen <= 3 || seen > total - 4 ? d : '*'));
+}
+/** 제목·메모 안에 적힌 이메일·전화번호만 가린다 (문의 내용은 남긴다) */
+function maskFreeText_(v) {
+  return String(v == null ? '' : v)
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, (m) => maskEmail_(m))
+    .replace(/(?:\+82[- ]?0?|(?<!\d)0)\d{1,2}[-). ]{0,2}\d{3,4}[-. ]?\d{4}(?!\d)/g, (m) => maskPhone_(m));
 }
 
 /**

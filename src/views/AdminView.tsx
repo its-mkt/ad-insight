@@ -219,7 +219,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
           phoneQuotes={data.quotesPhone || []}
           originals={originals}
           loading={isSyncing}
-          detailsPending={quoteDetailsPending(data, isSyncing, true)}
+          detailsPending={quoteDetailsPending(data, isSyncing)}
           onUpdateQuoteCategory={handleUpdateQuoteCategory}
           changedCount={pendingOverrides.size}
           onSave={handleSaveOverrides}

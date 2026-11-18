@@ -15,7 +15,6 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { quoteDetailsPending, quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
-import { useAuth } from '../context/AuthContext';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
@@ -72,7 +71,6 @@ const ORIGIN_COLORS: Record<string, string> = {
 };
 
 export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
-  const { isLoggedIn } = useAuth();
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useQuoteStats(data);
   const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
@@ -431,7 +429,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
           />
         ))}
       </div>
-      <QuoteListTable rows={listRows} periodLabel={listPeriod} detailsPending={quoteDetailsPending(data, isSyncing, isLoggedIn)} resetKey={`${curM}|${allPeriod}|${yearTotal}|${period?.label ?? ''}`} />
+      <QuoteListTable rows={listRows} periodLabel={listPeriod} detailsPending={quoteDetailsPending(data, isSyncing)} resetKey={`${curM}|${allPeriod}|${yearTotal}|${period?.label ?? ''}`} />
       <SecSrc sources={QUOTES_SOURCES} />
     </View>
   );

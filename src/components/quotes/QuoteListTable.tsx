@@ -76,8 +76,8 @@ const inHierarchyOrder = (used: string[], known: string[]): string[] => [
 
 /**
  * 견적 접수 목록 (읽기 전용) — 어드민 '견적 접수 원본 리스트'와 같은 열·순서·너비로 보여 준다.
- * 이 화면은 로그인 없이도 열리므로 제목·회사명·작성자·이메일은 로그인했을 때만 보여 준다
- * (이름·회사·이메일은 서버가 관리자에게만 내려 준다). 카테고리 지정은 어드민에서만 한다.
+ * 이 화면은 로그인 없이도 열리므로, 로그인하지 않으면 서버가 회사명·작성자·이메일·연락처를 일부 * 로 가려 내려 준다
+ * (원문은 관리자에게만). 카테고리 지정은 어드민에서만 한다.
  */
 export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabel, resetKey, detailsPending = false }) => {
   const { isLoggedIn } = useAuth();
@@ -189,20 +189,16 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
       ) : (
         <>
           <div className="tw">
-            <table className={`stk${isLoggedIn ? ' with-subject' : ''}`} id="tbQuoteList">
+            <table className="stk with-subject" id="tbQuoteList">
               {/* 열 폭을 고정한다 — 필터·페이지에 따라 칸 너비가 달라지지 않게 */}
               <colgroup>
                 <col className="ql-col-origin" />
                 <col className="ql-col-sno" />
                 <col className="ql-col-date" />
-                {isLoggedIn && (
-                  <>
-                    <col className="ql-col-subject" />
-                    <col className="ql-col-company" />
-                    <col className="ql-col-name" />
-                    <col className="ql-col-email" />
-                  </>
-                )}
+                <col className="ql-col-subject" />
+                <col className="ql-col-company" />
+                <col className="ql-col-name" />
+                <col className="ql-col-email" />
                 <col className="ql-col-rep" />
                 <col className="ql-col-cat" />
                 <col className="ql-col-source" />
@@ -212,14 +208,10 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
                   {th('origin', '사이트')}
                   {th('sno', 'SNO')}
                   {th('date', '접수날짜')}
-                  {isLoggedIn && (
-                    <>
-                      {th('subject', '제목 (문의 내용)')}
-                      {th('company', '회사명')}
-                      {th('name', '작성자')}
-                      {th('email', '이메일')}
-                    </>
-                  )}
+                  {th('subject', '제목 (문의 내용)')}
+                  {th('company', '회사명')}
+                  {th('name', '작성자')}
+                  {th('email', '이메일')}
                   {th('rep', '영업담당')}
                   {th('category', '표준 카테고리')}
                   {th('source', '유입경로')}
@@ -232,16 +224,12 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
                       <td className="ql-nowrap">{siteLabelOf(r)}</td>
                       <td className="ql-nowrap">{detail(r.sno, '2.5rem')}</td>
                       <td className="ql-nowrap">{r.date.slice(0, 10)}</td>
-                      {isLoggedIn && (
-                        <>
-                          <td className="ql-subject" title={r.subject}>
-                            {detail(r.subject, '70%')}
-                          </td>
-                          <td className="ql-nowrap" title={r.company || undefined}>{detail(r.company, '4rem')}</td>
-                          <td className="ql-nowrap" title={r.name || undefined}>{detail(r.name, '3rem')}</td>
-                          <td className="ql-nowrap" title={contactOf(r) || undefined}>{detail(contactOf(r), '6rem')}</td>
-                        </>
-                      )}
+                      <td className="ql-subject" title={r.subject}>
+                        {detail(r.subject, '70%')}
+                      </td>
+                      <td className="ql-nowrap" title={r.company || undefined}>{detail(r.company, '4rem')}</td>
+                      <td className="ql-nowrap" title={r.name || undefined}>{detail(r.name, '3rem')}</td>
+                      <td className="ql-nowrap" title={contactOf(r) || undefined}>{detail(contactOf(r), '6rem')}</td>
                       <td className="ql-nowrap" title={repOf(r)}>{repOf(r)}</td>
                       <td className="ql-nowrap" title={r.category || '기타'}>{r.category || '기타'}</td>
                       <td className="ql-nowrap" title={r.sourceDetail ? `${sourceOf(r)} - ${r.sourceDetail}` : undefined}>
@@ -262,7 +250,7 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
         basis={
           isLoggedIn
             ? '읽기 전용 · 어드민 견적 접수 원본 리스트와 같은 데이터이며, 카테고리 지정은 어드민에서 합니다 · 전화문의 건은 이메일 칸에 전화번호를 보여 줍니다'
-            : '읽기 전용 · 제목·회사명·작성자·이메일은 로그인 후 볼 수 있습니다'
+            : '읽기 전용 · 개인정보 보호를 위해 회사명·작성자·이메일·연락처는 일부를 *** 로 가려 보여 주며, 로그인하면 원문을 볼 수 있습니다'
         }
       />
     </Card>
