@@ -2624,4 +2624,11 @@ tr.kw-more-row td {
     gap: 0.5rem;
     font-size: 0.8125rem;
   }
+
+  // 로그인 방식 전환 (인증번호 ↔ 비밀번호)
+  p.gate-method {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    text-align: center;
+  }
 }
