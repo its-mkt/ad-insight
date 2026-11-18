@@ -56,7 +56,7 @@ const toLoginEmail = (loginId: string) => {
   return id.includes('@') ? id : `${id}@${LOGIN_EMAIL_DOMAIN}`;
 };
 
-const isEmail = (v: string) => /^[^s@]+@[^s@]+.[^s@]{2,}$/.test(v);
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 
 const toAuthUser = (sessionUser: Session['user']): AuthUser => ({
   id: sessionUser.id,
@@ -184,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const verifyEmailCode = async (email: string, code: string, signup?: SignUpInfo): Promise<{ error?: string }> => {
-    const token = code.replace(/D/g, '');
+    const token = code.replace(/\D/g, '');
     if (token.length < 6) return { error: '메일로 받은 6자리 인증번호를 입력해 주세요.' };
     const { data, error } = await supabase.auth.verifyOtp({ email: toLoginEmail(email), token, type: 'email' });
     if (error || !data.session) {
