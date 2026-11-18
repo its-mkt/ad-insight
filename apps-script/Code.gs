@@ -2452,3 +2452,37 @@ function rebuildGoodsInflow() {
   const orders = godoOrdersBetween_('2025-01-01', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'));
   put_(ss, 'godo_goods_inflow_monthly', [['month', 'goods_no', 'source', 'orders']].concat(godoGoodsInflowRows_(orders, read_(ss, 'order_inflow'), '2025-01')));
 }
+
+/**
+ * 네이버 광고그룹 월별 광고비를 조회 가능한 가장 이른 달(최근 730일)부터 비어 있는 달 모두 한 번에 채운다.
+ * 정기 수집(collectNaverStats_)은 비어 있는 달 중 최신 5개만 다시 보므로, 광고가 없던 달이 5개를 넘으면 그 이전 달에 닿지 못한다. 처음 연결한 사이트에서 한 번 실행한다.
+ */
+function backfillNaverHistory() {
+  checkNaverKeys_();
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID), t0 = Date.now();
+  const groups = read_(ss, 'n_idx_groups');
+  if (!groups.length) throw new Error('n_idx_groups 가 비어 있습니다 — collectNaver 를 먼저 한 번 실행하세요');
+  const gById = Object.fromEntries(groups.map((g) => [String(g.id), g]));
+  const thisM = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM');
+  // 네이버 통계 API 는 최근 730일 안만 조회된다 — 그 안에서 달 전체가 들어오는 첫 달부터
+  const floor = addMonth_(Utilities.formatDate(new Date(Date.now() - 729 * 864e5), 'Asia/Seoul', 'yyyy-MM'), 1);
+  const want = PROPS.getProperty('NAVER_BACKFILL_FROM') || '2023-01', from = want > floor ? want : floor;
+  const head = ['month', 'type', 'campaign', 'campaign_tp', 'ad_group', 'ad_group_id', 'cost', 'impressions', 'clicks', 'conversions'];
+  const old = read_(ss, 'n_adgroup_monthly');
+  const have = new Set(old.map((r) => r.month));
+  const rows = [], done = [], found = {};
+  try {
+    for (let m = from; m < addMonth_(thisM, -1); m = addMonth_(m, 1)) {
+      if (have.has(m)) continue;
+      if (Date.now() - t0 > 5 * 60 * 1000) { console.log('시간 제한 — ' + m + ' 부터는 다시 실행'); break; }
+      stats_(groups.map((g) => String(g.id)), m + '-01', lastDay_(m)).forEach((s) => {
+        const g = gById[s.id];
+        if (g && (s.salesAmt || s.impCnt)) { rows.push([m, 'SA', g.campaign, g.ctype, g.name, String(g.id), s.salesAmt || 0, s.impCnt || 0, s.clkCnt || 0, s.ccnt || 0]); found[m] = (found[m] || 0) + (s.salesAmt || 0); }
+      });
+      done.push(m);
+    }
+  } finally { saveApiCount_(); }
+  const keep = old.filter((r) => r.type !== 'SA' || !done.includes(r.month)).map((r) => head.map((h) => r[h]));
+  put_(ss, 'n_adgroup_monthly', [head].concat(keep.concat(rows).sort((a, b) => String(a[0]).localeCompare(String(b[0])))));
+  console.log('조회한 달 ' + done.length + '개 (' + (done[0] || '-') + ' ~ ' + (done[done.length - 1] || '-') + '), 광고비가 있던 달: ' + (Object.keys(found).map((k) => k + ' ' + found[k] + '원').join(', ') || '없음'));
+}
