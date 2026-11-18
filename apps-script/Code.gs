@@ -2247,7 +2247,8 @@ function collectGodoOrders() {
   });
   const merged = {};
   old.forEach((r) => { merged[String(r.month).slice(0, 7)] = Number(r.count) || 0; });
-  if (old.length) { for (let m = keepFrom; m <= thisM; m = addMonth_(m, 1)) merged[m] = counts[m] || 0; } else Object.assign(merged, counts);
+  // 처음에도 조회한 달을 모두 적는다 — 결제 주문이 없던 달은 0 (빈 시트면 화면이 0건이 아니라 '수집 전'으로 본다)
+  for (let m = old.length ? keepFrom : start.slice(0, 7); m <= thisM; m = addMonth_(m, 1)) merged[m] = counts[m] || 0;
   put_(ss, 'godo_orders_monthly', [['month', 'count']].concat(Object.keys(merged).sort().map((m) => [m, merged[m]])));
 
   // 제품별 시트는 처음에 전체 기간을 채우고, 이후에는 건수와 같이 최근 석 달만 다시 쓴다
