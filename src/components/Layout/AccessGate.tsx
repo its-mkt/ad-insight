@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, Lock, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkelBar } from '../common/SkeletonView';
 import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
+import { currentAccessToken, fetchAccessRole } from '../../lib/access';
+
+/** 승인 대기 화면이 승인 여부를 다시 묻는 간격 */
+const PENDING_POLL_MS = 30 * 1000;
 
 type GateTab = 'login' | 'signup';
 
@@ -57,20 +61,48 @@ const RequestAgainForm: React.FC = () => {
 };
 
 /** 로그아웃·다시 확인 버튼 줄 */
-const GateActions: React.FC<{ recheck?: boolean }> = ({ recheck }) => {
-  const { logout, refreshRole, user } = useAuth();
+const GateActions: React.FC = () => {
+  const { logout, user } = useAuth();
   return (
     <div className="gate-actions">
       {user?.email && <span className="gate-account">{user.email}</span>}
-      {recheck && (
-        <button type="button" className="btn" data-btn="access-recheck" onClick={refreshRole}>
-          승인 여부 다시 확인
-        </button>
-      )}
       <button type="button" className="btn" data-btn="gate-logout" onClick={() => void logout()}>
         로그아웃
       </button>
     </div>
+  );
+};
+
+/**
+ * 승인 대기 상태 줄 — 30초마다, 그리고 이 탭으로 돌아올 때 승인 여부를 조용히 묻는다.
+ * 승인(또는 거절·해제)되면 그때만 권한을 다시 확인해 화면을 바꾼다 (평소에는 확인 중 화면으로 깜빡이지 않게 직접 묻는다)
+ */
+const PendingWatch: React.FC = () => {
+  const { refreshRole } = useAuth();
+  const [checkedAt, setCheckedAt] = useState(() => new Date());
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      const next = await fetchAccessRole(await currentAccessToken());
+      if (!alive) return;
+      setCheckedAt(new Date());
+      if (next && next !== 'pending') refreshRole();
+    };
+    const timer = window.setInterval(() => void check(), PENDING_POLL_MS);
+    const onVisible = () => document.visibilityState === 'visible' && void check();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshRole]);
+  const hm = checkedAt.toTimeString().slice(0, 5);
+  return (
+    <p className="gate-pending" role="status">
+      <span className="gate-pending-dot" aria-hidden="true" />
+      승인 여부를 자동으로 확인하고 있습니다 · {hm} 확인
+    </p>
   );
 };
 
@@ -114,8 +146,19 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (role === 'pending') {
     return (
-      <GateCard icon={<Clock size="1.25rem" aria-hidden="true" />} title="승인을 기다리고 있습니다" desc="관리자가 가입 요청을 확인하고 있습니다. 승인되면 바로 볼 수 있습니다.">
-        <GateActions recheck />
+      <GateCard
+        icon={<Clock size="1.25rem" aria-hidden="true" />}
+        title="승인을 기다리고 있습니다"
+        desc={
+          <>
+            관리자가 가입 요청을 확인하고 있습니다.
+            <br />
+            승인되면 이 화면이 자동으로 열립니다.
+          </>
+        }
+      >
+        <PendingWatch />
+        <GateActions />
       </GateCard>
     );
   }
