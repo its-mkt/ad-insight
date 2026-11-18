@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import { Clock, Lock, ShieldOff } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { TextInput } from '../common/TextInput';
+import { SegmentedControl } from '../common/SegmentedControl';
+import { SkelBar } from '../common/SkeletonView';
+import { GateError, LoginForm } from './LoginForm';
+
+type GateTab = 'login' | 'signup';
+const GATE_TABS = [
+  { value: 'login' as const, label: '로그인' },
+  { value: 'signup' as const, label: '가입 요청' },
+];
+
+/** 접속 화면 한 장 — 가운데 카드 (로그인 모달과 같은 모양) */
+const GateCard: React.FC<{ icon: React.ReactNode; title: string; desc: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, desc, children }) => (
+  <div className="login-backdrop access-gate">
+    <div className="card login-modal" role="main" aria-labelledby="access-gate-title">
+      <div className="gate-icon">{icon}</div>
+      <h2 id="access-gate-title">{title}</h2>
+      <p>{desc}</p>
+      {children}
+    </div>
+  </div>
+);
+
+/** 이름·소속 입력칸 — 가입 요청과 다시 요청에 함께 쓴다 */
+const NameTeamFields: React.FC<{ name: string; team: string; onName: (v: string) => void; onTeam: (v: string) => void; err: boolean }> = ({ name, team, onName, onTeam, err }) => (
+  <>
+    <TextInput className={`gate-input${err ? ' err' : ''}`} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => onName(e.target.value)} />
+    <TextInput className={`gate-input${err ? ' err' : ''}`} name="team" autoComplete="organization" placeholder="소속 (회사·팀)" value={team} onChange={(e) => onTeam(e.target.value)} />
+  </>
+);
+
+/** 가입 요청 폼 — Supabase 가입 후 관리자에게 승인 요청을 보낸다 */
+const SignUpForm: React.FC<{ onSent: (needsEmailConfirm: boolean) => void }> = ({ onSent }) => {
+  const { signUp } = useAuth();
+  const [name, setName] = useState('');
+  const [team, setTeam] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (password !== password2) {
+      setError('비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+    setSubmitting(true);
+    const res = await signUp({ name, team, email, password });
+    setSubmitting(false);
+    if (res.error) setError(res.error);
+    else onSent(!!res.needsEmailConfirm);
+  };
+
+  return (
+    <form className="gate-form" onSubmit={handleSubmit}>
+      <NameTeamFields name={name} team={team} onName={setName} onTeam={setTeam} err={!!error} />
+      <TextInput className={`gate-input${error ? ' err' : ''}`} type="email" name="email" autoComplete="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password" autoComplete="new-password" placeholder="비밀번호 (6자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
+      {error && <GateError message={error} />}
+      <button type="submit" className="btn acc btn-login" data-btn="signup-submit" disabled={submitting}>
+        {submitting ? '보내는 중...' : '가입 요청 보내기'}
+      </button>
+    </form>
+  );
+};
+
+/** 로그인한 계정으로 승인을 (다시) 요청 — 요청 기록이 없거나 거절·해제된 경우 */
+const RequestAgainForm: React.FC = () => {
+  const { user, requestAccess } = useAuth();
+  const [name, setName] = useState(user?.name || '');
+  const [team, setTeam] = useState(user?.team || '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    const res = await requestAccess(name, team);
+    setSubmitting(false);
+    if (res.error) setError(res.error);
+  };
+
+  return (
+    <form className="gate-form" onSubmit={handleSubmit}>
+      <NameTeamFields name={name} team={team} onName={setName} onTeam={setTeam} err={!!error} />
+      {error && <GateError message={error} />}
+      <button type="submit" className="btn acc btn-login" data-btn="request-access" disabled={submitting}>
+        {submitting ? '보내는 중...' : '승인 요청 보내기'}
+      </button>
+    </form>
+  );
+};
+
+/** 로그아웃·다시 확인 버튼 줄 */
+const GateActions: React.FC<{ recheck?: boolean }> = ({ recheck }) => {
+  const { logout, refreshRole, user } = useAuth();
+  return (
+    <div className="gate-actions">
+      {user?.email && <span className="gate-account">{user.email}</span>}
+      {recheck && (
+        <button type="button" className="btn" data-btn="access-recheck" onClick={refreshRole}>
+          승인 여부 다시 확인
+        </button>
+      )}
+      <button type="button" className="btn" data-btn="gate-logout" onClick={() => void logout()}>
+        로그아웃
+      </button>
+    </div>
+  );
+};
+
+/**
+ * 접속 관문 — 관리자 또는 승인된 계정만 대시보드(children)를 연다.
+ * 그 밖에는 대시보드를 아예 그리지 않아 데이터 요청도 나가지 않는다 (경쟁사·봇이 데이터를 보지 못하게, 2026-11-18 사용자 결정).
+ */
+export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { loading, isSignedIn, role, canView, refreshRole } = useAuth();
+  const [tab, setTab] = useState<GateTab>('login');
+  const [sent, setSent] = useState<null | { confirm: boolean }>(null);
+
+  // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
+  if (canView) return <>{children}</>;
+
+  if (loading) {
+    return (
+      <GateCard icon={<Lock size="1.25rem" aria-hidden="true" />} title="아이티스 광고 인사이트" desc="접속 권한을 확인하고 있습니다.">
+        <SkelBar w="100%" h="2.625rem" />
+      </GateCard>
+    );
+  }
+
+  if (!isSignedIn) {
+    if (sent) {
+      return (
+        <GateCard
+          icon={<Clock size="1.25rem" aria-hidden="true" />}
+          title="가입 요청을 보냈습니다"
+          desc={
+            sent.confirm
+              ? '받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 관리자가 승인하면 데이터를 볼 수 있습니다.'
+              : '관리자가 승인하면 로그인해서 데이터를 볼 수 있습니다.'
+          }
+        >
+          <button type="button" className="btn acc btn-login" data-btn="gate-to-login" onClick={() => { setSent(null); setTab('login'); }}>
+            로그인 화면으로
+          </button>
+        </GateCard>
+      );
+    }
+    return (
+      <GateCard
+        icon={<Lock size="1.25rem" aria-hidden="true" />}
+        title="아이티스 광고 인사이트"
+        desc="승인된 계정만 볼 수 있습니다. 처음이면 가입 요청을 보내 주세요."
+      >
+        <div className="gate-tabs">
+          <SegmentedControl<GateTab> id="seg-gate" options={GATE_TABS} value={tab} onChange={setTab} />
+        </div>
+        {tab === 'login' ? <LoginForm /> : <SignUpForm onSent={(confirm) => setSent({ confirm })} />}
+      </GateCard>
+    );
+  }
+
+  if (role === 'pending') {
+    return (
+      <GateCard icon={<Clock size="1.25rem" aria-hidden="true" />} title="승인을 기다리고 있습니다" desc="관리자가 가입 요청을 확인하고 있습니다. 승인되면 바로 볼 수 있습니다.">
+        <GateActions recheck />
+      </GateCard>
+    );
+  }
+
+  if (role === null) {
+    return (
+      <GateCard icon={<ShieldOff size="1.25rem" aria-hidden="true" />} title="권한을 확인하지 못했습니다" desc="잠시 뒤 다시 시도해 주세요.">
+        <button type="button" className="btn acc btn-login" data-btn="access-retry" onClick={refreshRole}>
+          다시 시도
+        </button>
+        <GateActions />
+      </GateCard>
+    );
+  }
+
+  // 요청 기록 없음(none)·거절(rejected)·해제(revoked)
+  return (
+    <GateCard
+      icon={<ShieldOff size="1.25rem" aria-hidden="true" />}
+      title={role === 'none' ? '승인 요청이 필요합니다' : '열람 권한이 없습니다'}
+      desc={role === 'none' ? '이름과 소속을 적어 관리자에게 승인을 요청해 주세요.' : '관리자가 열람 권한을 승인하지 않았거나 해제했습니다. 필요하면 다시 요청해 주세요.'}
+    >
+      <RequestAgainForm />
+      <GateActions />
+    </GateCard>
+  );
+};
