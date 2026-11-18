@@ -2,15 +2,11 @@ import React, { useState } from 'react';
 import { Clock, Lock, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
-import { SegmentedControl } from '../common/SegmentedControl';
+import { Button } from '../common/Button';
 import { SkelBar } from '../common/SkeletonView';
 import { GateError, LoginForm } from './LoginForm';
 
 type GateTab = 'login' | 'signup';
-const GATE_TABS = [
-  { value: 'login' as const, label: '로그인' },
-  { value: 'signup' as const, label: '가입 요청' },
-];
 
 /** 접속 화면 한 장 — 가운데 카드 (로그인 모달과 같은 모양) */
 const GateCard: React.FC<{ icon: React.ReactNode; title: string; desc: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, desc, children }) => (
@@ -65,7 +61,7 @@ const SignUpForm: React.FC<{ onSent: (needsEmailConfirm: boolean) => void }> = (
       <TextInput className={`gate-input${error ? ' err' : ''}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
       {error && <GateError message={error} />}
       <button type="submit" className="btn acc btn-login" data-btn="signup-submit" disabled={submitting}>
-        {submitting ? '보내는 중...' : '가입 요청 보내기'}
+        {submitting ? '보내는 중...' : '회원가입'}
       </button>
     </form>
   );
@@ -142,7 +138,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
       return (
         <GateCard
           icon={<Clock size="1.25rem" aria-hidden="true" />}
-          title="가입 요청을 보냈습니다"
+          title="회원가입 요청을 보냈습니다"
           desc={
             sent.confirm
               ? '받은 메일의 인증 링크를 누른 뒤 로그인해 주세요. 관리자가 승인하면 데이터를 볼 수 있습니다.'
@@ -158,13 +154,17 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
     return (
       <GateCard
         icon={<Lock size="1.25rem" aria-hidden="true" />}
-        title="아이티스 광고 인사이트"
-        desc="승인된 계정만 볼 수 있습니다. 처음이면 가입 요청을 보내 주세요."
+        title={tab === 'login' ? '아이티스 광고 인사이트' : '회원가입'}
+        desc={tab === 'login' ? '승인된 계정만 볼 수 있습니다.' : '가입하면 관리자에게 승인 요청이 갑니다. 승인되면 데이터를 볼 수 있습니다.'}
       >
-        <div className="gate-tabs">
-          <SegmentedControl<GateTab> id="seg-gate" options={GATE_TABS} value={tab} onChange={setTab} />
-        </div>
         {tab === 'login' ? <LoginForm /> : <SignUpForm onSent={(confirm) => setSent({ confirm })} />}
+        {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
+        <p className="gate-switch">
+          {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
+          <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
+            {tab === 'login' ? '회원가입' : '로그인'}
+          </Button>
+        </p>
       </GateCard>
     );
   }

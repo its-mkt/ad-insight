@@ -1454,10 +1454,10 @@ tr.kw-more-row td {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 
-  .gate-tabs {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 1rem;
+  // 로그인 버튼 밑 "계정이 없으신가요? 회원가입"
+  p.gate-switch {
+    margin: 1rem 0 0;
+    font-size: 0.8125rem;
   }
 
   .gate-actions {
