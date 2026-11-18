@@ -2754,3 +2754,82 @@ tr.kw-more-row td {
     opacity: 0.4;
   }
 }
+
+// 회원가입 진행도 — ① 이메일 인증 ② 정보 입력 ③ 관리자 승인 (가입 폼·승인 대기 카드 위)
+.signup-steps {
+  display: flex;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+
+  li {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--sub);
+    margin: 0; // 공통 li + li 위쪽 간격을 받지 않게 (단계 점 높이를 맞춘다)
+
+    // 앞 단계와 잇는 줄
+    & + li::before {
+      content: '';
+      position: absolute;
+      top: 0.75rem;
+      right: 50%;
+      left: -50%;
+      height: 2px;
+      margin: 0 0.875rem;
+      background: var(--line2);
+      transition: background 0.3s ease;
+    }
+
+    &.done + li::before,
+    &.done + li.current::before {
+      background: var(--acc);
+    }
+  }
+
+  .signup-step-dot {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 2px solid var(--line2);
+    background: var(--card);
+    font-weight: 700;
+    font-size: 0.75rem;
+    transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  li.current {
+    color: var(--ink);
+    font-weight: 700;
+
+    .signup-step-dot {
+      border-color: var(--acc);
+      color: var(--acc);
+      box-shadow: 0 0 0 3px var(--accbg);
+    }
+  }
+
+  li.done .signup-step-dot {
+    border-color: var(--acc);
+    background: var(--acc);
+    color: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signup-steps li + li::before,
+  .signup-steps .signup-step-dot {
+    transition: none;
+  }
+}

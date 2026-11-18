@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkeletonView } from '../common/SkeletonView';
-import { EmailCodeForm, GateError, LoginForm } from './LoginForm';
+import { GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
 
@@ -126,14 +126,17 @@ const PendingWatch: React.FC = () => {
  * 그 밖에는 대시보드를 아예 그리지 않아 데이터 요청도 나가지 않는다 (경쟁사·봇이 데이터를 보지 못하게, 2026-11-18 사용자 결정).
  */
 export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { loading, isSignedIn, role, canView, refreshRole } = useAuth();
+  const { loading, isSignedIn, role, canView, refreshRole, signupInProgress } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
 
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
 
+  // 회원가입 도중(이메일 인증은 됐고 정보 입력 전) — 로그인 상태가 됐어도 권한 확인·승인 요청 화면으로 넘기지 않고 가입 폼을 그대로 둔다
+  const signingUp = signupInProgress && !canView;
+
   // 권한 확인 중 — 대부분 승인된 사람이므로 잠금 카드 대신 대시보드 모양 로딩을 보여 준다 (화면이 열릴 때 들썩이지 않게)
-  if (loading) {
+  if (loading && !signingUp) {
     return (
       <div className="access-loading">
         <div className="access-loading-bar" aria-hidden="true" />
@@ -147,22 +150,24 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
-  if (!isSignedIn) {
+  if (!isSignedIn || signingUp) {
     return (
       <GuestPreview>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
-          title={tab === 'login' ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
-          desc={tab === 'login' ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증번호로 가입과 함께 관리자에게 열람 승인을 요청합니다. 승인되면 데이터를 볼 수 있습니다.'}
+          title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
+          desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
         >
-          {tab === 'login' ? <LoginForm /> : <EmailCodeForm mode="signup" />}
+          {tab === 'login' && !signingUp ? <LoginForm /> : <SignupForm />}
           {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
+          {!signingUp && (
           <p className="gate-switch">
             {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
             <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
               {tab === 'login' ? '회원가입' : '로그인'}
             </Button>
           </p>
+          )}
         </GateCardBody>
       </GuestPreview>
     );
@@ -181,6 +186,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
           </>
         }
       >
+        <SignupSteps current={2} />
         <PendingWatch />
         <GateActions />
       </GateCard>
