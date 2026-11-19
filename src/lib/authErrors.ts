@@ -23,18 +23,24 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
 /**
- * 이름·회사·팀 중 빈 칸이 있거나 한글·영문 말고 다른 글자가 있으면 안내 문구, 아니면 빈 문자열.
+ * 이름·회사·팀 중 빈 칸이 있거나 허용하지 않는 글자가 있으면 안내 문구, 아니면 빈 문자열.
+ * 이름·팀은 한글·영문만, 회사는 '(주)아이티켓'·'3M' 처럼 숫자와 회사명 기호도 받는다 (2026-11-19 사용자 결정).
  * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청은 '담당자', 내 계정 설정은 '이름' (2026-11-19 사용자 결정)
  */
 export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
   !name.trim() || !company.trim() || !team.trim()
     ? `${nameLabel}·회사·팀을 모두 입력해 주세요.`
-    : [name, company, team].some((v) => !isLetterText(v))
-      ? `${nameLabel}·회사·팀은 한글이나 영문으로만 입력해 주세요. 숫자·기호는 쓸 수 없습니다.`
-      : '';
+    : !isLetterText(name) || !isLetterText(team)
+      ? `${nameLabel}·팀은 한글이나 영문으로만 입력해 주세요. 숫자·기호는 쓸 수 없습니다.`
+      : !isCompanyText(company)
+        ? '회사는 한글·영문·숫자와 ㈜ ( ) & . , - 기호만 쓸 수 있습니다.'
+        : '';
 
-/** 한글(완성형)·영문과 단어 사이 띄어쓰기만 있는지 — 담당자명·회사·팀 칸 (2026-11-19 사용자 결정) */
+/** 한글(완성형)·영문과 단어 사이 띄어쓰기만 있는지 — 담당자명·팀 칸 (2026-11-19 사용자 결정) */
 export const isLetterText = (v: string): boolean => /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/.test(v.trim().replace(/\s+/g, ' '));
+
+/** 회사 칸 — 한글·영문·숫자·띄어쓰기와 회사명에 쓰는 기호 ㈜ ( ) & . , - 만, 글자나 숫자가 하나는 있어야 한다 */
+export const isCompanyText = (v: string): boolean => /^[가-힣a-zA-Z0-9 ㈜()&.,-]+$/.test(v.trim()) && /[가-힣a-zA-Z0-9]/.test(v);
 
 /** 입력한 인증번호에서 숫자만 남긴다 */
 export const otpDigits = (code: string): string => code.replace(/\D/g, '');
