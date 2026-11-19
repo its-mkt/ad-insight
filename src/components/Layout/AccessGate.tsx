@@ -214,7 +214,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview app={children}>
+      <GuestPreview app={children} keepOpen={signingUp}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
           title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}

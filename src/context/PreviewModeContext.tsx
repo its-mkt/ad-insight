@@ -9,9 +9,8 @@ export const PreviewModeContext = createContext(false);
 /** 지금 화면이 로그인 전 미리보기인지 */
 export const usePreviewMode = () => useContext(PreviewModeContext);
 
-/** 미리보기 위에 띄운 로그인 카드의 첫 입력칸으로 보낸다 (헤더의 로그인·검색 버튼) */
-export const focusPreviewLogin = () => {
-  const card = document.querySelector<HTMLElement>('.preview-lock .login-modal');
-  card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  card?.querySelector<HTMLInputElement>('input')?.focus();
-};
+/** 미리보기의 로그인·회원가입 창을 여는 신호 (GuestPreview 가 듣는다) */
+export const OPEN_PREVIEW_LOGIN_EVENT = 'adi:open-preview-login';
+
+/** 미리보기의 로그인·회원가입 창을 연다 (헤더의 로그인·검색 버튼) */
+export const openPreviewLogin = () => window.dispatchEvent(new Event(OPEN_PREVIEW_LOGIN_EVENT));
