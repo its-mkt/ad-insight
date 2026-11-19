@@ -240,7 +240,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
       <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceLoading ? `(${sourcePeriod})` : sourceSubtitle}>
         {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4Closed ? '진행 중인 달의 GA4 주문 완료 값은 달 합계로만 받아 오늘 값이 섞여 있어, 마감 후 반영합니다.' : ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
         <ViewNote>
-          ※ GA4 가 실제로 측정한 값 그대로입니다 ({purchaseBasis ? '결제 주문마다 보낸 구매 이벤트 수' : "'주문 완료' 화면 방문 수라 같은 고객이 다시 들어오면 한 주문이 여러 번 잡히고, 광고 차단 프로그램을 쓰면 빠집니다"}) · 판매는 고도몰에서 결제된 주문 수 · {ga.asOf || '–'} 수집
+          ※ GA4 측정값 그대로({purchaseBasis ? '구매 이벤트 수' : "'주문 완료' 화면 방문 수 — 재방문은 중복, 광고 차단 시 누락"}) · 판매는 고도몰 결제 주문 수 · {ga.asOf || '–'} 수집
         </ViewNote>
       </Card>
     </View>

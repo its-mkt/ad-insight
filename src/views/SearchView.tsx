@@ -56,7 +56,7 @@ const SEARCH_HINT = '화면 위쪽 돋보기 버튼이나 Ctrl+K로 검색할 �
 
 /** 견적 카드의 판매 건수 기준 — 판매 주문은 유입 경로가 기록되지 않아 제품으로만 검색어와 이어진다 */
 const SALES_NOTE =
-  '판매는 제품명이나 제품명으로 분류한 카테고리가 일치한 고도몰 결제 주문 수입니다(캠페인·키워드는 제품명에 그 이름이 들어 있을 때만 일치).';
+  '판매는 제품명·카테고리 일치 고도몰 결제 주문 수(캠페인·키워드는 제품명에 들어 있을 때만)';
 
 export const SearchView: React.FC<SearchViewProps> = ({
   data,
@@ -269,18 +269,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {dayRange && (
         <ViewNote>
           {dayCovered
-            ? '※ 일·기간 선택은 광고비·노출·클릭·전환과 견적을 선택한 날짜 그대로 집계합니다(키워드·소재 성과는 월 단위라 해당 달 전체). 전월 비교는 하지 않습니다.'
-            : `※ 이 기간은 일별 광고비 수집 전이라 견적만 선택한 날짜 그대로 집계하고, 광고 지표는 기간이 걸친 달(${monthsOfRange(dayRange).map(mLabel).join('·')}) 전체로 표시하며 비교·CPA는 계산하지 않습니다.`}
+            ? '※ 선택한 날짜 그대로 집계(키워드·소재 성과는 월 단위라 그 달 전체) · 전월 비교 없음'
+            : `※ 일별 광고비 수집 전 기간 — 견적만 날짜 그대로, 광고 지표는 ${monthsOfRange(dayRange).map(mLabel).join('·')} 전체 · 비교·CPA 없음`}
         </ViewNote>
       )}
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준. 유입 매체가 "{sourceScope}"인 견적만 집계합니다(매체 추적은 2026년 10월부터). 매체는 광고비와 직접 연결되지 않아 광고비·CPA는 표시하지 않습니다. {SALES_NOTE}
+          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만(2026.10~ 추적) · 매체는 광고비와 연결되지 않아 광고비·CPA 없음 · {SALES_NOTE}
         </ViewNote>
       ) : (
       <ViewNote>
-          ※ {periodLabel} 기준. 광고비는 이름·카테고리·매체가 일치한 광고그룹·키워드 합계, 견적은 제목·카테고리·유입 매체 일치 건입니다(매체 추적은 2026년 10월부터). 둘은 직접 연결되지 않아 CPA는 추정치({cpaLabel})이고, 전환당 비용은 같은 광고 실적 기준이라 정확합니다. {SALES_NOTE}
+          ※ {periodLabel} 기준 · 광고비는 이름·카테고리·매체 일치 광고그룹·키워드 합, 견적은 제목·카테고리·유입 매체 일치 건(2026.10~ 추적) · CPA는 추정({cpaLabel}), 전환당 비용은 정확 · {SALES_NOTE}
       </ViewNote>
       )}
 

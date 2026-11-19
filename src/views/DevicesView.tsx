@@ -207,9 +207,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     <View name="devices" title={TITLE}>
       <ViewHeader title={TITLE} description="PC·모바일·태블릿별 방문, 견적·주문 전환, 광고 성과와 판매를 한 화면에 봅니다" status={status} />
       <ViewNote>
-        ※ {periodLabel} 기준. 방문·전환은 GA4(견적 요청 완료·주문 완료 화면을 본 세션), 광고는 구글·네이버 API의 기기별 실적, 판매는 고도몰 주문 형태(PC·모바일·수기 주문) 그대로입니다.
-        수집되지 않은 달은 0이 아니라 "{PENDING}"으로 두고, 다른 자료로 나눠 채우지 않습니다.
-        {estimateUntracked && ' 이 사이트는 견적 요청 완료 화면이 없어 GA4가 견적 완료를 세지 않으므로, 전환은 주문 완료를 기준으로 보여 줍니다.'}
+        ※ {periodLabel} 기준 · 방문·전환 GA4(완료 화면 본 세션) · 광고 구글·네이버 기기별 실적 · 판매 고도몰 주문 형태. 미수집 달은 "{PENDING}"(추정으로 채우지 않음).
+        {estimateUntracked && ' 이 사이트는 견적 완료 화면이 없어 전환은 주문 완료 기준입니다.'}
       </ViewNote>
 
       <KpiSection id="kpiDevices">
