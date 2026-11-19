@@ -1302,8 +1302,9 @@ function doGet(e) {
   // 로그인 전 미리보기 — 기기별 비중만 준다 (절대값 없음, 2026-11-19 사용자 결정: 기기별 통계는 비중만 공개). 로그인 없이 통과
   if (p.preview === 'devices') return json_(previewDeviceShares_());
   if (!isStaffRole_(acc.role) && acc.role !== 'member') return json_({ error: 'login_required', role: acc.role });
-  const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
-  if (p.daily) return json_(dailyHistResponse_(ss, p.daily, out));
+  const out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
+  // 시트는 일별 기록 요청에서만 연다 — 스냅숏 응답은 캐시만 읽으므로 열 필요가 없다 (요청마다 0.3~1초)
+  if (p.daily) return json_(dailyHistResponse_(SpreadsheetApp.openById(CFG.SHEET_ID), p.daily, out));
   const isAdmin = isStaffRole_(acc.role); // 관리자도 원문(가리지 않은 값)을 받는다 (2026-11-19 사용자 결정)
   // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다)
   return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin))
@@ -1817,7 +1818,26 @@ function saveOrderInflow_(data) {
 function doPost(e) {
   const member = memberPost_(e);
   if (member) return member;
-  try { return doPostBody_(e); } finally { bumpApiCache_(); } // 견적 수신·카테고리 저장 뒤 응답 스냅숏을 새로 만들게
+  // 견적 수신·카테고리 저장 뒤 응답 스냅숏을 새로 만들게 — 응답 데이터가 바뀌지 않은 요청은 스냅숏을 그대로 둔다 (다음 사람이 20초 넘는 재생성을 떠안지 않게)
+  let keep = false;
+  try {
+    const res = doPostBody_(e);
+    keep = postKeepsSnapshot_(e, res);
+    return res;
+  } finally { if (!keep) bumpApiCache_(); }
+}
+/**
+ * 응답 데이터(웹앱 doGet)가 바뀌지 않는 POST 인지 — 주문 유입 원본 기록(order_inflow 는 응답에 넣지 않고, 집계 시트는 put_ 때 따로 갱신),
+ * 읽기 전용 조회, 형식이 틀리거나 키가 틀려 아무것도 쓰지 않은 요청. 그 밖과 예외는 지금처럼 스냅숏을 새로 만든다
+ */
+function postKeepsSnapshot_(e, res) {
+  let action = '';
+  try { action = String(JSON.parse((e && e.postData && e.postData.contents) || '{}').action || ''); } catch (err) { return true; }
+  if (action === 'orderInflow' || action === 'adsHistMonths') return true;
+  try {
+    const out = JSON.parse(res.getContent());
+    return !!out && (out.error === 'unauthorized' || out.error === 'empty_body');
+  } catch (err) { return false; }
 }
 /** 수집을 다시 돌리는 요청은 sec 초에 한 번만 받는다 — 키가 새어도 반복 호출로 UrlFetch 하루 한도를 바닥내지 못하게. 막혔으면 true */
 function throttled_(name, sec) {
