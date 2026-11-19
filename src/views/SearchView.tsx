@@ -273,7 +273,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만 · 광고비·CPA 없음
+          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만(2026.10~ 추적) · 광고비·CPA 없음
         </ViewNote>
       ) : (
       <ViewNote>
