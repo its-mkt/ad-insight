@@ -34,11 +34,9 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
-  const { rows, owners, error, busy, pending, refreshing, checkedAt } = useMembers();
+  const { rows, error, busy, pending, refreshing, checkedAt } = useMembers();
   const { isSuperAdmin, user } = useAuth();
   const myEmail = (user?.email || '').toLowerCase();
-  // 소유자는 명단(members 탭)이 아니라 admins 탭에 있어 바꿀 수 없는 줄로 맨 위에 보여 준다. 옛 웹앱이 소유자를 보내지 않으면 소유자 본인만 자기 줄을 본다
-  const ownerEmails = owners.length ? owners : isSuperAdmin && myEmail ? [myEmail] : [];
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
   // 소유자 권한을 넘길 운영자 (창이 열려 있을 때만)
   const [transferTo, setTransferTo] = useState<{ email: string; name: string } | null>(null);
@@ -76,26 +74,6 @@ export const MemberApprovals: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {rows &&
-            ownerEmails.map((email) => {
-              const me = email === myEmail;
-              return (
-                <tr key={`owner:${email}`} className="member-owner">
-                  <td>{(me && user?.name) || '–'}</td>
-                  <td>{(me && [user?.company, user?.team].filter(Boolean).join(' · ')) || '–'}</td>
-                  <td>{email}</td>
-                  <td>
-                    <StatusBadge level="info" size="sm">
-                      소유자
-                    </StatusBadge>
-                  </td>
-                  <td>소유자</td>
-                  <td>–</td>
-                  <td>–</td>
-                  <td className="member-actions">–</td>
-                </tr>
-              );
-            })}
           {!rows ? (
             <SkelRows rows={3} widths={['4rem', '6rem', '10rem', '4rem', '4rem', '6rem', '6rem', '8rem']} />
           ) : (

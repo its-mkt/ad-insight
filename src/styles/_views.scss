@@ -1307,6 +1307,62 @@ tr.kw-more-row td {
 // 가입 요청·열람 권한 카드 — 견적 관리 위에 둔다
 // 계정 관리 화면 — 승인·거절·해제 버튼 칸
 .members-view {
+  // 소유자 카드 — 가입 요청 표와 따로, 사진·이름·이메일 한 줄씩
+  .owner-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .owner-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+
+    & + .owner-item {
+      border-top: 1px solid var(--line);
+    }
+
+    // 프로필 메뉴(.lg)와 같은 크기·색 — 사진이 없으면 이니셜
+    .pm-avatar.lg {
+      @include mixins.avatar-circle;
+      width: 2.25rem;
+      height: 2.25rem;
+      background: var(--accbg);
+      color: var(--accink);
+      font-size: 1rem;
+    }
+  }
+
+  .owner-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .owner-name {
+    color: var(--ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .owner-me {
+    margin-left: 0.25rem;
+    color: var(--sub);
+    font-weight: 500;
+  }
+
+  .owner-sub {
+    overflow: hidden;
+    color: var(--sub);
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   // 승인·거절·해제·삭제는 설정 버튼 메뉴(ActionMenu)로 — 다른 칸처럼 왼쪽에 맞춘다
   // 계정 표 — 불러오기 전(자리표시)·후, 상태·등급이 바뀌어도 열 너비가 그대로이게 고정한다
   // 소속·이메일은 너비를 주지 않아 남는 폭을 나눠 쓴다
