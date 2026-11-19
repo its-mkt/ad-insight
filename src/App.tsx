@@ -239,7 +239,7 @@ export const App: React.FC = () => {
             : currentView === 'devices'
               ? `${until} (GA4 방문·전환과 구글 광고는 마감 후 반영)`
               : `${until}${dropped}`;
-    return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
+    return `${head} · 오늘 값은 로그인 후 확인할 수 있습니다`;
   })();
 
   // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다

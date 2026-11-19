@@ -696,7 +696,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               </>
             ) : (
               <p className="leg-note search-login-note">
-                견적 제목과 고객 정보는 로그인 후 볼 수 있습니다.{' '}
+                견적 제목과 고객 정보는 로그인 후 확인할 수 있습니다.{' '}
                 <Button variant="link" className="btn-search-login" id="btn-search-login" data-btn="search-login" onClick={onLogin}>
                   로그인
                 </Button>
