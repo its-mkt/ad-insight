@@ -199,7 +199,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
   return (
     <div className="admin-view">
       <ViewHeader
-        title="어드민 관리"
+        title="견적 원본 관리"
         description="견적 접수 원본 리스트(Google 시트) 및 표준 카테고리 수동 지정 · 데이터 저장 관리"
         status="live"
       />
