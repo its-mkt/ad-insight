@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { toggledSet } from '../../utils/toggleSet';
 import { trackCategoryOpen } from '../../lib/usage';
 import type { CatEfficiencyItem } from './types';
-import { fmt, sumBy } from '../../utils/format';
+import { ctrText, fmt, sumBy } from '../../utils/format';
 import { TableFootnote } from '../common/TableFootnote';
 import { useSort } from '../../hooks/useSort';
 import { SortableTh } from '../common/SortableTh';
@@ -103,8 +103,8 @@ export const CatEfficiencyTable: React.FC<CatEfficiencyTableProps> = ({
     </SortableTh>
   );
 
-  const convRateStr = (quotes: number, clk: number) =>
-    clk > 0 ? `${((quotes / clk) * 100).toFixed(2)}%` : '–';
+  // 견적 전환율 = 견적 / 클릭 — CTR 과 같은 식이라 ctrText 를 쓴다
+  const convRateStr = (quotes: number, clk: number) => ctrText(quotes, clk);
 
   const cpaStr = (cpa: number | null) =>
     cpa != null ? `${fmt(cpa)}원` : '–';
