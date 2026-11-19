@@ -14,7 +14,8 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteDetailsPending, useQuoteStats } from '../hooks/useDashboardData';
+import { useQuoteStats } from '../hooks/useQuoteStats';
+import { quoteDetailsPending } from '../utils/quoteStats';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';

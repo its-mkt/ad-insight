@@ -26,7 +26,7 @@
 | 견적 접수처 판별·KPI 접수처 건수 / CTR 표기 | `originOf`·`originGroupCounts` (`utils/quoteOrigin`), `ctrText` (`utils/format`) |
 | KPI 큰 값 + 작고 흐린 보조 값 / 견적·판매 함께 | `KpiSubValue`, `QuoteSalesValue` (`charts/KpiCard`, 판매 건수는 `salesInMonths`·`salesInRange`) |
 | KPI 보조 줄 "이름 값 \| 이름 값" / CPA 의 "광고비 \| 견적" | `KpiDetailItems`, `KpiSpendQuoteDetail` (`charts/KpiCard`) |
-| 견적 통계(다른 사이트·전화 합산) | `useQuoteStats(data)` (`hooks/useDashboardData`) — 화면마다 `useMemo(() => quoteStatsOf(…))` 를 복사하지 않는다 |
+| 견적 통계(다른 사이트·전화 합산) | `useQuoteStats(data)` (`hooks/useQuoteStats`, 계산은 `utils/quoteStats`) — 화면마다 `useMemo(() => quoteStatsOf(…))` 를 복사하지 않는다 |
 | 달(YYYY-MM)·연도(YYYY)별 행 찾기 | `rowsByPeriod(rows)(key)` (`utils/format`) — 키마다 `rows.filter(r => r.month.startsWith(key))` 를 반복하지 않는다 |
 | 버튼 / 링크 모양 버튼 | `Button`, `ButtonLink` |
 | 새 탭 외부 링크 | `ExtLink` (직접 `target="_blank"` 쓰지 않는다) |

@@ -18,7 +18,7 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { useQuoteStats } from '../hooks/useDashboardData';
+import { useQuoteStats } from '../hooks/useQuoteStats';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
 import { View } from '../components/common/View';

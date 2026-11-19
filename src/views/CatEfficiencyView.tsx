@@ -35,7 +35,7 @@ import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel } from '../utils/allPeriod';
-import { useQuoteStats } from '../hooks/useDashboardData';
+import { useQuoteStats } from '../hooks/useQuoteStats';
 
 interface CatEfficiencyViewProps {
   data: DashboardData;

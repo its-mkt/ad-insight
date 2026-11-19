@@ -3,7 +3,7 @@ import type { DashboardData, QuoteRawRow } from '../types/dashboard';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { QuotesRawAdminTable, type QuoteChannel } from '../components/admin/QuotesRawAdminTable';
 import { SegmentedControl } from '../components/common/SegmentedControl';
-import { quoteDetailsPending } from '../hooks/useDashboardData';
+import { quoteDetailsPending } from '../utils/quoteStats';
 import { getCfg } from '../lib/webApp';
 import { useAuth } from '../context/AuthContext';
 import { currentAccessToken } from '../lib/access';
