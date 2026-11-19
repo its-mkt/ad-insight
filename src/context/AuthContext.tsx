@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, currentAccessToken, fetchAccessRole, postMemberAction } from '../lib/access';
+import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, isStaffRole, currentAccessToken, fetchAccessRole, postMemberAction } from '../lib/access';
 import { clearCachedPayloads } from '../utils/payloadCache';
 
 export interface AuthUser {
@@ -26,8 +26,10 @@ interface AuthContextType {
   user: AuthUser | null;
   /** 저장된 로그인과 열람 권한을 확인하는 중 */
   loading: boolean;
-  /** 관리자로 로그인했는지 — 원문 데이터·설정 화면이 열린다 (예전부터 쓰던 이름이라 그대로 둔다) */
+  /** 최고 관리자·관리자로 로그인했는지 — 원문 데이터·설정 화면이 열린다 (예전부터 쓰던 이름이라 그대로 둔다) */
   isLoggedIn: boolean;
+  /** 최고 관리자인지 — 어드민 관리 화면·계정 등급 변경·계정 삭제 */
+  isSuperAdmin: boolean;
   /** 로그인했는지 (권한과 상관없이) */
   isSignedIn: boolean;
   /** 열람 권한 — 확인 전이거나 확인에 실패하면 null */
@@ -355,7 +357,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading: sessionLoading || roleLoading,
-        isLoggedIn: role === 'admin',
+        isLoggedIn: isStaffRole(role),
+        isSuperAdmin: role === 'admin',
         isSignedIn: !!user,
         role,
         canView,

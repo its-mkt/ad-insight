@@ -72,7 +72,8 @@ create table if not exists public.usage_user_daily (
 alter table public.usage_user_daily enable row level security;
 -- 정책을 두지 않아 직접 읽기·쓰기는 막힌다 (함수만 쓴다)
 
--- 1-4. 계정별 이용을 볼 수 있는 관리자 — 화면의 관리자(Apps Script admins 탭)와 같게 맞춘다
+-- 1-4. 계정별 이용을 볼 수 있는 관리자 — 최고 관리자(Apps Script admins 탭)는 여기에 직접 넣고,
+--      관리자 등급(members 탭 role=manager)은 계정 관리에서 등급을 바꿀 때 웹앱이 관리자 키로 넣고 뺀다
 create table if not exists public.usage_admins (
   email text primary key
 );

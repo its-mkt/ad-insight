@@ -109,7 +109,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** 설정·연동 메뉴 — 로그인한 관리자에게만 보인다 */
+/** 설정·연동 메뉴 — 최고 관리자·관리자에게 보인다 (어드민 관리는 최고 관리자만) */
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'data', label: '데이터 연결', icon: <Database /> },
   { id: 'admin', label: '어드민 관리', icon: <Lock /> },
@@ -131,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSiteChange,
   preview,
 }) => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isSuperAdmin } = useAuth();
   // 계정 관리 메뉴 옆 승인 대기 건수 — 관리자로 로그인했을 때만 명단을 받는다
   const { pending } = useMembers(isLoggedIn);
   const live = status === 'live';
@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sm">
             <div className="lbl">설정 · 연동</div>
             <nav className="toc">
-              {ADMIN_NAV_ITEMS.map(navButton)}
+              {ADMIN_NAV_ITEMS.filter((item) => isSuperAdmin || item.id !== 'admin').map(navButton)}
             </nav>
           </div>
         )}
