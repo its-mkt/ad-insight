@@ -249,3 +249,22 @@ export function applyGodoOrderInflow(rows: { month?: unknown; source?: unknown; 
     (GODOMALL_ORDER_INFLOW[month] ??= {})[String(r.source ?? '미수집')] = Number(r.count) || 0;
   });
 }
+
+/**
+ * 결제일이 from~to('YYYY-MM-DD', 양끝 포함)인 주문 줄의 금액·개수 합 — 진행 중인 달을 전월 동기간과 비교할 때 쓴다.
+ * 그 달의 주문 줄을 받지 못했으면 null (0 과 구분)
+ */
+export function goodsTotalsInRange(from: string, to: string): { amount: number; qty: number } | null {
+  const month = from.slice(0, 7);
+  if (!GODOMALL_ORDER_LINES.some((l) => l.month === month)) return null;
+  let amount = 0;
+  let qty = 0;
+  GODOMALL_ORDER_LINES.forEach((l) => {
+    const d = l.paid.slice(0, 10);
+    if (d >= from && d <= to && lineInCutoff(l)) {
+      amount += l.amount;
+      qty += l.qty;
+    }
+  });
+  return { amount, qty };
+}

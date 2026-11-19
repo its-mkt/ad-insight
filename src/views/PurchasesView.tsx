@@ -12,8 +12,8 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { PurchasedGoodsTable } from '../components/quotes/PurchasedGoodsTable';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../data/ga4OrderSources';
-import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, salesCutoff, salesInMonths } from '../data/godomallOrders';
-import { daysOfMonth } from '../utils/dayRange';
+import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, goodsTotalsInRange, salesCutoff, salesInMonths, salesInRange } from '../data/godomallOrders';
+import { daysOfMonth, sameRangeLastMonth } from '../utils/dayRange';
 import { fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 import { lastYearMonth, monthsUpTo, ymLabel } from '../utils/allPeriod';
 
@@ -130,8 +130,14 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const qtyText = (v: number) => `${fmt(v)}개`;
   const curAmount = amountOf(selectedMonth);
   const curQty = qtyOf(selectedMonth);
-  /** 진행 중인 달은 끝난 달과 맞비교하지 않는다 */
-  const monthCompare = (cur: number | null, prev: number | null) => (partial ? { sub: `${AS_OF_DAY}일까지 집계` } : { cur, prev, cmpLabel: '전월' });
+  // 진행 중인 달은 전월 동기간(전월 1일~같은 날짜, 말일은 전월 말일)과 비교한다 (2026-11-19 사용자 요청).
+  // 건수는 일별 판매, 금액·개수는 주문 줄(결제일)로 다시 센다. 전월 값을 그 날짜로 자를 수 없으면 비교하지 않고 집계일만 적는다
+  const pvRange = sameRangeLastMonth({ from: `${selectedMonth}-01`, to: AS_OF });
+  // 일별 판매 수집이 전월 구간 도중에 시작했으면 덜 세므로 비교하지 않는다
+  const pvSameCount = partial && GODOMALL_DAILY.some((r) => r.date <= pvRange.from) ? salesInRange(pvRange.from, pvRange.to) : null;
+  const pvSameGoods = partial ? goodsTotalsInRange(pvRange.from, pvRange.to) : null;
+  const monthCompare = (cur: number | null, prev: number | null, pvSame: number | null | undefined) =>
+    !partial ? { cur, prev, cmpLabel: '전월' } : pvSame == null ? { sub: `${AS_OF_DAY}일까지 집계` } : { cur, prev: pvSame, cmpLabel: '전월 동기간' };
 
   // 유입 매체별 구매 참고값 — GA4 가 실제로 측정한 '주문 완료' 화면 방문 수를 그대로 그린다 (추정·보정 없음).
   // 판매는 비교용으로 GA4 가 측정한 기간에 결제된 건수만 센다. 측정 시작일이 있는 달은 고도몰 일별 실측값으로 그 날부터 센다
@@ -189,11 +195,11 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
           </>
         ) : (
           <>
-            {/* 진행 중인 달의 건수는 끝난 달과 맞비교하지 않는다. 일평균·비율은 기간이 달라도 비교할 수 있다 */}
+            {/* 진행 중인 달의 건수·금액·개수는 전월 동기간과 비교한다. 일평균·비율은 기간이 달라도 비교할 수 있어 전월 전체와 비교한다 */}
             <KpiCard
               label={<>{monthName} 판매 건수{partial && <PendingTag />}</>}
               value={hasOrders ? countText(monthCount) : PENDING}
-              {...(partial ? { sub: `${AS_OF_DAY}일까지 집계` } : { cur: hasOrders ? monthCount : null, prev: known(pv), cmpLabel: '전월' })}
+              {...monthCompare(hasOrders ? monthCount : null, known(pv), pvSameCount)}
               detail={<KpiDetailItems items={[['전월', orDash(known(pv), countText)], ['전년 동월', orDash(known(lastYear), countText)]]} />}
             />
             <KpiCard
@@ -215,13 +221,13 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
             <KpiCard
               label={<>{monthName} 판매 금액{partial && <PendingTag />}</>}
               value={hasOrders ? orDash(curAmount, wonText) : PENDING}
-              {...monthCompare(curAmount, amountOf(pv))}
+              {...monthCompare(curAmount, amountOf(pv), pvSameGoods?.amount)}
               detail={<KpiDetailItems items={[['주문 1건당', curAmount !== null && monthCount > 0 ? wonText(curAmount / monthCount) : '–']]} />}
             />
             <KpiCard
               label={<>{monthName} 구매 개수{partial && <PendingTag />}</>}
               value={hasOrders ? orDash(curQty, qtyText) : PENDING}
-              {...monthCompare(curQty, qtyOf(pv))}
+              {...monthCompare(curQty, qtyOf(pv), pvSameGoods?.qty)}
               detail={<KpiDetailItems items={[['주문 1건당', curQty !== null && monthCount > 0 ? `${(curQty / monthCount).toFixed(1)}개` : '–']]} />}
             />
           </>
