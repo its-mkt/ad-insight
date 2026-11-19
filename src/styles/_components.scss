@@ -2142,28 +2142,9 @@ td.future {
     cursor: not-allowed;
   }
 
-  // 삭제 — 경고색, 위 항목들과 줄로 나눈다. 한 번 누르면 채운 배경으로 바뀌어 한 번 더 누르게 한다
+  // 삭제 — 경고색으로만 구분한다 (나누는 줄 없음). 한 번 누르면 채운 배경으로 바뀌어 한 번 더 누르게 한다
   &.danger {
     color: var(--warn);
-    margin-top: 0.25rem;
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: -0.125rem;
-      left: 0;
-      right: 0;
-      border-top: 1px solid var(--line);
-    }
-
-    &:first-child {
-      margin-top: 0;
-
-      &::before {
-        display: none;
-      }
-    }
 
     svg {
       color: currentColor;
