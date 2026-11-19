@@ -1826,10 +1826,21 @@ function throttled_(name, sec) {
   cache.put(k, '1', sec);
   return false;
 }
+/**
+ * 회원가입 1단계 — 이 이메일이 명단(admins·members 탭)에 있는지. 로그인 계정이 남아 있어도 관리자가 명단에서 삭제했으면
+ * listed=false 로 답해 화면이 인증번호를 다시 보내게 한다 (Supabase 계정 삭제가 실패·생략된 경우, 2026-11-19 사용자 요청)
+ */
+function signupStatus_(data) {
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email)) return { error: 'bad_request' };
+  const ss = authSheet_();
+  return { success: true, listed: adminEmails_(ss).includes(email) || memberRows_(ss).some((r) => r.email === email) };
+}
 /** 가입 요청·회원 관리 — 데이터 시트를 바꾸지 않으므로 응답 스냅숏을 그대로 둔다. 해당 요청이 아니면 null */
 function memberPost_(e) {
   let data;
   try { data = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { return null; }
+  if (data.action === 'signupStatus') return json_(signupStatus_(data));
   if (data.action === 'requestAccess') return json_(requestAccess_(data));
   if (data.action === 'updateProfile') return json_(updateProfile_(data));
   if (data.action === 'listMembers') return json_(listMembers_(data.access_token));

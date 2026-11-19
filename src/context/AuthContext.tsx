@@ -284,7 +284,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (signup) {
       const reg = await supabase.rpc('email_registered', { p_email: mail });
       if (reg.error) console.error('Check registered error:', reg.error.message);
-      else if (reg.data === true) return { error: '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 찾아 주세요.', registered: true };
+      else if (reg.data === true) {
+        // 로그인 계정이 남아 있어도 관리자가 명단에서 삭제한 이메일이면 다시 가입할 수 있다 (웹앱이 명단을 확인).
+        // 웹앱 확인이 안 되면(옛 버전·네트워크) 지금처럼 가입된 이메일로 안내한다
+        const st = await postMemberAction<{ listed?: boolean }>({ action: 'signupStatus', email: mail }).catch(() => null);
+        if (!st || st.error || st.listed !== false) return { error: '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 찾아 주세요.', registered: true };
+      }
     }
     const { error } = await supabase.auth.signInWithOtp({
       email: mail,
