@@ -161,7 +161,7 @@ export function runDataAudit(
     ]),
   ];
   const mappedCurQuotes = sumBy(allEffCats, (c) =>
-    curQuotesRows.filter((r) => r.category === c).reduce((a, r) => a + r.count, 0)
+    sumBy(curQuotesRows.filter((r) => r.category === c), (r) => r.count)
   );
 
   const spendDiff = Math.abs(rawCurSpend - mappedCurSpend);

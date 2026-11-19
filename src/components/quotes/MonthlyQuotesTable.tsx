@@ -136,12 +136,12 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
   const cntCat = (mo: string, cat1: string) =>
     indexed(mo)
       ? counts.quote.get(`${mo}\u0001${cat1}`) || 0
-      : quotes.filter((r) => r.month.startsWith(mo) && cat1Of(r.category || CAT_OTHER) === cat1).reduce((a, r) => a + r.count, 0);
+      : sumBy(quotes.filter((r) => r.month.startsWith(mo) && cat1Of(r.category || CAT_OTHER) === cat1), (r) => r.count);
   // 올해 견적이 있는 1차 카테고리 전부, 건수 큰 순 ('기타'는 맨 뒤)
   const yearCats = useMemo(() => quoteCat1Order(quotes.filter((r) => months.includes(r.month))), [quotes, months]);
 
   const totMonth = (mo: string) =>
-    indexed(mo) ? counts.quote.get(mo) || 0 : quotes.filter((r) => r.month.startsWith(mo)).reduce((a, r) => a + r.count, 0);
+    indexed(mo) ? counts.quote.get(mo) || 0 : sumBy(quotes.filter((r) => r.month.startsWith(mo)), (r) => r.count);
 
   // 진행 중인 달은 작년 같은 날짜까지만 세어 다 끝난 달과 비교되지 않게 한다 (끝난 달은 월 합계 그대로)
   const today = new Date().getDate();

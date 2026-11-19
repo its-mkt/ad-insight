@@ -115,7 +115,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const allTotal = sumBy(quotes, (r) => r.count);
 
   const totM = (mo: string) =>
-    quotes.filter((r) => r.month === mo).reduce((a, r) => a + r.count, 0);
+    sumBy(quotes.filter((r) => r.month === mo), (r) => r.count);
   const curTot = totM(curM);
   const pvTot = totM(pv);
   const ytdQuotes = sumBy(

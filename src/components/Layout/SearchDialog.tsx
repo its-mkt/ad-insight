@@ -2,6 +2,7 @@ import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Clock, Search, Star, X } from 'lucide-react';
 import type { CategoryMap, DashboardData } from '../../types/dashboard';
 import { fmt, mLabel } from '../../utils/format';
+import { mediaKo } from '../../utils/constants';
 import { adDisplayTitle } from '../../utils/creativeImage';
 import { formatCategoryScope, formatScope, parseScope, searchDashboard, type SearchTab } from '../../utils/search';
 import { clearRecentSearches, loadRecentSearches, removeRecentSearch, sameSearch } from '../../utils/recentSearches';
@@ -24,7 +25,6 @@ interface SearchDialogProps {
 }
 
 const PREVIEW_LIMIT = 3;
-const MEDIA_KO: Record<string, string> = { Google: '구글', Naver: '네이버', Meta: '메타' };
 
 /** 이름별로 광고비를 모아 큰 순서로 — 단계 선택 목록용 */
 function rankedNames(rows: { name: string; media: string; cost: number }[]): { name: string; media: string }[] {
@@ -34,7 +34,7 @@ function rankedNames(rows: { name: string; media: string; cost: number }[]): { n
     if (!name) return;
     const cur = map.get(name) || { name, medias: new Set<string>(), cost: 0 };
     cur.cost += r.cost;
-    cur.medias.add(MEDIA_KO[r.media] || r.media);
+    cur.medias.add(mediaKo(r.media));
     map.set(name, cur);
   });
   return [...map.values()]

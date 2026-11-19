@@ -217,7 +217,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       k,
       c: quoteSeriesColor(k, ci),
       v: quoteAxis.map((key) =>
-        quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k).reduce((a, r) => a + r.count, 0)
+        sumBy(quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
       ),
     }))
     .filter((s) => s.v.some((x) => x));

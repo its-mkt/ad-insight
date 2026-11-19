@@ -1,10 +1,10 @@
 import type { AdRow, CategoryMap, DashboardData, KeywordGroup, KeywordRow, QuoteRawRow, SpendRow } from '../types/dashboard';
 import { mergeKeywordMonths, periodStartsOf } from './allPeriod';
 import { adStatKey, type AdStat } from './creativeImage';
-import { catsOf, parseCatParts } from './format';
+import { catsOf, parseCatParts, sumBy } from './format';
 import { inDayRange, type DayRange } from './dayRange';
 import { goodsCategoryOf } from './categoryText';
-import { CATEGORY_HIERARCHY } from './constants';
+import { CATEGORY_HIERARCHY, MEDIA_KO } from './constants';
 import { GODOMALL_GOODS, GODOMALL_ORDER_LINES, GODOMALL_ORDERS, godoGoodsVersion, salesCutoff, salesInRange, type GodoOrderLine } from '../data/godomallOrders';
 
 export type SearchTab = 'groups' | 'keywords' | 'ads' | 'quotes';
@@ -104,7 +104,6 @@ export function resultAdGroups(result: SearchResult): KeywordGroup[] {
 }
 
 /** 매체 코드의 한글 이름 — "네이버" 로 찾아도 Naver 광고가 나오게 한다 */
-const MEDIA_KO: Record<string, string> = { Google: '구글', Naver: '네이버', Meta: '메타' };
 
 const compact = (s?: string | number): string => String(s ?? '').toLowerCase().replace(/\s+/g, '');
 
@@ -395,10 +394,10 @@ export function searchDashboard(
     (range ? salesInRange(range.from, range.to) !== null : !months || months.some((m) => m in GODOMALL_ORDERS));
   const sales = salesCovered ? new Set(salesLines.map((l) => l.key)).size : null;
 
-  const sum = (f: (r: SpendRow) => number) => spendRows.reduce((a, r) => a + f(r), 0);
+  const sum = (f: (r: SpendRow) => number) => sumBy(spendRows, f);
   const isItket = (r: QuoteRawRow) => !r.site && !r.inquiryType;
   const cpaFrom = periodStartsOf(data).cpaFrom;
-  const cpaCost = spendRows.filter((r) => r.month >= cpaFrom).reduce((a, r) => a + r.cost, 0);
+  const cpaCost = sumBy(spendRows.filter((r) => r.month >= cpaFrom), (r) => r.cost);
   // CPA 는 아이티켓·다른 사이트·전화문의를 모두 더한 견적 수로 나눈다 (2026-11-06 사용자 결정)
   const cpaQuotes = quotes.filter((r) => r.date.slice(0, 7) >= cpaFrom).length;
 
