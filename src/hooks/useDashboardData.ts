@@ -47,11 +47,16 @@ export const SITE_SOURCES: Record<Exclude<SiteId, 'itket'>, { url: string; key: 
   },
 };
 
-/** 그 사이트의 수집기 웹앱이 연결돼 있는지 */
+/** 그 사이트의 수집기 웹앱이 연결돼 있는지 — 데이터는 로그인 토큰으로 받으므로 주소만 있으면 된다 */
 export function siteConnected(site: SiteId): boolean {
-  const c = getCfg(site);
-  return !!(c.url && c.key);
+  return !!getCfg(site).url;
 }
+
+/** 웹앱 주소에 조회 값을 붙인다 — 비밀키는 있을 때만 (새 웹앱은 데이터 조회에 키를 보지 않는다, 2026-11-19 보안 점검) */
+const webAppUrl = (c: { url: string; key: string }, params: Record<string, string> = {}): string => {
+  const q = new URLSearchParams(c.key ? { key: c.key, ...params } : params).toString();
+  return q ? `${c.url}${c.url.includes('?') ? '&' : '?'}${q}` : c.url;
+};
 
 export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
   if (site !== 'itket') return SITE_SOURCES[site];
@@ -230,7 +235,7 @@ export const quoteDetailsPending = (data: Pick<DashboardData, 'quotesSites' | 'q
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
 export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): Promise<SpendDailyRow[]> {
   const c = getCfg(site);
-  const res = await fetch(withAccessToken(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`, await currentAccessToken()));
+  const res = await fetch(withAccessToken(webAppUrl(c, { daily: months.join(',') }), await currentAccessToken()));
   const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
   if (j.error) throw new Error(j.error);
   // fromApi 를 거치면 판매·기기 등 전역 저장소가 빈 값으로 덮이므로 일별 행만 따로 만든다
@@ -618,7 +623,7 @@ export function useDashboardData(site: SiteId = 'itket') {
 
   const load = useCallback(async () => {
     const c = getCfg(site);
-    if (!c.url || !c.key) {
+    if (!c.url) {
       setStatus((prev) => (prev !== 'live' ? 'unlinked' : prev));
       return;
     }
@@ -627,7 +632,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     setIsSyncing(true);
 
     try {
-      const fetchUrl = `${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}`;
+      const fetchUrl = webAppUrl(c);
       // 승인된 계정에만 데이터가, 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins·members 명단을 확인)
       const res = await fetch(withAccessToken(fetchUrl, await currentAccessToken()));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

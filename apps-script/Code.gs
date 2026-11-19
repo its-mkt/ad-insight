@@ -1297,8 +1297,8 @@ function doGet(e) {
   // 열람 권한 — 승인된 계정(member)·관리자(admin)만 데이터를 받는다. whoami 는 화면이 로그인 직후 권한만 묻는 가벼운 요청
   const acc = accessOf_(p.access_token);
   if (p.whoami) return json_(acc);
-  const token = PROPS.getProperty('API_TOKEN');
-  if (!token || p.key !== token) return json_({ error: 'unauthorized' });
+  // 웹앱 비밀키(API_TOKEN)는 보지 않는다 — 화면 코드에 들어 있어 누구나 볼 수 있으므로 관문이 되지 못한다.
+  // 데이터의 관문은 로그인 토큰 + 명단이다. 키는 서버끼리 쓰는 doPost 쓰기 동작에만 쓴다 (2026-11-19 보안 점검)
   if (acc.role !== 'admin' && acc.role !== 'member') return json_({ error: 'login_required', role: acc.role });
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
   if (p.daily) return json_(dailyHistResponse_(ss, p.daily, out));
@@ -1705,6 +1705,13 @@ function doPost(e) {
   if (member) return member;
   try { return doPostBody_(e); } finally { bumpApiCache_(); } // 견적 수신·카테고리 저장 뒤 응답 스냅숏을 새로 만들게
 }
+/** 수집을 다시 돌리는 요청은 sec 초에 한 번만 받는다 — 키가 새어도 반복 호출로 UrlFetch 하루 한도를 바닥내지 못하게. 막혔으면 true */
+function throttled_(name, sec) {
+  const cache = CacheService.getScriptCache(), k = 'throttle:' + name;
+  if (cache.get(k)) return true;
+  cache.put(k, '1', sec);
+  return false;
+}
 /** 가입 요청·회원 관리 — 데이터 시트를 바꾸지 않으므로 응답 스냅숏을 그대로 둔다. 해당 요청이 아니면 null */
 function memberPost_(e) {
   let data;
@@ -1723,8 +1730,9 @@ function doPostBody_(e) {
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     // 쇼핑몰 주문 완료 화면이 보내는 유입 경로 — 공개 화면이라 키가 없다. 주문번호·경로만 받는다
     if (data.action === 'orderInflow') return json_(saveOrderInflow_(data));
+    // 카테고리 수동 지정은 화면(관리자)이 보낸다 — 키 대신 관리자 로그인 토큰으로만 확인한다 ([F] 참고)
     const token = PROPS.getProperty('API_TOKEN');
-    if (!token || data.key !== token) return json_({ error: 'unauthorized' });
+    if (data.action !== 'saveManualCategories' && (!token || data.key !== token)) return json_({ error: 'unauthorized' });
 
     const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
 
@@ -1798,12 +1806,14 @@ function doPostBody_(e) {
 
     // [D] 네이버 커머스(스마트스토어) API 즉시 동기화 호출
     if (data.action === 'syncCommerce') {
+      if (throttled_('syncCommerce', 600)) return json_({ error: 'too_soon' });
       const res = collectCommerce();
       return json_({ success: true, result: res });
     }
 
     // [E] 전체 매체(네이버·구글·견적·GFA·커머스) 즉시 동기화 호출
     if (data.action === 'syncAll') {
+      if (throttled_('syncAll', 600)) return json_({ error: 'too_soon' });
       syncAll();
       return json_({ success: true, message: 'All channels synced simultaneously' });
     }
