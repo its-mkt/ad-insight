@@ -79,9 +79,14 @@ export const TreeParentRow: React.FC<TreeParentRowProps> = ({ label, childCount 
 };
 
 /** 펼쳐진 하위 항목 줄 */
-export const TreeChildRow: React.FC<{ label: React.ReactNode; children: React.ReactNode }> = ({ label, children }) => (
+export const TreeChildRow: React.FC<{
+  label: React.ReactNode;
+  /** 이름 칸이 차지할 칸 수 — 부모 줄에 글자 칸이 여럿이면(담당자·회사·팀·이메일) 그만큼 합쳐 쓴다 */
+  labelColSpan?: number;
+  children: React.ReactNode;
+}> = ({ label, labelColSpan, children }) => (
   <tr className="kw-cat-child">
-    <td className="kw-cat-child-label">{label}</td>
+    <td className="kw-cat-child-label" colSpan={labelColSpan}>{label}</td>
     {children}
   </tr>
 );

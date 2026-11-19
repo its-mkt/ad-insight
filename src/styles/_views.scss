@@ -2960,6 +2960,26 @@ tr.kw-more-row td {
   }
 }
 
+// 계정별 이용 — 담당자·회사·팀·이메일 칸. 이메일은 남는 폭을 쓰고, 글자가 넘치면 말줄임 (마우스를 올리면 전체)
+.usage-table.usage-accounts {
+  min-width: 56rem;
+
+  .col-us-name {
+    width: 7rem;
+  }
+  .col-us-company {
+    width: 7rem;
+  }
+  .col-us-team {
+    width: 6rem;
+  }
+  tr:not(.kw-cat-child) > td:nth-child(-n + 4) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 // 이메일 인증번호 2단계 — 보낸 주소 안내·인증번호 칸·다시 보내기/이메일 바꾸기
 .card.login-modal {
   p.gate-code-sent {
