@@ -75,8 +75,8 @@ export const MemberApprovals: React.FC = () => {
         <thead>
           <tr>
             <Th className="col-mem-name">담당자</Th>
-            <Th>소속</Th>
-            <Th>이메일</Th>
+            <Th className="col-mem-org">소속</Th>
+            <Th className="col-mem-email">이메일</Th>
             <Th className="col-mem-status">상태</Th>
             <Th className="col-mem-role" tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
             <Th className="col-mem-date">요청</Th>
