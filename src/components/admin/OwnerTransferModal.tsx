@@ -24,6 +24,7 @@ type Step = 'notice' | 'confirm' | 'password';
  */
 export const OwnerTransferModal: React.FC<OwnerTransferModalProps> = ({ target, onClose }) => {
   const { user } = useAuth();
+  const dev = !!user?.isDevAdmin;
   const [step, setStep] = useState<Step>('notice');
   const [confirm, setConfirm] = useState('');
   const [password, setPassword] = useState('');
@@ -70,6 +71,7 @@ export const OwnerTransferModal: React.FC<OwnerTransferModalProps> = ({ target, 
         {step === 'notice' && (
           <>
             <p>{who}에게 소유자 권한을 넘깁니다.</p>
+            {dev && <Notice tone="ok">테스트 계정입니다. 세 단계를 똑같이 거치지만 실제로는 넘기지 않습니다 (비밀번호는 아무 값이나 넣으면 됩니다).</Notice>}
             <Notice tone="warn">
               넘기면 나는 바로 운영자가 되어 견적 원본 관리·등급 변경·계정 삭제를 할 수 없습니다. 내가 다시 되돌릴 수 없고, 새 소유자만 돌려줄 수 있습니다.
               화면 안의 권한만 넘어가며 권한 시트·웹앱·Supabase 의 실제 소유권은 그대로입니다.

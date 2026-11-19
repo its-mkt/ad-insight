@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { ACCESS_CHANGED_EVENT, postAuthedAction } from '../lib/access';
 import { affiliationText } from '../lib/authErrors';
+import { readDevSession } from '../lib/roleCache';
 import { supabase } from '../lib/supabase';
 import { showToast } from '../components/common/Toast';
 
@@ -60,11 +61,25 @@ const whoOf = (email: string): string => {
   return name ? `${name} 님` : `${email} 계정`;
 };
 
+/** 개발 서버 테스트 계정(로컬 전용)인지 — 웹앱 토큰이 없어 명단 대신 예시 명단을 보여 주고, 소유자 넘기기는 흐름만 돈다 */
+export const isDevSession = (): boolean => readDevSession<object>() !== null;
+
+/** 테스트 계정용 예시 명단 — 실제 사람이 아닌 example.com 주소 */
+const DEV_MEMBERS: MemberRow[] = [
+  { email: 'pending@example.com', name: '예시 대기', team: '예시회사 · 영업팀', status: 'pending', requested_at: '2026-11-19 09:00', decided_at: '', decided_by: '' },
+  { email: 'manager@example.com', name: '예시 운영자', team: '예시회사 · 마케팅팀', status: 'approved', requested_at: '2026-11-10 10:00', decided_at: '2026-11-10 11:00', decided_by: 'admin@itket.com', role: 'manager' },
+  { email: 'viewer@example.com', name: '예시 뷰어', team: '예시회사 · 기획팀', status: 'approved', requested_at: '2026-11-12 14:00', decided_at: '2026-11-12 15:00', decided_by: 'admin@itket.com', role: 'member' },
+];
+
 /** 명단을 다시 받는다 (받는 중이면 그 요청을 같이 기다린다) */
 export function loadMembers(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
     setState({ error: '', refreshing: true });
+    if (isDevSession()) {
+      setState({ owners: ['admin@itket.com'], rows: DEV_MEMBERS, checkedAt: new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }) });
+      return;
+    }
     const res = await postAuthedAction<{ members?: MemberRow[]; owners?: string[] }>('listMembers');
     if (res.error || !res.members) setState({ error: '가입 요청 목록을 불러오지 못했습니다.', rows: state.rows ?? [] });
     else
@@ -190,7 +205,14 @@ export async function transferOwner(
   password: string,
   me: { email?: string; name?: string; company?: string; team?: string; isDevAdmin?: boolean } | null
 ): Promise<OwnerTransferResult> {
-  if (!me?.email || me.isDevAdmin) return { error: '실제 소유자 계정으로 로그인해야 넘길 수 있습니다.' };
+  if (!me?.email) return { error: '로그인이 필요합니다.' };
+  // 테스트 계정 — 비밀번호 확인·웹앱 요청 없이 흐름만 돌고 실제로는 넘기지 않는다
+  if (me.isDevAdmin) {
+    if (confirm.trim().toLowerCase() !== email.toLowerCase()) return { error: '받는 사람 이메일이 맞지 않습니다.', step: 'confirm' };
+    await new Promise((r) => setTimeout(r, 600));
+    showToast(`테스트 계정이라 실제로 넘기지 않았습니다. 실제 소유자 계정이면 ${whoOf(email)}에게 소유자 권한이 넘어갑니다.`, 'warn');
+    return {};
+  }
   const check = await supabase.auth.signInWithPassword({ email: me.email, password });
   if (check.error) return { error: '비밀번호가 맞지 않습니다.', step: 'password' };
   const who = whoOf(email);
