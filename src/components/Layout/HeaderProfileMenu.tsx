@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 import { useAuth } from '../../context/AuthContext';
-import { LogOut, Palette, User, UserRound, Users, type LucideIcon } from 'lucide-react';
+import { LogOut, Palette, Settings, User, Users, type LucideIcon } from 'lucide-react';
 import { SkelBar } from '../common/SkeletonView';
 import { Avatar } from '../common/Avatar';
 import { StatusBadge } from '../common/StatusBadge';
@@ -103,7 +103,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
           </div>
 
           <div className="pm-group" role="group" aria-label="계정">
-            <MenuItem icon={UserRound} label="내 계정 설정" btn="account-settings" onClick={pick(() => setSettingsOpen(true))} />
+            <MenuItem icon={Settings} label="내 계정 설정" btn="account-settings" onClick={pick(() => setSettingsOpen(true))} />
           </div>
 
           {onThemeMode && (
