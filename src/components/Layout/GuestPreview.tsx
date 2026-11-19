@@ -107,8 +107,8 @@ export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = fals
         <div className="preview-lock">
           <button type="button" className="preview-badge" data-btn="preview-login" onClick={() => setOpen(true)}>
             <FlaskConical size="0.875rem" aria-hidden="true" />
-            <span className="preview-badge-long">예시 데이터입니다 · 로그인하면 실제 수치를 볼 수 있습니다</span>
-            <span className="preview-badge-short">예시 데이터입니다</span>
+            <span className="preview-badge-long">로그인하면 실제 수치를 확인할 수 있습니다</span>
+            <span className="preview-badge-short">실제 수치는 로그인 후 확인</span>
             <span className="preview-badge-cta">
               로그인
               <ArrowRight size="0.875rem" aria-hidden="true" />
