@@ -31,6 +31,7 @@ import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
+import { focusPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
 import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
@@ -56,6 +57,9 @@ export const App: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const { isLoggedIn, isSuperAdmin, loading: authLoading } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  // 로그인 전 미리보기(예시 데이터) — 로그인 버튼은 모달 대신 화면 위 로그인 카드로 보낸다
+  const preview = usePreviewMode();
+  const openLogin = preview ? focusPreviewLogin : () => setLoginOpen(true);
   const wasLoggedIn = useRef(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   // 로그인 상태마다 목록이 따로라 바뀌면 다시 읽는다
@@ -402,6 +406,7 @@ export const App: React.FC = () => {
           onReload={load}
           site={site}
           onSiteChange={changeSite}
+          preview={preview}
         />
         <div className="wrap">
           <Header
@@ -430,8 +435,8 @@ export const App: React.FC = () => {
             themeMode={themeMode}
             onThemeMode={handleThemeMode}
             onNavigate={handleNavigate}
-            onLogin={() => setLoginOpen(true)}
-            onSearch={() => setSearchOpen(true)}
+            onLogin={openLogin}
+            onSearch={preview ? focusPreviewLogin : () => setSearchOpen(true)}
           />
           {/* 데이터 연결·계정 관리는 기간과 상관없는 화면이라 기간 바를 두지 않는다 */}
           {currentView !== 'data' && currentView !== 'members' && !oncorePending && (
@@ -559,7 +564,7 @@ export const App: React.FC = () => {
                   dayRange={searchDay}
                   dayCovered={dayCovered}
                   isLoggedIn={isLoggedIn}
-                  onLogin={() => setLoginOpen(true)}
+                  onLogin={openLogin}
                   onSelectAllPeriod={selectAllPeriod}
                 />
               )}

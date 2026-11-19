@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ChartNoAxesCombined, Clock, Layers, Lock, MailCheck, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkeletonView } from '../common/SkeletonView';
 import { Modal } from '../common/Modal';
-import { DevLoginButton, GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
+import { DevLoginButton, GateError, LoginForm, ProfileFields, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
 
@@ -72,18 +71,11 @@ const GateCard: React.FC<GateCardProps> = (props) => (
   </div>
 );
 
-/** 이름·소속 입력칸 — 가입 요청과 다시 요청에 함께 쓴다 */
-const NameTeamFields: React.FC<{ name: string; team: string; onName: (v: string) => void; onTeam: (v: string) => void; err: boolean }> = ({ name, team, onName, onTeam, err }) => (
-  <>
-    <TextInput className={`gate-input${err ? ' err' : ''}`} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => onName(e.target.value)} />
-    <TextInput className={`gate-input${err ? ' err' : ''}`} name="team" autoComplete="organization" placeholder="소속 (회사·팀)" value={team} onChange={(e) => onTeam(e.target.value)} />
-  </>
-);
-
 /** 로그인한 계정으로 승인을 (다시) 요청 — 요청 기록이 없거나 거절·해제된 경우 */
 const RequestAgainForm: React.FC = () => {
   const { user, requestAccess } = useAuth();
   const [name, setName] = useState(user?.name || '');
+  const [company, setCompany] = useState(user?.company || '');
   const [team, setTeam] = useState(user?.team || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -92,14 +84,14 @@ const RequestAgainForm: React.FC = () => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
-    const res = await requestAccess(name, team);
+    const res = await requestAccess(name, company, team);
     setSubmitting(false);
     if (res.error) setError(res.error);
   };
 
   return (
     <form className="gate-form" onSubmit={handleSubmit}>
-      <NameTeamFields name={name} team={team} onName={setName} onTeam={setTeam} err={!!error} />
+      <ProfileFields name={name} company={company} team={team} onName={setName} onCompany={setCompany} onTeam={setTeam} err={!!error} autoFocus />
       {error && <GateError message={error} />}
       <button type="submit" className="btn acc btn-login" data-btn="request-access" disabled={submitting}>
         {submitting ? '보내는 중...' : '승인 요청 보내기'}
@@ -205,6 +197,8 @@ const AccessChecking: React.FC = () => {
 export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loading, isSignedIn, role, canView, refreshRole, signupInProgress } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
+  // 회원가입에서 이미 가입된 이메일로 넘어왔을 때 로그인 폼에 미리 채울 값 (바뀔 때마다 폼을 새로 그린다)
+  const [loginPreset, setLoginPreset] = useState<{ email: string; reset: boolean; seq: number } | null>(null);
 
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
@@ -220,13 +214,22 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview>
+      <GuestPreview app={children}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
           title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
           desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
         >
-          {tab === 'login' && !signingUp ? <LoginForm showDevLogin={false} /> : <SignupForm />}
+          {tab === 'login' && !signingUp ? (
+            <LoginForm key={loginPreset?.seq ?? 0} showDevLogin={false} initialEmail={loginPreset?.email} initialResetting={loginPreset?.reset} />
+          ) : (
+            <SignupForm
+              onExistingAccount={(email, next) => {
+                setLoginPreset((prev) => ({ email, reset: next === 'reset', seq: (prev?.seq ?? 0) + 1 }));
+                setTab('login');
+              }}
+            />
+          )}
           {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
           {!signingUp && (
           <p className="gate-switch">

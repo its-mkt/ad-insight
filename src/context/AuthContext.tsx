@@ -9,9 +9,9 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string;
-  /** 회사 (내 계정 설정에서 정한다 — 옛 가입자는 비어 있을 수 있다) */
+  /** 회사 (가입 요청·내 계정 설정에서 정한다 — 옛 가입자는 비어 있을 수 있다) */
   company?: string;
-  /** 가입 요청 때 적은 소속(팀) */
+  /** 가입 요청 때 적은 팀 (옛 가입자는 '회사·팀'을 한 칸에 적었다) */
   team?: string;
   /** 프로필 사진 주소 (Supabase Storage avatars) */
   avatarUrl?: string;
@@ -21,6 +21,7 @@ export interface AuthUser {
 /** 회원가입 2단계(정보 입력)에서 받는 값 — 이메일 인증을 마친 뒤 계정에 정한다 */
 export interface SignUpInfo {
   name: string;
+  company: string;
   team: string;
   /** 로그인에 쓸 비밀번호 */
   password: string;
@@ -54,7 +55,7 @@ interface AuthContextType {
   /** 데이터를 볼 수 있는지 (관리자·승인된 계정) */
   canView: boolean;
   /** 이메일로 6자리 인증번호를 보낸다 — signup 이면 처음 쓰는 이메일도 계정을 만든다(회원가입 1단계), 아니면 가입된 이메일만(비밀번호 찾기) */
-  sendEmailCode: (email: string, signup?: boolean) => Promise<{ error?: string }>;
+  sendEmailCode: (email: string, signup?: boolean) => Promise<{ error?: string; /** 회원가입인데 이미 가입된 이메일이라 보내지 않았다 */ registered?: boolean }>;
   /** 이메일(gmail 은 아이디만)·비밀번호로 로그인한다 */
   loginWithPassword: (loginId: string, password: string) => Promise<{ error?: string }>;
   /** 회원가입 1단계 — 인증번호를 확인한다. 확인되면 로그인된 채로 2단계(정보 입력)로 넘어간다 (signupInProgress) */
@@ -68,7 +69,7 @@ interface AuthContextType {
   /** 비밀번호 찾기 — 메일 인증번호를 확인한 뒤 새 비밀번호로 바꾸고 로그인한다 */
   resetPasswordWithCode: (email: string, code: string, newPassword: string) => Promise<{ error?: string }>;
   /** 로그인한 계정으로 승인을 (다시) 요청한다 — 요청 기록이 없거나 거절·해제된 경우 */
-  requestAccess: (name: string, team: string) => Promise<{ error?: string }>;
+  requestAccess: (name: string, company: string, team: string) => Promise<{ error?: string }>;
   /** 내 계정 설정 — 이름·회사·팀을 바꾸고 관리자 명단(members 탭)에도 반영한다 */
   updateProfile: (info: ProfileInfo) => Promise<AccountResult>;
   /** 내 계정 설정 — 현재 비밀번호를 확인한 뒤 새 비밀번호로 바꾼다 */
@@ -136,6 +137,10 @@ const affiliationText = (company: string, team: string): string => (company.trim
 
 /** 개발용 테스트 계정은 Supabase 계정이 없어 바꿀 수 없다 */
 const DEV_ACCOUNT_ERROR = '개발용 테스트 계정은 바꿀 수 없습니다. 실제 계정으로 로그인해 주세요.';
+
+/** 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열 */
+const missingProfileText = (name: string, company: string, team: string): string =>
+  !name.trim() || !company.trim() || !team.trim() ? '이름·회사·팀을 모두 입력해 주세요.' : '';
 
 /** 인증번호 보내기·확인 오류 → 화면 문구 */
 const codeErrorText = (message: string): string => {
@@ -272,9 +277,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!roleLoading && role && !canView) void clearCachedPayloads();
   }, [roleLoading, role, canView]);
 
-  const sendEmailCode = async (email: string, signup = false): Promise<{ error?: string }> => {
+  const sendEmailCode = async (email: string, signup = false): Promise<{ error?: string; registered?: boolean }> => {
     const mail = toLoginEmail(email);
     if (!isEmail(mail)) return { error: '이메일 주소를 확인해 주세요.' };
+    // 회원가입이면 인증번호를 보내기 전에 이미 가입된 이메일인지 본다 — 확인이 안 되면(함수 없음·네트워크) 막지 않고 보낸다
+    if (signup) {
+      const reg = await supabase.rpc('email_registered', { p_email: mail });
+      if (reg.error) console.error('Check registered error:', reg.error.message);
+      else if (reg.data === true) return { error: '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 찾아 주세요.', registered: true };
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email: mail,
       options: { shouldCreateUser: signup, emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
@@ -311,18 +322,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {};
   };
 
-  const completeSignup = async ({ name, team, password }: SignUpInfo): Promise<{ error?: string }> => {
-    if (!name.trim() || !team.trim()) return { error: '이름과 소속을 입력해 주세요.' };
+  const completeSignup = async ({ name, company, team, password }: SignUpInfo): Promise<{ error?: string }> => {
+    const missing = missingProfileText(name, company, team);
+    if (missing) return { error: missing };
+    if (!password) return { error: '비밀번호를 입력해 주세요.' };
     if (password.length < 6) return { error: '비밀번호는 6자 이상으로 정해 주세요.' };
     // 인증으로 로그인된 세션에 비밀번호·이름·소속을 정한다 — 다음부터 비밀번호로 로그인한다
-    const pw = await supabase.auth.updateUser({ password, data: { name: name.trim(), team: team.trim() } });
+    const pw = await supabase.auth.updateUser({ password, data: { name: name.trim(), company: company.trim(), team: team.trim() } });
     if (pw.error) {
       console.error('Set password error:', pw.error.message);
       return { error: passwordErrorText(pw.error.message) };
     }
     // 인증된 로그인 토큰으로 열람 승인을 요청한다 — 웹앱이 토큰의 이메일로 명단에 올린다
     const token = await currentAccessToken();
-    const req = await postMemberAction({ action: 'requestAccess', access_token: token, email: pw.data.user?.email, name: name.trim(), team: team.trim() }).catch(() => ({ error: 'network' }));
+    const req = await postMemberAction({ action: 'requestAccess', access_token: token, email: pw.data.user?.email, name: name.trim(), team: affiliationText(company, team) }).catch(() => ({ error: 'network' }));
     if (req.error) return { error: req.error === 'too_many' ? '요청이 많아 잠시 막혔습니다. 한 시간 뒤 다시 시도해 주세요.' : '열람 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     setSignupInProgress(false);
     refreshRole();
@@ -351,9 +364,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {};
   };
 
-  const requestAccess = async (name: string, team: string): Promise<{ error?: string }> => {
-    if (!user?.email || !name.trim() || !team.trim()) return { error: '이름과 소속을 입력해 주세요.' };
-    const req = await postMemberAction({ action: 'requestAccess', access_token: await currentAccessToken(), email: user.email, name: name.trim(), team: team.trim() }).catch(() => ({ error: 'network' }));
+  const requestAccess = async (name: string, company: string, team: string): Promise<{ error?: string }> => {
+    const missing = missingProfileText(name, company, team);
+    if (!user?.email || missing) return { error: missing || '로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.' };
+    const req = await postMemberAction({ action: 'requestAccess', access_token: await currentAccessToken(), email: user.email, name: name.trim(), team: affiliationText(company, team) }).catch(() => ({ error: 'network' }));
     if (req.error) return { error: '승인 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     refreshRole();
     return {};

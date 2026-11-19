@@ -55,7 +55,9 @@ const CodeStep: React.FC<{
 }> = ({ sentTo, code, onCode, err, wait, submitting, onResend, onChangeEmail }) => (
   <>
     <p className="gate-code-sent">
-      <strong>{sentTo}</strong> 로 보낸 6자리 인증번호를 입력해 주세요. 메일이 없으면 스팸함도 확인해 주세요.
+      <strong>{sentTo}</strong> 로 보낸 6자리 인증번호를 입력해 주세요.
+      <br />
+      메일이 없으면 스팸함도 확인해 주세요.
     </p>
     <TextInput
       className={`gate-input gate-code${err ? ' err' : ''}`}
@@ -107,17 +109,56 @@ export const SignupSteps: React.FC<{ current: 0 | 1 | 2 }> = ({ current }) => (
   </ol>
 );
 
+interface ProfileFieldsProps {
+  /** 이름 입력값 */
+  name: string;
+  /** 회사 입력값 */
+  company: string;
+  /** 팀 입력값 */
+  team: string;
+  /** 이름이 바뀌면 부른다 */
+  onName: (v: string) => void;
+  /** 회사가 바뀌면 부른다 */
+  onCompany: (v: string) => void;
+  /** 팀이 바뀌면 부른다 */
+  onTeam: (v: string) => void;
+  /** 오류 테두리를 그릴지 */
+  err: boolean;
+  /** 이름 칸에 처음 커서를 둘지 */
+  autoFocus?: boolean;
+}
+
+/** 이름·회사·팀 입력칸 — 회원가입 2단계와 승인 다시 요청에 함께 쓴다 (셋 다 필수) */
+export const ProfileFields: React.FC<ProfileFieldsProps> = ({ name, company, team, onName, onCompany, onTeam, err, autoFocus }) => {
+  const cls = `gate-input${err ? ' err' : ''}`;
+  return (
+    <>
+      <TextInput className={cls} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => onName(e.target.value)} autoFocus={autoFocus} />
+      <TextInput className={cls} name="company" autoComplete="organization" placeholder="회사" value={company} onChange={(e) => onCompany(e.target.value)} />
+      <TextInput className={cls} name="team" autoComplete="organization-title" placeholder="팀" value={team} onChange={(e) => onTeam(e.target.value)} />
+    </>
+  );
+};
+
+interface SignupFormProps {
+  /** 이미 가입된 이메일일 때 — 그 이메일로 로그인(login) 또는 비밀번호 찾기(reset) 화면으로 넘긴다 */
+  onExistingAccount?: (email: string, next: 'login' | 'reset') => void;
+}
+
 /**
- * 회원가입 및 열람 요청 — ① 이메일 인증(인증번호) → ② 이름·소속·비밀번호 → ③ 관리자 승인 대기.
+ * 회원가입 및 열람 요청 — ① 이메일 인증(인증번호) → ② 이름·회사·팀·비밀번호 → ③ 관리자 승인 대기.
  * 이메일부터 확인해 쓸 수 없는 주소로 정보를 다 적는 일을 막는다 (2026-11-18 사용자 결정).
  * 인증되면 로그인 상태가 되지만 2단계를 마칠 때까지 접속 화면은 이 폼을 유지한다 (AuthContext.signupInProgress)
  */
-export const SignupForm: React.FC = () => {
+export const SignupForm: React.FC<SignupFormProps> = ({ onExistingAccount }) => {
   const { user, sendEmailCode, verifyEmailCode, completeSignup, signupInProgress, cancelSignup } = useAuth();
   const [email, setEmail] = useState('');
+  /** 인증번호를 보내려던 이메일이 이미 가입돼 있다 — 로그인·비밀번호 찾기 버튼을 보인다 */
+  const [registered, setRegistered] = useState(false);
   const [sentTo, setSentTo] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
   const [team, setTeam] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
@@ -129,9 +170,11 @@ export const SignupForm: React.FC = () => {
 
   const send = async () => {
     setError('');
+    setRegistered(false);
     setSubmitting(true);
     const res = await sendEmailCode(email, true);
     setSubmitting(false);
+    if (res.registered) setRegistered(true);
     if (res.error) return setError(res.error);
     setSentTo(email.trim());
     setCode('');
@@ -150,7 +193,7 @@ export const SignupForm: React.FC = () => {
     setError('');
     if (password !== password2) return setError('비밀번호 확인이 일치하지 않습니다.');
     setSubmitting(true);
-    const res = await completeSignup({ name, team, password });
+    const res = await completeSignup({ name, company, team, password });
     setSubmitting(false);
     if (res.error) setError(res.error);
   };
@@ -167,10 +210,11 @@ export const SignupForm: React.FC = () => {
           }}
         >
           <p className="gate-code-sent">
-            <strong>{user?.email || sentTo}</strong> 인증이 끝났습니다. 열람 요청에 쓸 정보와 로그인 비밀번호를 정해 주세요.
+            <strong>{user?.email || sentTo}</strong> 인증이 끝났습니다.
+            <br />
+            열람 요청에 쓸 정보와 로그인 비밀번호를 정해 주세요.
           </p>
-          <TextInput className={`gate-input${err}`} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          <TextInput className={`gate-input${err}`} name="team" autoComplete="organization" placeholder="소속 (회사·팀)" value={team} onChange={(e) => setTeam(e.target.value)} />
+          <ProfileFields name={name} company={company} team={team} onName={setName} onCompany={setCompany} onTeam={setTeam} err={!!error} autoFocus />
           <TextInput className={`gate-input${err}`} type="password" name="new-password" autoComplete="new-password" placeholder="비밀번호 (6자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
           <TextInput className={`gate-input${err}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
           {error && <GateError message={error} />}
@@ -209,12 +253,38 @@ export const SignupForm: React.FC = () => {
               }}
             />
           ) : (
-            <TextInput className={`gate-input${err}`} type="email" name="email" autoComplete="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+            <TextInput
+              className={`gate-input${err}`}
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="이메일"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (registered) {
+                  setRegistered(false);
+                  setError('');
+                }
+              }}
+              autoFocus
+            />
           )}
           {error && <GateError message={error} />}
-          <button type="submit" className="btn acc btn-login" data-btn={sentTo ? 'signup-verify' : 'signup-send-code'} disabled={submitting}>
-            {submitting ? (sentTo ? '확인 중...' : '보내는 중...') : sentTo ? '인증하고 다음 단계로' : '이메일 인증번호 받기'}
-          </button>
+          {registered && onExistingAccount ? (
+            <div className="gate-actions gate-registered">
+              <Button variant="primary" data-btn="signup-registered-login" onClick={() => onExistingAccount(email.trim(), 'login')}>
+                로그인하기
+              </Button>
+              <Button data-btn="signup-registered-reset" onClick={() => onExistingAccount(email.trim(), 'reset')}>
+                비밀번호 찾기
+              </Button>
+            </div>
+          ) : (
+            <button type="submit" className="btn acc btn-login" data-btn={sentTo ? 'signup-verify' : 'signup-send-code'} disabled={submitting}>
+              {submitting ? (sentTo ? '확인 중...' : '보내는 중...') : sentTo ? '인증하고 다음 단계로' : '이메일 인증번호 받기'}
+            </button>
+          )}
         </form>
       )}
     </>
@@ -353,6 +423,10 @@ interface LoginFormProps {
   onDone?: () => void;
   /** 폼 바로 밑에 테스트 관리자 버튼을 그릴지 (접속 화면은 맨 아래에 따로 그려 false) */
   showDevLogin?: boolean;
+  /** 이메일 칸에 미리 채울 값 (없으면 이 브라우저에서 지난번 로그인한 이메일) */
+  initialEmail?: string;
+  /** 비밀번호 찾기 화면으로 시작할지 */
+  initialResetting?: boolean;
 }
 
 /**
@@ -360,9 +434,9 @@ interface LoginFormProps {
  * 이메일·비밀번호로만 로그인하고(2026-11-18 사용자 결정), 비밀번호를 잊으면 '비밀번호 찾기'에서 메일 인증번호로 새로 정한다.
  * 이 브라우저에서 지난번 로그인한 이메일을 기억해 채워 둔다. 개발 서버에서는 테스트 관리자 버튼도 보인다.
  */
-export const LoginForm: React.FC<LoginFormProps> = ({ onDone, showDevLogin = true }) => {
-  const [lastEmail] = useState(readLastEmail);
-  const [resetting, setResetting] = useState(false);
+export const LoginForm: React.FC<LoginFormProps> = ({ onDone, showDevLogin = true, initialEmail, initialResetting = false }) => {
+  const [lastEmail] = useState(() => initialEmail || readLastEmail());
+  const [resetting, setResetting] = useState(initialResetting);
   const done = (email: string) => {
     saveLastEmail(email);
     onDone?.();

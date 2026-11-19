@@ -1299,6 +1299,8 @@ function doGet(e) {
   if (p.whoami) return json_(acc);
   // 웹앱 비밀키(API_TOKEN)는 보지 않는다 — 화면 코드에 들어 있어 누구나 볼 수 있으므로 관문이 되지 못한다.
   // 데이터의 관문은 로그인 토큰 + 명단이다. 키는 서버끼리 쓰는 doPost 쓰기 동작에만 쓴다 (2026-11-19 보안 점검)
+  // 로그인 전 미리보기 — 기기별 비중만 준다 (절대값 없음, 2026-11-19 사용자 결정: 기기별 통계는 비중만 공개). 로그인 없이 통과
+  if (p.preview === 'devices') return json_(previewDeviceShares_());
   if (!isStaffRole_(acc.role) && acc.role !== 'member') return json_({ error: 'login_required', role: acc.role });
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
   if (p.daily) return json_(dailyHistResponse_(ss, p.daily, out));
@@ -1306,6 +1308,56 @@ function doGet(e) {
   // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다)
   return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 로그인 전 미리보기용 기기 비중 — 광고(달·매체마다 기기별 광고비·노출·클릭·전환의 비중)와 고도몰 주문 형태(달마다 주문 수 비중).
+ * 비중(0~1, 소수 넷째 자리)만 내보내 광고비·판매 건수 같은 절대값은 알 수 없다. 데이터가 바뀌면(API_CACHE_V) 다시 만든다.
+ */
+function previewDeviceShares_() {
+  const cache = CacheService.getScriptCache(), key = 'preview:devices:' + (PROPS.getProperty('API_CACHE_V') || '0');
+  const hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
+  const r4 = (n) => Math.round(n * 10000) / 10000;
+  const devOf = (v) => { const s = String(v || '').trim().toLowerCase(); return s === 'desktop' || s === 'mobile' || s === 'tablet' ? s : 'other'; };
+  const sum = {}; // 달 → 매체 → 기기 → 합계
+  const addAds = (media, rows, monthOf) => rows.forEach((r) => {
+    const m = monthOf(r);
+    if (!/^\d{4}-\d{2}$/.test(m)) return;
+    const byDev = ((sum[m] = sum[m] || {})[media] = sum[m][media] || {});
+    const x = (byDev[devOf(r.device)] = byDev[devOf(r.device)] || { cost: 0, imp: 0, clk: 0, conv: 0 });
+    x.cost += Number(r.cost) || 0; x.imp += Number(r.impressions) || 0; x.clk += Number(r.clicks) || 0; x.conv += Number(r.conversions) || 0;
+  });
+  addAds('Google', read_(ss, 'g_device_monthly'), (r) => String(r.month).slice(0, 7));
+  addAds('Naver', read_(ss, 'n_device_daily'), (r) => String(r.date).slice(0, 7));
+  const ads = {};
+  Object.keys(sum).forEach((m) => Object.keys(sum[m]).forEach((media) => {
+    const byDev = sum[m][media], devs = Object.keys(byDev), out = {};
+    const tot = (k) => devs.reduce((s, d) => s + byDev[d][k], 0);
+    const t = { cost: tot('cost'), imp: tot('imp'), clk: tot('clk'), conv: tot('conv') };
+    devs.forEach((d) => { out[d] = {}; ['cost', 'imp', 'clk', 'conv'].forEach((k) => { out[d][k] = t[k] > 0 ? r4(byDev[d][k] / t[k]) : 0; }); });
+    (ads[m] = ads[m] || {})[media] = out;
+  }));
+  // 주문 형태(pc·mobile·write, 비면 미수집) — 주문 번호로 한 번만 센다
+  const seen = {}, cnt = {};
+  read_(ss, 'godo_order_lines').forEach((r) => {
+    const m = String(r.month).slice(0, 7), k = String(r.key);
+    if (!/^\d{4}-\d{2}$/.test(m) || seen[k]) return;
+    seen[k] = 1;
+    const c = ((cnt[m] = cnt[m] || {}));
+    const d = String(r.device || '').trim();
+    c[d] = (c[d] || 0) + 1;
+  });
+  const orders = {};
+  Object.keys(cnt).forEach((m) => {
+    const t = Object.keys(cnt[m]).reduce((s, d) => s + cnt[m][d], 0);
+    orders[m] = {};
+    Object.keys(cnt[m]).forEach((d) => { orders[m][d] = r4(cnt[m][d] / t); });
+  });
+  const out = { ads: ads, orders: orders };
+  try { cache.put(key, JSON.stringify(out), API_SNAPSHOT_TTL_SEC); } catch (e) { /* 캐시 한도를 넘으면 다음에 다시 만든다 */ }
+  return out;
 }
 
 /* ── 대시보드 응답 스냅숏 ──

@@ -29,6 +29,8 @@ import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
 import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../lib/access';
+import { usePreviewMode } from '../context/PreviewModeContext';
+import { isPreviewDeviceShares, previewPayload, setPreviewRealDevices } from '../data/previewPayload';
 
 export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
@@ -588,8 +590,10 @@ const isUsableCache = (j: RawApiPayload | null, site: SiteId): j is RawApiPayloa
 
 /** site: 보고 있는 사이트 — 바뀌면 화면 데이터를 비우고 그 사이트의 웹앱에서 다시 받는다 */
 export function useDashboardData(site: SiteId = 'itket') {
-  const [data, setData] = useState<DashboardData>(emptyData);
-  const [status, setStatus] = useState<SyncStatus>('init');
+  // 로그인 전 미리보기는 웹앱에 묻지 않고 예시 데이터로 그린다 (캐시에도 남기지 않는다)
+  const preview = usePreviewMode();
+  const [data, setData] = useState<DashboardData>(() => (preview ? fromSiteApi(previewPayload(), site) : emptyData()));
+  const [status, setStatus] = useState<SyncStatus>(preview ? 'live' : 'init');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   // 실데이터가 먼저 도착하면 늦게 읽힌 캐시로 덮어쓰지 않는다
   const liveLoaded = useRef(false);
@@ -622,6 +626,7 @@ export function useDashboardData(site: SiteId = 'itket') {
   }, [site]);
 
   const load = useCallback(async () => {
+    if (preview) return;
     const c = getCfg(site);
     if (!c.url) {
       setStatus((prev) => (prev !== 'live' ? 'unlinked' : prev));
@@ -654,9 +659,32 @@ export function useDashboardData(site: SiteId = 'itket') {
       // 뒤에 보낸 요청이 아직 받는 중이면 동기화 표시를 끄지 않는다
       if (id === reqId.current) setIsSyncing(false);
     }
-  }, [site, tryLoadStaticFallback]);
+  }, [site, preview, tryLoadStaticFallback]);
 
   useEffect(() => {
+    if (preview) {
+      setData(fromSiteApi(previewPayload(), site));
+      setStatus('live');
+      // 기기별 비중만은 실제 값 — 웹앱이 로그인 없이도 비중(절대값 없음)을 준다. 못 받으면 예시 비중 그대로 흐리게 둔다
+      let alive = true;
+      const c = getCfg(site);
+      if (c.url) {
+        fetch(webAppUrl(c, { preview: 'devices' }))
+          .then((res) => (res.ok ? res.json() : null))
+          .then((j: unknown) => {
+            if (!alive || !isPreviewDeviceShares(j)) return;
+            setData(fromSiteApi(previewPayload(j), site));
+            setPreviewRealDevices(true);
+          })
+          .catch(() => undefined);
+      }
+      // 미리보기를 닫을 때(로그인) 판매·기기 저장소에 남은 예시 값을 비운다 — 실제 데이터가 오기 전에 섞여 보이지 않게
+      return () => {
+        alive = false;
+        setPreviewRealDevices(false);
+        fromApi({});
+      };
+    }
     // 사이트가 바뀌면 이전 사이트 데이터를 지우고 처음부터 받는다
     liveLoaded.current = false;
     setData(emptyData());
@@ -676,7 +704,7 @@ export function useDashboardData(site: SiteId = 'itket') {
 
     const timer = setInterval(load, 15 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [site, load, tryLoadStaticFallback]);
+  }, [site, preview, load, tryLoadStaticFallback]);
 
   // 로그인·로그아웃하면 그 권한에 맞는 데이터로 다시 받는다 (토큰 갱신처럼 계정이 그대로면 받지 않는다)
   useEffect(() => {
