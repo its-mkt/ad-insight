@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
-import { getCfg } from '../hooks/useDashboardData';
+import { getCfg, webAppUrl } from '../hooks/useDashboardData';
+import { parseRoute } from '../utils/route';
+import { prefetchJson } from './prefetch';
 
 /**
  * 열람 권한 — 수집기 웹앱(Apps Script)이 로그인 토큰과 데이터 시트의 admins·members 명단으로 판정한다.
@@ -45,4 +47,10 @@ export async function postMemberAction<T = Record<string, unknown>>(body: Record
   const { url } = getCfg('itket');
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
   return (await res.json()) as T & { error?: string };
+}
+
+/** 처음 접속 — 권한 확인과 함께 지금 주소 사이트의 데이터 요청을 미리 출발시킨다 (useDashboardData 의 첫 요청이 이어받는다) */
+export function prefetchDashboardData(token: string): void {
+  const c = getCfg(parseRoute().site);
+  if (token && c.url) prefetchJson(withAccessToken(webAppUrl(c), token));
 }
