@@ -64,6 +64,15 @@ const dayLabel = (key: string) => `${+key.slice(5, 7)}/${+key.slice(8, 10)}`;
 const dayWithWeekday = (key: string) => `${key.slice(2).replace(/-/g, '.')} (${WEEKDAYS[fromDayKey(key).getDay()]})`;
 const monthText = (key: string) => key.slice(0, 7).replace('-', '.');
 
+/** ISO 시각 → "11.19 14:32" (한국 시간) */
+const lastAtText = (iso: string) => {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '–';
+  const k = new Date(d.getTime() + 9 * 3600 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(k.getUTCMonth() + 1)}.${p(k.getUTCDate())} ${p(k.getUTCHours())}:${p(k.getUTCMinutes())}`;
+};
+
 const viewTitle = (id: string) => VIEW_TITLES[id as ViewId] ?? id;
 
 const sum = (rows: UsageDay[], k: 'visits' | 'pageviews' | 'seconds') => rows.reduce((a, r) => a + r[k], 0);
@@ -121,6 +130,7 @@ interface UsageViewProps {
 export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod = false, yearTotal = false, dayRange = null, onSelectDayRange }) => {
   const [loaded, setLoaded] = useState<Loaded>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+  const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -298,6 +308,77 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           )}
         </Card>
 
+        {cur.accounts !== null && (
+          <Card
+            name="usage-accounts"
+            id="usage-accounts"
+            tableWrap
+            title="계정별 이용"
+            subtitle={`(${label}${Array.isArray(cur.accounts) && cur.accounts.length ? ` · ${cur.accounts.length}개 계정` : ''} · 페이지뷰 많은 순)`}
+          >
+            {cur.accounts === 'setup' ? (
+              <Notice tone="warn">
+                계정별 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
+              </Notice>
+            ) : cur.accounts.length ? (
+              <table className="stk usage-table">
+                <colgroup>
+                  <col />
+                  <col className="col-us-count" />
+                  <col className="col-us-count" />
+                  <col className="col-us-duration" />
+                  <col className="col-us-date" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <Th>계정</Th>
+                    <Th className="n" tip="이용한 날|그 계정으로 로그인해 화면을 연 날 수 (펼친 줄은 그 화면을 연 날 수)">이용한 날</Th>
+                    <Th className="n">페이지뷰</Th>
+                    <Th className="n">총 체류시간</Th>
+                    <Th className="n" tip="마지막 접속|그 계정의 마지막 기록 시각 (한국 시간)">마지막 접속</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cur.accounts.map((a) => {
+                    const isOpen = openAccounts.has(a.userId);
+                    return (
+                      <React.Fragment key={a.userId}>
+                        <TreeParentRow
+                          label={a.name || a.email.split('@')[0] || '(알 수 없음)'}
+                          sub={[[a.company, a.team].filter(Boolean).join(' '), a.email].filter(Boolean).join(' · ')}
+                          childCount={a.views.length}
+                          showCount={false}
+                          open={isOpen}
+                          onToggle={() => setOpenAccounts((prev) => toggledSet(prev, a.userId))}
+                        >
+                          <NumTd value={a.days} unit="일" />
+                          <NumTd value={a.pageviews} unit="회" bold />
+                          <NumTd>{durationText(a.seconds)}</NumTd>
+                          <NumTd>{lastAtText(a.lastAt)}</NumTd>
+                        </TreeParentRow>
+                        {isOpen &&
+                          a.views.map((v) => (
+                            <TreeChildRow key={v.view} label={viewTitle(v.view)}>
+                              <NumTd value={v.days} unit="일" />
+                              <NumTd value={v.pageviews} unit="회" />
+                              <NumTd>{durationText(v.seconds)}</NumTd>
+                              <NumTd value={null} />
+                            </TreeChildRow>
+                          ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyState
+                message="이 기간에 로그인해서 이용한 기록이 없습니다."
+                subMessage={cur.accountSince ? `계정별 기록은 ${cur.accountSince.replace(/-/g, '.')} 부터 쌓였습니다.` : '계정별 기록은 배포 후부터 쌓입니다.'}
+              />
+            )}
+          </Card>
+        )}
+
         <Card name="usage-categories" id="usage-categories" tableWrap title="카테고리별 이용" subtitle={`(${label} · 많이 고른 순)`}>
           {cur.categories === null ? (
             <Notice tone="warn">
@@ -412,7 +493,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
       <ViewHeader title={TITLE} description="직원들이 광고 인사이트를 얼마나 자주, 얼마나 오래 보는지 보여 줍니다." status="live" />
       <ViewNote>
         ※ 방문은 같은 기기(PC·태블릿·휴대폰)에서 하루(한국 시간)에 여러 번 열어도, 브라우저·시크릿 창이 달라도 1회로 셉니다. 이용 기기는 기간 동안 들어온 기기 대수이고, PC·태블릿·모바일로 나눠 보여 줍니다(기기 종류를 기록하기 전 접속은 미수집). 체류시간은 탭이 보이는 동안만 재고, 5분 넘게 조작이 없으면
-        뺍니다. 개발 서버(localhost) 접속은 기록하지 않습니다. 기간은 위 기간 선택을 따르고, 진행 중인 달은 전월 같은 날짜까지와 비교합니다.{since && ` 수집 시작 ${since.replace(/-/g, '.')}.`}
+        뺍니다. 계정별 이용은 로그인한 상태로 쓴 기록만, 계정별 기록을 시작한 뒤부터 셉니다. 개발 서버(localhost) 접속은 기록하지 않습니다. 기간은 위 기간 선택을 따르고, 진행 중인 달은 전월 같은 날짜까지와 비교합니다.{since && ` 수집 시작 ${since.replace(/-/g, '.')}.`}
         {!USAGE_TRACKING_ON && ' (지금 창은 개발 환경이라 기록되지 않습니다)'}
       </ViewNote>
       <div className="usage-tools">

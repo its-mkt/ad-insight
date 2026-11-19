@@ -6,6 +6,7 @@
 --   기기는 '접속 IP + 기기 특징(fp: 기기 종류·OS·화면 크기·CPU 코어 수)' 으로 판별한다
 --   → 같은 기기에서 시크릿 창·다른 브라우저·인앱 브라우저로 열어도 1회
 --   (fp 가 없는 옛 기록은 브라우저 저장 ID(device_id) 로 센다)
+-- 계정별 이용: 로그인한 상태로 쓴 기록은 계정(user_id)별로도 쌓고 (2026-11-19 부터), 관리자만 조회한다
 -- 기록은 track_usage 함수로만 넣고, 조회는 로그인한 계정만 usage_stats 함수로 한다
 -- (테이블 직접 읽기·쓰기는 RLS 로 모두 막는다)
 -- ===============================================================
@@ -55,6 +56,42 @@ as $$
   select case when p_ip is not null and p_fp is not null then p_ip || '|' || p_fp else 'd:' || p_device end;
 $$;
 
+-- 1-3. 계정별 하루 집계 — 로그인한 상태로 쓴 기록만 (track_usage 가 usage_daily 와 함께 쌓는다)
+--      한 기기를 여러 계정이 번갈아 써도 계정마다 따로 센다. 조회는 관리자만 (usage_stats 의 accounts)
+create table if not exists public.usage_user_daily (
+  visit_date date not null,                       -- 한국 시간 날짜
+  user_id uuid not null references auth.users (id) on delete cascade,
+  view text not null,                             -- 화면 id
+  pageviews int not null default 0,
+  active_seconds int not null default 0,
+  first_at timestamptz not null default now(),
+  last_at timestamptz not null default now(),
+  primary key (visit_date, user_id, view)
+);
+
+alter table public.usage_user_daily enable row level security;
+-- 정책을 두지 않아 직접 읽기·쓰기는 막힌다 (함수만 쓴다)
+
+-- 1-4. 계정별 이용을 볼 수 있는 관리자 — 화면의 관리자(Apps Script admins 탭)와 같게 맞춘다
+create table if not exists public.usage_admins (
+  email text primary key
+);
+
+alter table public.usage_admins enable row level security;
+
+insert into public.usage_admins (email) values ('itsmkt1307@gmail.com') on conflict do nothing;
+
+create or replace function public.usage_is_admin() returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.usage_admins where email = lower(coalesce(auth.jwt() ->> 'email', '')));
+$$;
+
+revoke all on function public.usage_is_admin() from public, anon, authenticated;  -- 조회 함수 안에서만 쓴다
+
 -- 2. 기록 — 화면을 열 때(p_pageview) / 보고 있던 시간을 모아 보낼 때(p_seconds)
 --    인자 목록이 바뀌었으므로 옛 함수를 지운다 (남겨 두면 같은 이름 함수가 둘이라 호출이 모호해진다)
 drop function if exists public.track_usage(text, text, boolean, int);
@@ -87,6 +124,16 @@ begin
     ip = coalesce(public.usage_daily.ip, excluded.ip),  -- 그날 처음 IP 를 유지 (방문 키가 하루 중 바뀌지 않게)
     fp = coalesce(public.usage_daily.fp, excluded.fp),
     logged_in = public.usage_daily.logged_in or excluded.logged_in;
+
+  -- 로그인한 상태면 계정별 집계에도 쌓는다
+  if auth.uid() is not null then
+    insert into public.usage_user_daily (visit_date, user_id, view, pageviews, active_seconds)
+    values (v_date, auth.uid(), p_view, case when p_pageview then 1 else 0 end, v_sec)
+    on conflict (visit_date, user_id, view) do update set
+      pageviews = public.usage_user_daily.pageviews + excluded.pageviews,
+      active_seconds = public.usage_user_daily.active_seconds + excluded.active_seconds,
+      last_at = now();
+  end if;
 end;
 $$;
 
@@ -257,7 +304,39 @@ begin
         group by split_part(category, ' > ', 1)
       ) g
     ), '[]'::json),
-    'category_since', (select min(visit_date) from public.usage_category_daily)
+    'category_since', (select min(visit_date) from public.usage_category_daily),
+    -- 계정별 이용 — 관리자만 받는다 (그 외 계정은 null). 이름·회사·팀은 가입 때 넣은 정보
+    'accounts', case when public.usage_is_admin() then coalesce((
+      select json_agg(a order by a.pageviews desc, a.seconds desc)
+      from (
+        select x.user_id,
+               coalesce(au.email, '') as email,
+               coalesce(au.raw_user_meta_data ->> 'name', '') as name,
+               coalesce(au.raw_user_meta_data ->> 'company', '') as company,
+               coalesce(au.raw_user_meta_data ->> 'team', '') as team,
+               count(distinct x.visit_date) as days,
+               sum(x.pageviews) as pageviews,
+               sum(x.active_seconds) as seconds,
+               max(x.last_at) as last_at,
+               (
+                 select json_agg(v order by v.pageviews desc, v.seconds desc)
+                 from (
+                   select y.view,
+                          count(distinct y.visit_date) as days,
+                          sum(y.pageviews) as pageviews,
+                          sum(y.active_seconds) as seconds
+                   from public.usage_user_daily y
+                   where y.user_id = x.user_id and y.visit_date between p_from and p_to
+                   group by y.view
+                 ) v
+               ) as views
+        from public.usage_user_daily x
+        left join auth.users au on au.id = x.user_id
+        where x.visit_date between p_from and p_to
+        group by x.user_id, au.email, au.raw_user_meta_data
+      ) a
+    ), '[]'::json) end,
+    'account_since', case when public.usage_is_admin() then (select min(visit_date) from public.usage_user_daily) end
   ) into v_result;
 
   return v_result;
