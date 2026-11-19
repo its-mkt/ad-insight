@@ -54,7 +54,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
   if (loading) {
     return (
       <div className="profile-menu" aria-busy="true">
-        <SkelBar w="5rem" h="2rem" />
+        <SkelBar w="2.25rem" h="2.25rem" />
       </div>
     );
   }
@@ -82,7 +82,6 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
         {isSignedIn ? (
           <>
             <Avatar src={user?.avatarUrl} name={user?.name || user?.email} />
-            <span className="pm-name">{user?.name || roleLabel}</span>
           </>
         ) : (
           <>

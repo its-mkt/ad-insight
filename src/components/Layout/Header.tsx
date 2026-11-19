@@ -79,28 +79,20 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onSearch}
         />
 
-        {/* 헤더 프로필 & 로그인 유도 버튼 */}
-        <HeaderProfileMenu onLogin={onLogin} themeMode={themeMode} onThemeMode={onThemeMode} onNavigate={onNavigate} />
-
-        {/* 테마 전환 버튼 */}
-        <button
-          className="tgl btn-theme"
+        {/* 테마 전환 — 지금 테마의 반대(바꿀 테마) 아이콘을 보여 준다 */}
+        <Button
+          iconOnly
+          icon={isDark ? Sun : Moon}
+          className="btn-theme"
           id="theme"
           data-btn="theme"
-          role="switch"
-          aria-checked={isDark}
-          aria-label="다크 모드"
-          title="테마 전환"
+          aria-label={isDark ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기'}
+          title={isDark ? '라이트 모드' : '다크 모드'}
           onClick={onToggleTheme}
-        >
-          <i />
-          <span className="k sun" aria-hidden="true">
-            <Sun />
-          </span>
-          <span className="k moon" aria-hidden="true">
-            <Moon />
-          </span>
-        </button>
+        />
+
+        {/* 헤더 프로필 & 로그인 유도 버튼 (맨 오른쪽) */}
+        <HeaderProfileMenu onLogin={onLogin} themeMode={themeMode} onThemeMode={onThemeMode} onNavigate={onNavigate} />
       </div>
     </header>
   );
