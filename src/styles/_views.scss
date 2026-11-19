@@ -1335,6 +1335,10 @@ tr.kw-more-row td {
     .col-mem-actions {
       width: 4.5rem;
     }
+    // 등급 선택칸 — 표 줄 높이에 맞춰 낮게 (다른 화면의 드롭다운은 2rem 그대로)
+    .dd .dd-trigger {
+      height: 1.5rem;
+    }
   }
   .member-actions {
     text-align: left;
