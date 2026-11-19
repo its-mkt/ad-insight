@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getCfg, webAppUrl } from '../hooks/useDashboardData';
+import { getCfg, webAppUrl } from './webApp';
 import { parseRoute } from '../utils/route';
 import { prefetchJson } from './prefetch';
 

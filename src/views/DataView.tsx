@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { CategoryMap, DashboardData, SyncStatus } from '../types/dashboard';
-import { DEFAULT_URL, getCfg } from '../hooks/useDashboardData';
+import { DEFAULT_URL, getCfg } from '../lib/webApp';
 import { fmt, sumBy } from '../utils/format';
 import { runDataAudit } from '../utils/dataAudit';
 import { EXTERNAL_LINKS } from '../utils/constants';
