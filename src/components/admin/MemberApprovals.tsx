@@ -30,6 +30,9 @@ const STATUS_TITLE: Record<MemberStatus, string> = {
   revoked: '열람 권한을 해제한다 (다시 승인할 수 있다)',
 };
 
+/** 요청·처리 시각 '2026-11-19 13:37' → '26.11.19 13:37' (칸을 좁게, 전체 값은 마우스를 올리면) */
+const shortAt = (at: string) => (at ? at.slice(2, 16).replace(/-/g, '.') : '–');
+
 const ROLE_TEXT: Record<MemberRole, string> = { member: '뷰어', manager: '운영자' };
 const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
   { value: 'member', label: ROLE_TEXT.member, title: '대시보드만' },
@@ -143,8 +146,8 @@ export const MemberApprovals: React.FC = () => {
                     ROLE_TEXT[role]
                   )}
                 </td>
-                <td>{r.requested_at}</td>
-                <td>{r.decided_at ? `${r.decided_at}` : '–'}</td>
+                <td className="member-at" title={r.requested_at || undefined}>{shortAt(r.requested_at)}</td>
+                <td className="member-at" title={r.decided_at || undefined}>{shortAt(r.decided_at)}</td>
                 <td className="member-actions">
                   {(() => {
                     const items: ActionMenuItem[] = [];

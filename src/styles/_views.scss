@@ -1381,13 +1381,13 @@ tr.kw-more-row td {
     }
     // 소속을 회사·팀으로 나눔 (예전 소속 15%와 이메일 일부를 나눠 쓴다)
     .col-mem-company {
-      width: 8.5%;
+      width: 12.5%; // 아이티스정보통신 같은 긴 회사명
     }
     .col-mem-team {
       width: 7.5%;
     }
     .col-mem-email {
-      width: 17%;
+      width: 19%;
     }
     .col-mem-status {
       width: 12%; // 승인·해제 두 칸 토글이 들어가게
@@ -1396,7 +1396,10 @@ tr.kw-more-row td {
       width: 10%;
     }
     .col-mem-date {
-      width: 15%; // 2026-11-19 13:37 (121px) + 여백
+      width: 12%; // 26.11.19 13:37 + 여백
+    }
+    .member-at {
+      white-space: nowrap;
     }
     .col-mem-actions {
       width: 5.5%;
