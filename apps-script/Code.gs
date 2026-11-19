@@ -1535,8 +1535,18 @@ function requestAccess_(data) {
 }
 /** 가입 요청 알림 — Teams 마케팅팀 채널(웹훅) + 관리자 메일. 알림이 실패해도 요청은 저장돼 있다 */
 function notifyAccessRequest_(email, name, team) {
+  sendAccessNotice_({
+    title: '광고 인사이트 가입 요청',
+    facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }],
+    note: ACCESS_VERIFY_NOTE_,
+    action: '승인하러 가기',
+    subject: '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
+    text: '광고 인사이트 가입 요청: ' + name + ' (' + team + ') · ' + email + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n관리자 화면에서 승인하거나 거절해 주세요.',
+  });
+}
+/** 관리자 알림 공통 — Teams 카드(제목·항목·안내·버튼) + 관리자 메일(제목·본문 + 관리자 화면 주소). 실패해도 저장 결과는 그대로 */
+function sendAccessNotice_(n) {
   const url = 'https://its.itket.com/ad-insight/itket/admin';
-  const text = '광고 인사이트 가입 요청: ' + name + ' (' + team + ') · ' + email;
   const hook = PROPS.getProperty('TEAMS_WEBHOOK_URL');
   if (hook) {
     try {
@@ -1545,18 +1555,55 @@ function notifyAccessRequest_(email, name, team) {
         // Teams 워크플로 웹훅 형식 (온코어 견적 알림과 같은 Adaptive Card)
         payload: JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: {
           $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4',
-          body: [{ type: 'TextBlock', text: '광고 인사이트 가입 요청', weight: 'Bolder', size: 'Medium' },
-            { type: 'FactSet', facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }] },
-            { type: 'TextBlock', text: ACCESS_VERIFY_NOTE_, wrap: true, isSubtle: true, size: 'Small' }],
-          actions: [{ type: 'Action.OpenUrl', title: '승인하러 가기', url }],
+          body: [{ type: 'TextBlock', text: n.title, weight: 'Bolder', size: 'Medium' },
+            { type: 'FactSet', facts: n.facts },
+            { type: 'TextBlock', text: n.note, wrap: true, isSubtle: true, size: 'Small' }],
+          actions: [{ type: 'Action.OpenUrl', title: n.action, url }],
         } }] }),
       });
     } catch (err) { console.warn('Teams 알림 실패: ' + err.message); }
   }
   try {
-    GmailApp.sendEmail(ACCESS_NOTIFY_TO_, '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
-      text + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n관리자 화면에서 승인하거나 거절해 주세요.\n' + url);
-  } catch (err) { console.warn('가입 요청 메일 실패: ' + err.message); }
+    GmailApp.sendEmail(ACCESS_NOTIFY_TO_, n.subject, n.text + '\n' + url);
+  } catch (err) { console.warn('관리자 알림 메일 실패: ' + err.message); }
+}
+/**
+ * 내 계정 설정 — 로그인 토큰의 이메일 줄만 이름·소속을 고친다 (남의 줄은 못 고친다).
+ * 승인 상태는 그대로 두고, 승인·대기 중인 사람이 바꾸면 관리자에게 알린다 (승인 때 확인한 사람과 같은지 볼 수 있게).
+ * 관리자(admins 탭)는 명단 줄이 없으면 고칠 것이 없다.
+ */
+function updateProfile_(data) {
+  const email = tokenEmail_(data.access_token);
+  if (!email) return { error: 'login_required' };
+  const name = String(data.name || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40);
+  const team = String(data.team || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 90);
+  if (!name || !team) return { error: 'bad_request' };
+  // 한 사람이 한 시간에 20번까지만 (알림 폭주 막기)
+  const cache = CacheService.getScriptCache(), hk = 'prof:' + email + ':' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMddHH');
+  const n = Number(cache.get(hk) || 0);
+  if (n >= 20) return { error: 'too_many' };
+  cache.put(hk, String(n + 1), 3600);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const ss = authSheet_();
+    const m = memberRows_(ss).find((r) => r.email === email);
+    if (!m) return adminEmails_(ss).includes(email) ? { success: true, listed: false } : { error: 'not_member' };
+    if (m.name === name && m.team === team) return { success: true, listed: true, changed: false };
+    membersSheet_(ss).getRange(m.row, 2, 1, 2).setValues([[name, team]]);
+    cache.remove('acc:' + email);
+    if (m.status === 'approved' || m.status === 'pending') {
+      sendAccessNotice_({
+        title: '광고 인사이트 계정 정보 변경',
+        facts: [{ title: '이메일', value: email }, { title: '이름', value: m.name + ' → ' + name }, { title: '소속', value: m.team + ' → ' + team }],
+        note: '이용자가 내 계정 설정에서 바꿨습니다. 승인 상태는 그대로입니다. 본인이 아닌 것 같으면 관리자 화면에서 해제해 주세요.',
+        action: '관리자 화면 열기',
+        subject: '[광고 인사이트] 계정 정보 변경 — ' + name + ' (' + team + ')',
+        text: '광고 인사이트 계정 정보 변경: ' + email + '\n이름 ' + m.name + ' → ' + name + '\n소속 ' + m.team + ' → ' + team + '\n\n승인 상태는 그대로입니다. 본인이 아닌 것 같으면 관리자 화면에서 해제해 주세요.',
+      });
+    }
+    return { success: true, listed: true, changed: true };
+  } finally { lock.releaseLock(); }
 }
 /** 관리자 — 가입 요청 목록 */
 function listMembers_(accessToken) {
@@ -1663,6 +1710,7 @@ function memberPost_(e) {
   let data;
   try { data = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { return null; }
   if (data.action === 'requestAccess') return json_(requestAccess_(data));
+  if (data.action === 'updateProfile') return json_(updateProfile_(data));
   if (data.action === 'listMembers') return json_(listMembers_(data.access_token));
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
   if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));

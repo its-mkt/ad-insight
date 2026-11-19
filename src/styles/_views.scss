@@ -1460,6 +1460,92 @@ tr.kw-more-row td {
   }
 }
 
+// 내 계정 설정 창 (Layout/AccountSettings) — 로그인 창과 같은 카드, 글은 왼쪽 정렬
+.card.login-modal.acct-modal {
+  max-width: 28rem;
+  text-align: left;
+
+  .acct-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-right: 1.5rem; // 닫기 버튼 자리
+
+    h2 {
+      margin: 0 0 0.125rem;
+    }
+  }
+
+  .pm-avatar.xl {
+    @include mixins.avatar-circle;
+    width: 4rem;
+    height: 4rem;
+    font-size: 1.5rem;
+    background: var(--accbg);
+    color: var(--accink);
+    border: 1px solid var(--line2);
+  }
+
+  .acct-head-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+
+    .muted {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .acct-photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.25rem;
+
+    .btn {
+      border: 1px solid var(--line2);
+    }
+  }
+
+  > .gate-error {
+    margin: -0.5rem 0 1rem;
+  }
+
+  .seg {
+    display: flex;
+    margin-bottom: 1rem;
+
+    .seg-btn {
+      flex: 1;
+      justify-content: center;
+      text-align: center;
+    }
+  }
+
+  .acct-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .acct-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink2);
+  }
+
+  .gate-input:disabled {
+    color: var(--sub);
+    cursor: not-allowed;
+  }
+
+  .notice {
+    margin: 0;
+  }
+}
+
 // 접속 관문(AccessGate) — 로그인 모달과 같은 카드를 바탕 없이 화면 전체에 띄운다
 .login-backdrop.access-gate {
   background: var(--bg);
