@@ -1369,7 +1369,7 @@ tr.kw-more-row td {
   .member-table {
     table-layout: fixed;
     width: 100%;
-    min-width: 60rem;
+    min-width: 52rem; // 고정 칸 합 44rem + 소속·이메일 최소 4rem 씩 — 1280px 화면 카드 안에 들어간다
     // 이름·소속·이메일만 넘치면 말줄임 — 등급·관리 칸은 펼침 메뉴가 잘리지 않게 두지 않는다
     td:nth-child(-n + 3) {
       overflow: hidden;
@@ -1390,6 +1390,10 @@ tr.kw-more-row td {
     }
     .col-mem-actions {
       width: 4.5rem;
+    }
+    // 불러오는 동안 자리표시 막대가 칸보다 길어 표를 밀어내지 않게
+    .skel {
+      max-width: 100%;
     }
     // 등급 선택칸 — 표 줄 높이에 맞춰 낮게 (다른 화면의 드롭다운은 2rem 그대로)
     .dd .dd-trigger {

@@ -83,7 +83,7 @@ export const MemberApprovals: React.FC = () => {
         </thead>
         <tbody>
           {!rows ? (
-            <SkelRows rows={3} widths={['4rem', '6rem', '10rem', '4rem', '4rem', '6rem', '6rem', '8rem']} />
+            <SkelRows rows={3} widths={['4rem', '6rem', '10rem', '4rem', '4rem', '6rem', '6rem', '1.5rem']} />
           ) : (
             rows.map((r) => {
               const role: MemberRole = r.role === 'manager' ? 'manager' : 'member';
