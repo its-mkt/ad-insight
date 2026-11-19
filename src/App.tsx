@@ -317,7 +317,8 @@ export const App: React.FC = () => {
     if (authLoading) return;
     if (loginOnlyView && !isLoggedIn) {
       handleNavigate('overview');
-      if (!wasLoggedIn.current) setLoginOpen(true);
+      // 로그인 전 미리보기에는 로그인 카드가 이미 떠 있으므로 관리자 로그인 창을 겹쳐 띄우지 않는다
+      if (!wasLoggedIn.current && !preview) setLoginOpen(true);
     }
     // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
     else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
@@ -325,12 +326,12 @@ export const App: React.FC = () => {
     if (site === 'oncore' && !isLoggedIn) {
       setSite('itket');
       window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
-      if (!wasLoggedIn.current) setLoginOpen(true);
+      if (!wasLoggedIn.current && !preview) setLoginOpen(true);
     }
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
     if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
     wasLoggedIn.current = isLoggedIn;
-  }, [authLoading, isLoggedIn, isSuperAdmin, currentView, site]);
+  }, [authLoading, isLoggedIn, isSuperAdmin, currentView, site, preview]);
 
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
