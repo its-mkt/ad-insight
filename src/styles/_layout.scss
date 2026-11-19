@@ -641,12 +641,21 @@ main {
     color: var(--sub);
   }
 
-  // 메뉴 묶음 — 묶음 사이를 줄로 나눈다
+  // 메뉴 묶음 — 항목이 하나씩이라 묶음 사이 줄은 두지 않고, 내 정보 밑과 로그아웃(마지막 묶음) 위에만 줄을 둔다
   .pm-group {
     display: flex;
     flex-direction: column;
-    padding: 0.25rem 0;
-    border-top: 1px solid var(--line);
+
+    &:last-child {
+      margin-top: 0.25rem;
+      padding-top: 0.25rem;
+      border-top: 1px solid var(--line);
+    }
+  }
+
+  .pm-user {
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--line);
   }
 
   .pm-item {
