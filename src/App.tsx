@@ -322,8 +322,8 @@ export const App: React.FC = () => {
     }
     // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
     else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
-    // 온코어는 승인된 계정만(등급 무관) — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
-    if (site === 'oncore' && !canView) {
+    // 온코어는 승인된 계정(등급 무관)과 로그인 전 미리보기(예시 데이터)에서 볼 수 있다. 그 밖에는 아이티켓으로 + 로그인 모달
+    if (site === 'oncore' && !canView && !preview) {
       setSite('itket');
       window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
       if (!wasLoggedIn.current && !preview) setLoginOpen(true);
