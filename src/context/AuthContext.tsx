@@ -288,7 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { error: '로그인이 필요합니다.' };
     if (user.isDevAdmin) return { error: DEV_ACCOUNT_ERROR };
     const next = { name: name.trim().slice(0, 40), company: company.trim().slice(0, 40), team: team.trim().slice(0, 40) };
-    const missing = missingProfileText(next.name, next.company, next.team);
+    const missing = missingProfileText(next.name, next.company, next.team, '담당자');
     if (missing) return { error: missing };
     const res = await supabase.auth.updateUser({ data: next });
     if (res.error) {

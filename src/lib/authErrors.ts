@@ -25,7 +25,7 @@ export const affiliationText = (company: string, team: string): string => (compa
 /**
  * 이름·회사·팀 중 빈 칸이 있거나 '.'·'-' 처럼 뜻 없는 값이면 안내 문구, 아니면 빈 문자열.
  * 흔히 쓰는 기호는 받되 실제 글자가 있어야 한다 (2026-11-19 사용자 결정 — 가입 때 귀찮아서 기호만 적는 것을 막는 목적).
- * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청은 '담당자', 내 계정 설정은 '이름' (2026-11-19 사용자 결정)
+ * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청·내 계정 설정 모두 '담당자' (2026-11-19 사용자 결정)
  */
 export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
   !name.trim() || !company.trim() || !team.trim()

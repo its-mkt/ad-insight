@@ -63,7 +63,7 @@ const ProfilePanel: React.FC = () => {
       <Field label="이메일" help="로그인·승인 기준이라 바꿀 수 없습니다. 바꿔야 하면 관리자에게 요청해 주세요.">
         <TextInput className="gate-input" value={user?.email || ''} readOnly disabled />
       </Field>
-      <Field label="이름">
+      <Field label="담당자">
         <TextInput className={`gate-input${err(name, isPersonName)}`} name="name" autoComplete="name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field label="회사">
