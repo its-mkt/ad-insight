@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { ArrowRight, FlaskConical } from 'lucide-react';
 import { OPEN_PREVIEW_LOGIN_EVENT, PreviewModeContext } from '../../context/PreviewModeContext';
 import { Modal } from '../common/Modal';
 
@@ -107,7 +107,12 @@ export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = fals
         <div className="preview-lock">
           <button type="button" className="preview-badge" data-btn="preview-login" onClick={() => setOpen(true)}>
             <FlaskConical size="0.875rem" aria-hidden="true" />
-            예시 데이터입니다 · 로그인하면 실제 수치를 볼 수 있습니다
+            <span className="preview-badge-long">예시 데이터입니다 · 로그인하면 실제 수치를 볼 수 있습니다</span>
+            <span className="preview-badge-short">예시 데이터입니다</span>
+            <span className="preview-badge-cta">
+              로그인
+              <ArrowRight size="0.875rem" aria-hidden="true" />
+            </span>
           </button>
         </div>
       )}
