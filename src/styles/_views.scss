@@ -1509,6 +1509,11 @@ tr.kw-more-row td {
     font-size: 0.8125rem;
   }
 
+  // 맨 아래 개발 서버 전용 테스트 관리자 버튼 — 실제 로그인 흐름과 떨어뜨린다
+  .btn.btn-dev-login {
+    margin-top: 1.75rem;
+  }
+
   .gate-actions {
     display: flex;
     flex-wrap: wrap;
