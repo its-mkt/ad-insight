@@ -207,7 +207,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const loading = ga4 === null;
   const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : gaWait);
 
-  // 표만 있던 세 카드의 그래프 보기 — 줄마다 기기 비중을 100% 누적 막대로 (사용자 요청 2026-11-19, 표/그래프 탭)
+  // 표만 있던 세 카드의 그래프 보기 — 줄마다 기기 비중을 100% 누적 막대로 (사용자 요청 2026-11-19, 표/그래프 탭 — 숫자를 정확히 비교하는 데이터라 처음에는 표)
   const deviceSeries = (keys: DeviceKey[]): RowBarsSeries[] => keys.map((d) => ({ key: d, label: DEVICE_LABELS[d], color: DEVICE_COLORS[d] }));
   const channelChartRows: RowBarsRow[] = channelNames.map((ch) => {
     const total = sumBy(tableDevices, (d) => chVisits.acc.get(`${d}|${ch}`) ?? 0);
@@ -243,9 +243,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     { key: 'orders', label: '판매 건수', format: (v) => `${fmt(v)}건`, values: Object.fromEntries(saleKnown.map((r) => [r.label, r.orders])) },
     { key: 'amount', label: '판매 금액', format: (v) => `${fmt(v)}원`, values: Object.fromEntries(saleKnown.map((r) => [r.label, r.amount])) },
   ];
-  const [channelMode, setChannelMode] = useState<ChartTableMode>('chart');
-  const [adMode, setAdMode] = useState<ChartTableMode>('chart');
-  const [saleMode, setSaleMode] = useState<ChartTableMode>('chart');
+  const [channelMode, setChannelMode] = useState<ChartTableMode>('table');
+  const [adMode, setAdMode] = useState<ChartTableMode>('table');
+  const [saleMode, setSaleMode] = useState<ChartTableMode>('table');
 
   return (
     <View name="devices" title={TITLE}>

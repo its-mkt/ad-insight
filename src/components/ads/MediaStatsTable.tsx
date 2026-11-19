@@ -174,8 +174,8 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
   // 키워드 검색광고(네이버·구글 비교)와 네이버 쇼핑검색을 탭으로 나눠 본다
   const [tab, setTab] = useState<SaSegment>('search');
   const showShop = hasShop && tab === 'shopping';
-  // 그래프 보기 — 지표마다 네이버·구글 막대를 그 지표의 큰 값에 맞춰 나란히 (사용자 요청 2026-11-19). 쇼핑검색 탭은 매체가 하나라 표만
-  const [mode, setMode] = useState<ChartTableMode>('chart');
+  // 그래프 보기 — 지표마다 네이버·구글 막대를 그 지표의 큰 값에 맞춰 나란히 (사용자 요청 2026-11-19). 쇼핑검색 탭은 매체가 하나라 표만, 처음에는 표 (지표마다 단위가 달라 숫자 비교가 먼저)
+  const [mode, setMode] = useState<ChartTableMode>('table');
   const showChart = mode === 'chart' && !showShop;
   const won = (v: number) => `${fmt(v)}원`;
   const cnt = (v: number) => `${fmt(v)}회`;
