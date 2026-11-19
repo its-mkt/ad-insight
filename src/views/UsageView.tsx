@@ -9,6 +9,7 @@ import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
+import { TabButton } from '../components/common/TabButton';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
@@ -111,6 +112,9 @@ function usagePeriodOf(month: string, allPeriod: boolean, yearTotal: boolean, da
   };
 }
 
+/** 상세 이용 표 탭 — 화면별 · 계정별 · 카테고리별 · 일별(월별) */
+type UsageTab = 'views' | 'accounts' | 'categories' | 'daily';
+
 type Loaded = { cur: UsageStats; prev: UsageStats | null } | { error: string; setupNeeded: boolean } | null;
 
 interface UsageViewProps {
@@ -131,6 +135,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   const [loaded, setLoaded] = useState<Loaded>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<UsageTab>('views');
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -219,6 +224,18 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
         ].concat(kinds.unknown > 0 ? [['미수집', `${fmt(kinds.unknown)}대`]] : [])
       : [];
 
+    // 표는 탭으로 나눠 하나씩 보여 준다 — 계정별은 기록 함수가 있을 때만
+    const tabs: { id: UsageTab; label: string; count?: number; sort: string }[] = [
+      { id: 'views', label: '화면별', count: cur.views.length, sort: '페이지뷰 많은 순' },
+      ...(cur.accounts !== null
+        ? [{ id: 'accounts' as const, label: '계정별', count: Array.isArray(cur.accounts) ? cur.accounts.length : undefined, sort: '페이지뷰 많은 순' }]
+        : []),
+      { id: 'categories', label: '카테고리별', count: cur.categoryGroups.length, sort: '많이 고른 순' },
+      { id: 'daily', label: monthly ? '월별' : '일별', sort: '최근부터' },
+    ];
+    const activeTab: UsageTab = tabs.some((t) => t.id === tab) ? tab : 'views';
+    const tabInfo = tabs.find((t) => t.id === activeTab)!;
+
     body = (
       <>
         <KpiSection id="usage-kpis">
@@ -272,215 +289,219 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           emptyMessage="이 기간에 기록된 방문이 없습니다"
         />
 
-        <Card name="usage-views" id="usage-views" tableWrap title="화면별 이용" subtitle={`(${label} · 페이지뷰 많은 순)`}>
-          {cur.views.length ? (
-            <table className="stk usage-table">
-              <colgroup>
-                <col />
-                <col className="col-us-count" />
-                <col className="col-us-count" />
-                <col className="col-us-duration" />
-                <col className="col-us-duration" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <Th>화면</Th>
-                  <Th className="n" tip="방문|그 화면을 연 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
-                  <Th className="n">페이지뷰</Th>
-                  <Th className="n">총 체류시간</Th>
-                  <Th className="n" tip="평균 체류|총 체류시간 ÷ 페이지뷰">평균 체류</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {cur.views.map((v) => (
-                  <tr key={v.view}>
-                    <td>{viewTitle(v.view)}</td>
-                    <NumTd value={v.visits} unit="회" />
-                    <NumTd value={v.pageviews} unit="회" />
-                    <NumTd>{durationText(v.seconds)}</NumTd>
-                    <NumTd>{v.pageviews ? durationText(v.seconds / v.pageviews) : '–'}</NumTd>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <EmptyState message="이 기간에 기록된 화면 이용이 없습니다." />
+        <Card name="usage-detail" id="usage-detail" tableWrap title="상세 이용" subtitle={`(${label} · ${tabInfo.sort})`}>
+          <div className="kw-tabs">
+            {tabs.map((t) => (
+              <TabButton key={t.id} className="btn-usage-tab" data-btn={`usage-tab-${t.id}`} active={activeTab === t.id} label={t.label} count={t.count} onClick={() => setTab(t.id)} />
+            ))}
+          </div>
+          {activeTab === 'views' && (
+            <>
+              {cur.views.length ? (
+                <table className="stk usage-table">
+                  <colgroup>
+                    <col />
+                    <col className="col-us-count" />
+                    <col className="col-us-count" />
+                    <col className="col-us-duration" />
+                    <col className="col-us-duration" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <Th>화면</Th>
+                      <Th className="n" tip="방문|그 화면을 연 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
+                      <Th className="n">페이지뷰</Th>
+                      <Th className="n">총 체류시간</Th>
+                      <Th className="n" tip="평균 체류|총 체류시간 ÷ 페이지뷰">평균 체류</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cur.views.map((v) => (
+                      <tr key={v.view}>
+                        <td>{viewTitle(v.view)}</td>
+                        <NumTd value={v.visits} unit="회" />
+                        <NumTd value={v.pageviews} unit="회" />
+                        <NumTd>{durationText(v.seconds)}</NumTd>
+                        <NumTd>{v.pageviews ? durationText(v.seconds / v.pageviews) : '–'}</NumTd>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState message="이 기간에 기록된 화면 이용이 없습니다." />
+              )}
+            </>
           )}
-        </Card>
-
-        {cur.accounts !== null && (
-          <Card
-            name="usage-accounts"
-            id="usage-accounts"
-            tableWrap
-            title="계정별 이용"
-            subtitle={`(${label}${Array.isArray(cur.accounts) && cur.accounts.length ? ` · ${cur.accounts.length}개 계정` : ''} · 페이지뷰 많은 순)`}
-          >
-            {cur.accounts === 'setup' ? (
-              <Notice tone="warn">
-                계정별 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
-              </Notice>
-            ) : cur.accounts.length ? (
+          {activeTab === 'accounts' && cur.accounts !== null && (
+            <>
+              {cur.accounts === 'setup' ? (
+                <Notice tone="warn">
+                  계정별 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
+                </Notice>
+              ) : cur.accounts.length ? (
+                <table className="stk usage-table">
+                  <colgroup>
+                    <col />
+                    <col className="col-us-count" />
+                    <col className="col-us-count" />
+                    <col className="col-us-duration" />
+                    <col className="col-us-date" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <Th>계정</Th>
+                      <Th className="n" tip="이용한 날|그 계정으로 로그인해 화면을 연 날 수 (펼친 줄은 그 화면을 연 날 수)">이용한 날</Th>
+                      <Th className="n">페이지뷰</Th>
+                      <Th className="n">총 체류시간</Th>
+                      <Th className="n" tip="마지막 접속|그 계정의 마지막 기록 시각 (한국 시간)">마지막 접속</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cur.accounts.map((a) => {
+                      const isOpen = openAccounts.has(a.userId);
+                      return (
+                        <React.Fragment key={a.userId}>
+                          <TreeParentRow
+                            label={a.name || a.email.split('@')[0] || '(알 수 없음)'}
+                            sub={[[a.company, a.team].filter(Boolean).join(' '), a.email].filter(Boolean).join(' · ')}
+                            childCount={a.views.length}
+                            showCount={false}
+                            open={isOpen}
+                            onToggle={() => setOpenAccounts((prev) => toggledSet(prev, a.userId))}
+                          >
+                            <NumTd value={a.days} unit="일" />
+                            <NumTd value={a.pageviews} unit="회" bold />
+                            <NumTd>{durationText(a.seconds)}</NumTd>
+                            <NumTd>{lastAtText(a.lastAt)}</NumTd>
+                          </TreeParentRow>
+                          {isOpen &&
+                            a.views.map((v) => (
+                              <TreeChildRow key={v.view} label={viewTitle(v.view)}>
+                                <NumTd value={v.days} unit="일" />
+                                <NumTd value={v.pageviews} unit="회" />
+                                <NumTd>{durationText(v.seconds)}</NumTd>
+                                <NumTd value={null} />
+                              </TreeChildRow>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState
+                  message="이 기간에 로그인해서 이용한 기록이 없습니다."
+                  subMessage={cur.accountSince ? `계정별 기록은 ${cur.accountSince.replace(/-/g, '.')} 부터 쌓였습니다.` : '계정별 기록은 배포 후부터 쌓입니다.'}
+                />
+              )}
+            </>
+          )}
+          {activeTab === 'categories' && (
+            <>
+              {cur.categories === null ? (
+                <Notice tone="warn">
+                  카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 기록이 쌓입니다.
+                </Notice>
+              ) : cur.categoryGroups.length ? (
+                <table className="stk usage-table">
+                  <colgroup>
+                    <col />
+                    <col className="col-us-count" />
+                    <col className="col-us-count" />
+                    <col className="col-us-duration" />
+                    <col className="col-us-duration" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <Th>카테고리</Th>
+                      <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
+                      <Th className="n" tip="선택|카테고리 필터(카테고리 효율·키워드·견적 목록)로 고르거나, 표에서 카테고리 줄을 펼치거나, 카테고리로 검색한 횟수">선택</Th>
+                      <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침·카테고리 검색은 시간을 세지 않음)">필터 체류</Th>
+                      <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cur.categoryGroups.map((g) => {
+                      const children = cur.categories!.filter((c) => c.category === g.category || c.category.startsWith(`${g.category} > `));
+                      const hasChildren = children.some((c) => c.category !== g.category);
+                      const isOpen = openCats.has(g.category);
+                      return (
+                        <React.Fragment key={g.category}>
+                          <TreeParentRow
+                            label={g.category}
+                            sub={g.views.map(viewTitle).join(' · ')}
+                            childCount={hasChildren ? children.length : 0}
+                            open={isOpen}
+                            onToggle={() => setOpenCats((prev) => toggledSet(prev, g.category))}
+                          >
+                            <NumTd value={g.visits} unit="회" />
+                            <NumTd value={g.picks} unit="회" bold />
+                            <NumTd>{durationText(g.seconds)}</NumTd>
+                            <NumTd>{g.picks && g.seconds ? durationText(g.seconds / g.picks) : '–'}</NumTd>
+                          </TreeParentRow>
+                          {hasChildren &&
+                            isOpen &&
+                            children.map((c) => (
+                              <TreeChildRow key={c.category} label={c.category === g.category ? '1차 전체' : childLabelOf(c.category, g.category)}>
+                                <NumTd value={c.visits} unit="회" />
+                                <NumTd value={c.picks} unit="회" />
+                                <NumTd>{durationText(c.seconds)}</NumTd>
+                                <NumTd>{c.picks && c.seconds ? durationText(c.seconds / c.picks) : '–'}</NumTd>
+                              </TreeChildRow>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <EmptyState
+                  message="이 기간에 카테고리를 고른 기록이 없습니다."
+                  subMessage={`카테고리 효율·키워드·견적 목록의 카테고리 필터, 카테고리 효율 표의 줄 펼침, 카테고리로 연 검색(검색창 카테고리 필터·종합 요약 카테고리 이름·카테고리 이름 입력)을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
+                />
+              )}
+            </>
+          )}
+          {activeTab === 'daily' && (
+            <>
               <table className="stk usage-table">
                 <colgroup>
                   <col />
                   <col className="col-us-count" />
                   <col className="col-us-count" />
                   <col className="col-us-duration" />
-                  <col className="col-us-date" />
+                  <col className="col-us-duration" />
                 </colgroup>
                 <thead>
                   <tr>
-                    <Th>계정</Th>
-                    <Th className="n" tip="이용한 날|그 계정으로 로그인해 화면을 연 날 수 (펼친 줄은 그 화면을 연 날 수)">이용한 날</Th>
+                    <Th>{monthly ? '월' : '날짜'}</Th>
+                    <Th className="n" tip="방문|그날 접속한 기기 수 (같은 기기는 하루 1회, 월은 날마다 더한 값)">방문</Th>
                     <Th className="n">페이지뷰</Th>
-                    <Th className="n">총 체류시간</Th>
-                    <Th className="n" tip="마지막 접속|그 계정의 마지막 기록 시각 (한국 시간)">마지막 접속</Th>
+                    <Th className="n">체류시간</Th>
+                    <Th className="n" tip="방문당 체류|체류시간 ÷ 방문">방문당 체류</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cur.accounts.map((a) => {
-                    const isOpen = openAccounts.has(a.userId);
-                    return (
-                      <React.Fragment key={a.userId}>
-                        <TreeParentRow
-                          label={a.name || a.email.split('@')[0] || '(알 수 없음)'}
-                          sub={[[a.company, a.team].filter(Boolean).join(' '), a.email].filter(Boolean).join(' · ')}
-                          childCount={a.views.length}
-                          showCount={false}
-                          open={isOpen}
-                          onToggle={() => setOpenAccounts((prev) => toggledSet(prev, a.userId))}
-                        >
-                          <NumTd value={a.days} unit="일" />
-                          <NumTd value={a.pageviews} unit="회" bold />
-                          <NumTd>{durationText(a.seconds)}</NumTd>
-                          <NumTd>{lastAtText(a.lastAt)}</NumTd>
-                        </TreeParentRow>
-                        {isOpen &&
-                          a.views.map((v) => (
-                            <TreeChildRow key={v.view} label={viewTitle(v.view)}>
-                              <NumTd value={v.days} unit="일" />
-                              <NumTd value={v.pageviews} unit="회" />
-                              <NumTd>{durationText(v.seconds)}</NumTd>
-                              <NumTd value={null} />
-                            </TreeChildRow>
-                          ))}
-                      </React.Fragment>
-                    );
-                  })}
+                  {buckets.length === 0 && (
+                    <tr>
+                      <td colSpan={5}>
+                        <EmptyState message="이 기간에 기록된 방문이 없습니다." />
+                      </td>
+                    </tr>
+                  )}
+                  {[...buckets].reverse().map((d) => (
+                    <tr key={d.date}>
+                      <td>{monthly ? monthText(d.date) : dayWithWeekday(d.date)}</td>
+                      <NumTd value={d.visits || null} unit="회" />
+                      <NumTd value={d.pageviews || null} unit="회" />
+                      <NumTd>{durationText(d.seconds)}</NumTd>
+                      <NumTd>{d.visits ? durationText(d.seconds / d.visits) : '–'}</NumTd>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            ) : (
-              <EmptyState
-                message="이 기간에 로그인해서 이용한 기록이 없습니다."
-                subMessage={cur.accountSince ? `계정별 기록은 ${cur.accountSince.replace(/-/g, '.')} 부터 쌓였습니다.` : '계정별 기록은 배포 후부터 쌓입니다.'}
-              />
-            )}
-          </Card>
-        )}
-
-        <Card name="usage-categories" id="usage-categories" tableWrap title="카테고리별 이용" subtitle={`(${label} · 많이 고른 순)`}>
-          {cur.categories === null ? (
-            <Notice tone="warn">
-              카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 기록이 쌓입니다.
-            </Notice>
-          ) : cur.categoryGroups.length ? (
-            <table className="stk usage-table">
-              <colgroup>
-                <col />
-                <col className="col-us-count" />
-                <col className="col-us-count" />
-                <col className="col-us-duration" />
-                <col className="col-us-duration" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <Th>카테고리</Th>
-                  <Th className="n" tip="방문|그 카테고리를 고른 기기 수를 날마다 더한 값 (같은 기기는 하루 1회)">방문</Th>
-                  <Th className="n" tip="선택|카테고리 필터(카테고리 효율·키워드·견적 목록)로 고르거나, 표에서 카테고리 줄을 펼치거나, 카테고리로 검색한 횟수">선택</Th>
-                  <Th className="n" tip="필터 체류|카테고리 필터를 그 카테고리로 둔 채 실제로 본 시간 (줄 펼침·카테고리 검색은 시간을 세지 않음)">필터 체류</Th>
-                  <Th className="n" tip="선택당 체류|필터 체류 ÷ 선택">선택당 체류</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {cur.categoryGroups.map((g) => {
-                  const children = cur.categories!.filter((c) => c.category === g.category || c.category.startsWith(`${g.category} > `));
-                  const hasChildren = children.some((c) => c.category !== g.category);
-                  const isOpen = openCats.has(g.category);
-                  return (
-                    <React.Fragment key={g.category}>
-                      <TreeParentRow
-                        label={g.category}
-                        sub={g.views.map(viewTitle).join(' · ')}
-                        childCount={hasChildren ? children.length : 0}
-                        open={isOpen}
-                        onToggle={() => setOpenCats((prev) => toggledSet(prev, g.category))}
-                      >
-                        <NumTd value={g.visits} unit="회" />
-                        <NumTd value={g.picks} unit="회" bold />
-                        <NumTd>{durationText(g.seconds)}</NumTd>
-                        <NumTd>{g.picks && g.seconds ? durationText(g.seconds / g.picks) : '–'}</NumTd>
-                      </TreeParentRow>
-                      {hasChildren &&
-                        isOpen &&
-                        children.map((c) => (
-                          <TreeChildRow key={c.category} label={c.category === g.category ? '1차 전체' : childLabelOf(c.category, g.category)}>
-                            <NumTd value={c.visits} unit="회" />
-                            <NumTd value={c.picks} unit="회" />
-                            <NumTd>{durationText(c.seconds)}</NumTd>
-                            <NumTd>{c.picks && c.seconds ? durationText(c.seconds / c.picks) : '–'}</NumTd>
-                          </TreeChildRow>
-                        ))}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <EmptyState
-              message="이 기간에 카테고리를 고른 기록이 없습니다."
-              subMessage={`카테고리 효율·키워드·견적 목록의 카테고리 필터, 카테고리 효율 표의 줄 펼침, 카테고리로 연 검색(검색창 카테고리 필터·종합 요약 카테고리 이름·카테고리 이름 입력)을 셉니다.${cur.categorySince ? '' : ' 카테고리 기록은 배포 후부터 쌓입니다.'}`}
-            />
+            </>
           )}
-        </Card>
-
-        <Card name="usage-daily" id="usage-daily" tableWrap title={monthly ? '월별 이용' : '일별 이용'} subtitle={`(${label} · 최근부터)`}>
-          <table className="stk usage-table">
-            <colgroup>
-              <col />
-              <col className="col-us-count" />
-              <col className="col-us-count" />
-              <col className="col-us-duration" />
-              <col className="col-us-duration" />
-            </colgroup>
-            <thead>
-              <tr>
-                <Th>{monthly ? '월' : '날짜'}</Th>
-                <Th className="n" tip="방문|그날 접속한 기기 수 (같은 기기는 하루 1회, 월은 날마다 더한 값)">방문</Th>
-                <Th className="n">페이지뷰</Th>
-                <Th className="n">체류시간</Th>
-                <Th className="n" tip="방문당 체류|체류시간 ÷ 방문">방문당 체류</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {buckets.length === 0 && (
-                <tr>
-                  <td colSpan={5}>
-                    <EmptyState message="이 기간에 기록된 방문이 없습니다." />
-                  </td>
-                </tr>
-              )}
-              {[...buckets].reverse().map((d) => (
-                <tr key={d.date}>
-                  <td>{monthly ? monthText(d.date) : dayWithWeekday(d.date)}</td>
-                  <NumTd value={d.visits || null} unit="회" />
-                  <NumTd value={d.pageviews || null} unit="회" />
-                  <NumTd>{durationText(d.seconds)}</NumTd>
-                  <NumTd>{d.visits ? durationText(d.seconds / d.visits) : '–'}</NumTd>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </Card>
       </>
     );
