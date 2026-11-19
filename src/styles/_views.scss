@@ -1308,6 +1308,34 @@ tr.kw-more-row td {
 // 계정 관리 화면 — 승인·거절·해제 버튼 칸
 .members-view {
   // 승인·거절·해제·삭제는 설정 버튼 메뉴(ActionMenu)로 — 다른 칸처럼 왼쪽에 맞춘다
+  // 계정 표 — 불러오기 전(자리표시)·후, 상태·등급이 바뀌어도 열 너비가 그대로이게 고정한다
+  // 소속·이메일은 너비를 주지 않아 남는 폭을 나눠 쓴다
+  .member-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 60rem;
+    // 이름·소속·이메일만 넘치면 말줄임 — 등급·관리 칸은 펼침 메뉴가 잘리지 않게 두지 않는다
+    td:nth-child(-n + 3) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .col-mem-name {
+      width: 7rem;
+    }
+    .col-mem-status {
+      width: 6rem;
+    }
+    .col-mem-role {
+      width: 7.5rem;
+    }
+    .col-mem-date {
+      width: var(--col-datetime);
+    }
+    .col-mem-actions {
+      width: 4.5rem;
+    }
+  }
   .member-actions {
     text-align: left;
     white-space: nowrap;

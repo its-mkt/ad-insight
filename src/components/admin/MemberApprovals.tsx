@@ -52,17 +52,17 @@ export const MemberApprovals: React.FC = () => {
           이메일 인증번호로 이메일 주인은 확인됐습니다. 승인 전에 요청자가 열람해도 되는 사람인지 팀즈·전화로 확인해 주세요. 확인되지 않으면 거절합니다.
         </Notice>
       )}
-      <table className="stk">
+      <table className="stk member-table">
         <thead>
           <tr>
-            <Th>이름</Th>
+            <Th className="col-mem-name">이름</Th>
             <Th>소속</Th>
             <Th>이메일</Th>
-            <Th>상태</Th>
-            <Th tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
-            <Th>요청</Th>
-            <Th>처리</Th>
-            <Th>관리</Th>
+            <Th className="col-mem-status">상태</Th>
+            <Th className="col-mem-role" tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
+            <Th className="col-mem-date">요청</Th>
+            <Th className="col-mem-date">처리</Th>
+            <Th className="col-mem-actions">관리</Th>
           </tr>
         </thead>
         <tbody>
