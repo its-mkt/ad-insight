@@ -16,6 +16,12 @@ const PENDING_POLL_MS = 30 * 1000;
 
 type GateTab = 'login' | 'signup';
 
+/**
+ * 비밀번호 재설정 안내 메일의 바로가기(?reset=1)로 들어왔는지 — 앱이 주소를 정리하기 전에 처음 한 번만 읽는다.
+ * 로그인 전이면 로그인 창을 '비밀번호 찾기'로 열어 둔다
+ */
+const OPENED_FROM_RESET_LINK = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('reset') === '1';
+
 interface GateCardProps {
   icon: React.ReactNode;
   title: string;
@@ -198,7 +204,9 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const { loading, isSignedIn, role, canView, refreshRole, signupInProgress } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
   // 회원가입에서 이미 가입된 이메일로 넘어왔을 때 로그인 폼에 미리 채울 값 (바뀔 때마다 폼을 새로 그린다)
-  const [loginPreset, setLoginPreset] = useState<{ email: string; reset: boolean; seq: number } | null>(null);
+  const [loginPreset, setLoginPreset] = useState<{ email: string; reset: boolean; seq: number } | null>(() =>
+    OPENED_FROM_RESET_LINK ? { email: '', reset: true, seq: 0 } : null
+  );
 
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
@@ -214,7 +222,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview app={children} keepOpen={signingUp}>
+      <GuestPreview app={children} keepOpen={signingUp} initialOpen={OPENED_FROM_RESET_LINK}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
           title={tab === 'login' && !signingUp ? '로그인하면 확인할 수 있습니다' : '회원가입 및 열람 요청'}

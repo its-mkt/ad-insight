@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
+import { KeyRound, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -10,7 +10,7 @@ import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { useAuth } from '../../context/AuthContext';
-import { decideMember, deleteMember, loadMembers, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
+import { decideMember, deleteMember, loadMembers, sendPasswordGuide, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
 
 const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> = {
   pending: { label: '승인 대기', level: 'warn' },
@@ -106,6 +106,7 @@ export const MemberApprovals: React.FC = () => {
                     const items: ActionMenuItem[] = [];
                     if (canDecide && r.status !== 'approved') items.push({ key: 'approve', label: '승인', icon: UserCheck, onSelect: () => decide(r.email, 'approved') });
                     if (canDecide && r.status === 'pending') items.push({ key: 'reject', label: '거절', icon: UserX, onSelect: () => decide(r.email, 'rejected') });
+                    if (canDecide && r.status === 'approved') items.push({ key: 'password', label: '비밀번호 재설정 안내 보내기', icon: KeyRound, onSelect: () => void sendPasswordGuide(r.email) });
                     if (canDecide && r.status === 'approved') items.push({ key: 'revoke', label: '열람 권한 해제', icon: UserMinus, onSelect: () => decide(r.email, 'revoked') });
                     if (isSuperAdmin)
                       items.push({ key: 'delete', label: '삭제', icon: Trash2, danger: true, confirmLabel: '한 번 더 누르면 삭제', onSelect: () => void deleteMember(r.email) });

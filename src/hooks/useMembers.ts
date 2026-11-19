@@ -107,6 +107,24 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
  * 이용자 삭제 (해제와 별도) — 명단에서 지우고, 웹앱에 Supabase 관리자 키가 있으면 로그인 계정도 지운다.
  * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
  */
+/** 비밀번호 재설정 안내 메일을 보낸다 — 비밀번호는 보거나 바꾸지 않고, 본인이 '비밀번호 찾기'에서 새로 정한다 */
+export async function sendPasswordGuide(email: string): Promise<void> {
+  const who = whoOf(email);
+  setState({ busy: email });
+  const res = await postAuthedAction('sendPasswordGuide', { email });
+  setState({ busy: '' });
+  if (!res.error) {
+    showToast(`${who}에게 비밀번호 재설정 안내 메일을 보냈습니다.`);
+    return;
+  }
+  const text: Record<string, string> = {
+    too_many: '같은 계정에는 한 시간에 3번까지 보낼 수 있습니다. 잠시 뒤 다시 시도해 주세요.',
+    not_approved: '승인된 계정에만 보낼 수 있습니다.',
+    forbidden: '이 계정에 보낼 권한이 없습니다. 관리자 계정은 최고 관리자만 보낼 수 있습니다.',
+  };
+  showToast(text[res.error] || '안내 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
+}
+
 export async function deleteMember(email: string): Promise<void> {
   const who = whoOf(email);
   setState({ busy: email });

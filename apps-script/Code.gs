@@ -1710,6 +1710,49 @@ function setMemberRole_(accessToken, email, role) {
     return { success: true, email, role, usage: syncUsageAdmin_(email, role === 'manager') };
   } finally { lock.releaseLock(); }
 }
+/** 비밀번호 재설정 안내 메일의 바로가기 — 접속하면 로그인 창이 '비밀번호 찾기'로 열린다 */
+const PASSWORD_GUIDE_URL_ = 'https://its.itket.com/ad-insight/itket/summary?reset=1';
+/**
+ * 최고 관리자·관리자 — 승인된 계정에 비밀번호 재설정 안내 메일을 보낸다 (계정 관리 설정 메뉴).
+ * 비밀번호는 보거나 바꾸지 않는다 — 본인이 '비밀번호 찾기'에서 메일 인증번호로 새로 정한다.
+ * 관리자는 일반 계정만 (다른 관리자·자기 자신은 최고 관리자만). 한 계정에 한 시간 3번까지
+ */
+function sendPasswordGuide_(accessToken, email) {
+  const acc = accessOf_(accessToken);
+  if (!isStaffRole_(acc.role)) return { error: 'forbidden' };
+  email = String(email || '').trim().toLowerCase();
+  const m = memberRows_(authSheet_()).find((r) => r.email === email);
+  if (!m) return { error: 'not_found' };
+  if (acc.role !== 'admin' && (m.role === 'manager' || email === acc.email)) return { error: 'forbidden' };
+  if (m.status !== 'approved') return { error: 'not_approved' };
+  const cache = CacheService.getScriptCache(), hk = 'pwg:' + email + ':' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMddHH');
+  const n = Number(cache.get(hk) || 0);
+  if (n >= 3) return { error: 'too_many' };
+  cache.put(hk, String(n + 1), 3600);
+  const who = m.name ? m.name + ' 님' : email;
+  const body = [
+    who + ', 안녕하세요.',
+    '',
+    '광고 인사이트 관리자가 비밀번호 재설정 방법을 보내 드립니다.',
+    '아래 주소로 접속하면 로그인 창이 '비밀번호 찾기'로 열립니다.',
+    '',
+    PASSWORD_GUIDE_URL_,
+    '',
+    '1. 가입한 이메일(' + email + ')을 넣고 인증번호를 받습니다.',
+    '2. 메일로 온 6자리 인증번호와 새 비밀번호를 넣으면 바로 로그인됩니다.',
+    '',
+    '이미 로그인돼 있다면 오른쪽 위 프로필 → 내 계정 설정에서 바꿀 수 있습니다.',
+    '관리자는 비밀번호를 알 수 없으며, 요청하지 않으셨다면 이 메일은 무시하셔도 됩니다.',
+  ].join('
+');
+  try {
+    GmailApp.sendEmail(email, '[광고 인사이트] 비밀번호 재설정 안내', body);
+  } catch (err) {
+    console.warn('비밀번호 안내 메일 실패: ' + err.message);
+    return { error: 'mail_failed' };
+  }
+  return { success: true, email };
+}
 /** Supabase 관리자 키(SUPABASE_SERVICE_KEY) 요청 머리글 — 새 형식 비밀 키(sb_secret_…)는 apikey 만 (게이트웨이가 토큰을 만든다), 예전 service_role(JWT)는 Bearer 도 함께 */
 function supabaseServiceHeaders_(key) {
   return /^sb_/.test(key) ? { apikey: key } : { apikey: key, Authorization: 'Bearer ' + key };
@@ -1867,6 +1910,7 @@ function memberPost_(e) {
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
   if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));
   if (data.action === 'setMemberRole') return json_(setMemberRole_(data.access_token, data.email, data.role));
+  if (data.action === 'sendPasswordGuide') return json_(sendPasswordGuide_(data.access_token, data.email));
   return null;
 }
 function doPostBody_(e) {
