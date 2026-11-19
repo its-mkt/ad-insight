@@ -3,6 +3,7 @@ import { Check, TriangleAlert, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
+import { readJSON, writeJSON } from '../../utils/storage';
 
 /** 인증번호를 다시 보낼 수 있을 때까지 기다리는 초 (Supabase 기본 제한과 같다) */
 const RESEND_SEC = 60;
@@ -18,20 +19,11 @@ export const GateError: React.FC<{ message: string }> = ({ message }) => (
 /** 이 브라우저에서 지난번 로그인한 이메일 (편의용 — 읽지 못해도 빈 칸으로 시작한다) */
 const LOGIN_PREF_KEY = 'adi_login_pref';
 const readLastEmail = (): string => {
-  try {
-    const v = JSON.parse(localStorage.getItem(LOGIN_PREF_KEY) || '{}');
-    return typeof v.email === 'string' ? v.email : '';
-  } catch {
-    return '';
-  }
+  const v = readJSON<{ email?: unknown } | null>(LOGIN_PREF_KEY, {});
+  return typeof v?.email === 'string' ? v.email : '';
 };
-const saveLastEmail = (email: string) => {
-  try {
-    localStorage.setItem(LOGIN_PREF_KEY, JSON.stringify({ email }));
-  } catch {
-    // 저장하지 못해도 로그인에는 영향 없다
-  }
-};
+// 저장하지 못해도 로그인에는 영향 없다
+const saveLastEmail = (email: string) => writeJSON(LOGIN_PREF_KEY, { email });
 
 interface EmailCodeFormProps {
   /** reset: 가입된 이메일로 인증한 뒤 새 비밀번호로 바꾸고 로그인 (회원가입은 SignupForm) */

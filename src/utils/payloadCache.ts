@@ -1,4 +1,5 @@
 import type { RawApiPayload, SiteId } from '../types/dashboard';
+import { removeKey } from './storage';
 
 /**
  * 마지막으로 받은 API 응답을 브라우저에 저장해 다음 방문 때 먼저 그린다.
@@ -63,11 +64,7 @@ export async function readCachedPayload(site: SiteId = 'itket'): Promise<RawApiP
 
 /** 저장해 둔 응답을 모두 지운다 — 로그아웃하거나 열람 권한이 없을 때 이전 사용자의 데이터가 남지 않게 */
 export async function clearCachedPayloads(): Promise<void> {
-  try {
-    localStorage.removeItem(LEGACY_KEY);
-  } catch {
-    // ignore
-  }
+  removeKey(LEGACY_KEY);
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {

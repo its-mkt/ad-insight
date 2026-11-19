@@ -6,7 +6,7 @@ import { SegmentedControl } from '../components/common/SegmentedControl';
 import { quoteDetailsPending } from '../utils/quoteStats';
 import { getCfg } from '../lib/webApp';
 import { useAuth } from '../context/AuthContext';
-import { currentAccessToken } from '../lib/access';
+import { currentAccessToken, postMemberAction } from '../lib/access';
 import { quoteKey } from '../utils/format';
 import { setUnsavedEdits } from '../utils/monthRollover';
 import type { DayRange } from '../utils/dayRange';
@@ -138,16 +138,17 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
     setSaving(true);
     setSaveMsg(null);
 
-    const { url, key } = getCfg();
+    const { key } = getCfg();
     const overrides = Array.from(pendingOverrides.entries()).map(([sno, category]) => ({ sno, category }));
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        // 웹앱이 관리자 로그인 토큰을 확인한 뒤에만 저장한다 (키는 화면 코드에 있어 누구나 볼 수 있다)
-        body: JSON.stringify({ key, access_token: await currentAccessToken(), action: 'saveManualCategories', overrides, by: user?.email || user?.name || '' }),
+      // 웹앱이 관리자 로그인 토큰을 확인한 뒤에만 저장한다 (키는 화면 코드에 있어 누구나 볼 수 있다)
+      const json = await postMemberAction<{ success?: boolean; recalculated?: boolean }>({
+        key,
+        access_token: await currentAccessToken(),
+        action: 'saveManualCategories',
+        overrides,
+        by: user?.email || user?.name || '',
       });
-      const json = await res.json();
       if (json.success) {
         // recalculated 가 없으면 아직 이전 버전 웹앱이다 — 정기 수집 때 반영된다
         if (json.recalculated === true) {
@@ -176,8 +177,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
       } else {
         setSaveMsg({ text: json.error || '저장 실패', ok: false });
       }
-    } catch (err: any) {
-      setSaveMsg({ text: err.message || '네트워크 오류', ok: false });
+    } catch (err) {
+      setSaveMsg({ text: (err instanceof Error ? err.message : '') || '네트워크 오류', ok: false });
     }
     setSaving(false);
   };

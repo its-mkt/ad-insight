@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { currentAccessToken, postMemberAction } from '../lib/access';
+import { postAuthedAction } from '../lib/access';
 
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
 /** 승인된 계정의 등급 — member(일반) · manager(관리자). 최고 관리자는 명단(members 탭)이 아니라 admins 탭에 있다 */
@@ -52,9 +52,7 @@ export function loadMembers(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
     setState({ error: '' });
-    const res = await postMemberAction<{ members?: MemberRow[] }>({ action: 'listMembers', access_token: await currentAccessToken() }).catch(
-      () => ({ error: 'network' }) as { error: string; members?: MemberRow[] }
-    );
+    const res = await postAuthedAction<{ members?: MemberRow[] }>('listMembers');
     if (res.error || !res.members) setState({ error: '가입 요청 목록을 불러오지 못했습니다.', rows: state.rows ?? [] });
     else setState({ rows: [...res.members].sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.requested_at.localeCompare(a.requested_at)) });
   })().finally(() => {
@@ -66,7 +64,7 @@ export function loadMembers(): Promise<void> {
 /** 승인(approved)·거절(rejected)·해제(revoked) 후 명단을 다시 받는다 */
 export async function decideMember(email: string, status: Exclude<MemberStatus, 'pending'>): Promise<void> {
   setState({ busy: email });
-  const res = await postMemberAction({ action: 'decideMember', access_token: await currentAccessToken(), email, status }).catch(() => ({ error: 'network' }));
+  const res = await postAuthedAction('decideMember', { email, status });
   setState({ busy: '' });
   if (res.error) setState({ error: res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. (관리자 계정은 최고 관리자만 바꿀 수 있습니다)' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
   else await loadMembers();
@@ -75,9 +73,7 @@ export async function decideMember(email: string, status: Exclude<MemberStatus, 
 /** 등급 변경 (최고 관리자만) — 이용 현황의 계정별 조회 권한도 웹앱이 함께 맞춘다 */
 export async function setMemberRole(email: string, role: MemberRole): Promise<void> {
   setState({ busy: email, notice: '' });
-  const res = await postMemberAction<{ usage?: string }>({ action: 'setMemberRole', access_token: await currentAccessToken(), email, role }).catch(
-    () => ({ error: 'network' }) as { error: string; usage?: string }
-  );
+  const res = await postAuthedAction<{ usage?: string }>('setMemberRole', { email, role });
   setState({ busy: '' });
   if (res.error) {
     setState({ error: res.error === 'not_approved' ? '승인된 계정만 등급을 바꿀 수 있습니다.' : '등급을 바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
@@ -94,9 +90,7 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
  */
 export async function deleteMember(email: string): Promise<void> {
   setState({ busy: email, notice: '' });
-  const res = await postMemberAction<{ account?: string }>({ action: 'deleteMember', access_token: await currentAccessToken(), email }).catch(
-    () => ({ error: 'network' }) as { error: string; account?: string }
-  );
+  const res = await postAuthedAction<{ account?: string }>('deleteMember', { email });
   setState({ busy: '' });
   if (res.error) {
     setState({ error: res.error === 'admin_protected' ? '관리자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });

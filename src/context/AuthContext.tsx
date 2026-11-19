@@ -1,9 +1,25 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, isStaffRole, currentAccessToken, fetchAccessRole, postMemberAction, prefetchDashboardData } from '../lib/access';
+import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, isStaffRole, postAuthedAction, postMemberAction } from '../lib/access';
+import {
+  DEV_ACCOUNT_ERROR,
+  RATE_LIMITED_TEXT,
+  SAME_PASSWORD_TEXT,
+  affiliationText,
+  codeErrorText,
+  isRateLimited,
+  missingProfileText,
+  otpDigits,
+  otpLengthError,
+  passwordErrorText,
+  passwordLengthError,
+} from '../lib/authErrors';
+import { DEV_ADMIN_KEY, readDevSession, writeRoleCache } from '../lib/roleCache';
+import { useAccessRole } from '../hooks/useAccessRole';
 import { clearCachedPayloads } from '../utils/payloadCache';
 import { squareJpeg } from '../utils/image';
+import { readString, removeKey, writeJSON, writeString } from '../utils/storage';
 
 export interface AuthUser {
   id: string;
@@ -84,30 +100,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEV_ADMIN_KEY = 'adi_dev_admin_session';
 /** 회원가입 2단계 진행 중 표시 (sessionStorage) */
 const SIGNUP_STEP_KEY = 'adi_signup_step';
-
-/** 계정별 마지막 열람 권한 — 다음 접속 때 권한 확인(2~4초)을 기다리지 않고 바로 연다. 12시간 지나면 다시 기다린다 */
-const ROLE_CACHE_KEY = 'adi_access_role';
-const ROLE_CACHE_MS = 12 * 3600 * 1000;
-const readRoleCache = (uid: string): AccessRole | null => {
-  try {
-    const c = JSON.parse(localStorage.getItem(ROLE_CACHE_KEY) || 'null') as { uid: string; role: AccessRole; at: number } | null;
-    return c && c.uid === uid && Date.now() - c.at < ROLE_CACHE_MS && canViewRole(c.role) ? c.role : null;
-  } catch {
-    return null;
-  }
-};
-/** 볼 수 있는 권한만 기억한다 (승인 대기·거절·해제는 매번 확인) */
-const writeRoleCache = (uid: string, role: AccessRole | null) => {
-  try {
-    if (role && canViewRole(role)) localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, role, at: Date.now() }));
-    else localStorage.removeItem(ROLE_CACHE_KEY);
-  } catch {
-    // 저장 공간을 못 쓰면 매번 확인한다
-  }
-};
 
 // 아이디만 입력하면 이 도메인을 붙여 Supabase Auth 이메일로 사용 (예전 관리자 계정 호환)
 const LOGIN_EMAIL_DOMAIN = 'gmail.com';
@@ -132,87 +126,32 @@ const toAuthUser = (sessionUser: Session['user']): AuthUser => ({
 const AVATAR_BUCKET = 'avatars';
 const avatarPath = (uid: string) => `${uid}/avatar.jpg`;
 
-/** 명단(members 탭)·알림의 소속 칸 — 회사와 팀을 '회사 · 팀' 한 칸으로 적는다 (회사가 없으면 팀만) */
-const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
-
-/** 개발용 테스트 계정은 Supabase 계정이 없어 바꿀 수 없다 */
-const DEV_ACCOUNT_ERROR = '개발용 테스트 계정은 바꿀 수 없습니다. 실제 계정으로 로그인해 주세요.';
-
-/** 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열 */
-const missingProfileText = (name: string, company: string, team: string): string =>
-  !name.trim() || !company.trim() || !team.trim() ? '이름·회사·팀을 모두 입력해 주세요.' : '';
-
-/** 인증번호 보내기·확인 오류 → 화면 문구 */
-const codeErrorText = (message: string): string => {
-  if (/signups not allowed|user not found/i.test(message)) return '가입된 이메일이 아닙니다. 아래 "회원가입 및 열람 요청"을 먼저 해 주세요.';
-  if (/expired|invalid/i.test(message)) return '인증번호가 맞지 않거나 시간이 지났습니다. 다시 받아 주세요.';
-  if (/rate|too many|seconds/i.test(message)) return '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.';
-  return '처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
-};
-
-/** 비밀번호 정하기(updateUser) 오류 → 화면 문구 */
-const passwordErrorText = (message: string): string => {
-  if (/different from the old|same/i.test(message)) return '지금 쓰는 비밀번호와 다른 비밀번호로 정해 주세요.';
-  if (/weak|short|at least|characters/i.test(message)) return '비밀번호가 너무 쉽거나 짧습니다. 6자 이상으로 다시 정해 주세요.';
-  return '비밀번호를 정하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
-};
-
-// 개발 서버 전용 테스트 세션 (운영 빌드에서는 무시)
-const readDevSession = (): AuthUser | null => {
-  if (!import.meta.env.DEV) return null;
-  try {
-    const dev = localStorage.getItem(DEV_ADMIN_KEY);
-    return dev ? JSON.parse(dev) : null;
-  } catch {
-    return null;
-  }
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionLoading, setSessionLoading] = useState<boolean>(true);
-  const [role, setRole] = useState<AccessRole | null>(null);
-  const [roleLoading, setRoleLoading] = useState<boolean>(true);
   const [roleTick, setRoleTick] = useState(0);
   // 회원가입 도중 표시 — 2단계(정보 입력)에서 새로 고침해도 이어서 하도록 이 탭(sessionStorage)에 남긴다
-  const [signupInProgress, setSignupInProgressState] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(SIGNUP_STEP_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  const [signupInProgress, setSignupInProgressState] = useState<boolean>(() => readString(SIGNUP_STEP_KEY, 'session') === '1');
   const setSignupInProgress = useCallback((on: boolean) => {
     setSignupInProgressState(on);
-    try {
-      if (on) sessionStorage.setItem(SIGNUP_STEP_KEY, '1');
-      else sessionStorage.removeItem(SIGNUP_STEP_KEY);
-    } catch {
-      // 저장하지 못하면 새로 고침 때 승인 요청 화면으로 간다
-    }
+    // 저장하지 못하면 새로 고침 때 승인 요청 화면으로 간다
+    if (on) writeString(SIGNUP_STEP_KEY, '1', 'session');
+    else removeKey(SIGNUP_STEP_KEY, 'session');
   }, []);
   const refreshRole = useCallback(() => setRoleTick((n) => n + 1), []);
-  // 데이터 요청을 미리 보낸 계정 — 계정마다 첫 확인 때 한 번만 (승인 대기 화면의 30초 재확인마다 보내지 않게)
-  const prefetchedFor = useRef('');
 
   useEffect(() => {
     // 예전 방식(코드 내장 비밀번호)으로 운영에 남은 로컬 세션 제거
-    if (!import.meta.env.DEV) {
-      try {
-        localStorage.removeItem(DEV_ADMIN_KEY);
-      } catch {
-        // ignore
-      }
-    }
+    if (!import.meta.env.DEV) removeKey(DEV_ADMIN_KEY);
 
     // 1. Supabase Auth 세션 확인
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
-        setUser(session?.user ? toAuthUser(session.user) : readDevSession());
+        setUser(session?.user ? toAuthUser(session.user) : readDevSession<AuthUser>());
       })
       // 세션 확인이 실패해도 로딩에 멈춰 있지 않게 비로그인으로 넘긴다
-      .catch(() => setUser(readDevSession()))
+      .catch(() => setUser(readDevSession<AuthUser>()))
       .finally(() => setSessionLoading(false));
 
     // 2. Supabase Auth 상태 변화 리스너
@@ -221,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } = supabase.auth.onAuthStateChange((event, session) => {
       // 로그아웃·세션 만료면 남은 가입 도중 표시를 지운다 (비로그인에게 2단계 폼이 보이지 않게)
       if (event === 'SIGNED_OUT') setSignupInProgress(false);
-      setUser(session?.user ? toAuthUser(session.user) : readDevSession());
+      setUser(session?.user ? toAuthUser(session.user) : readDevSession<AuthUser>());
       setSessionLoading(false);
     });
 
@@ -233,52 +172,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [refreshRole, setSignupInProgress]);
 
-  // 3. 계정이 바뀌거나 다시 확인을 요청하면 열람 권한을 웹앱에 묻는다 (토큰 갱신처럼 계정이 그대로면 묻지 않는다).
-  //    웹앱 확인은 2~4초 걸리므로, 이 계정이 최근에 받은 권한이 있으면 그 권한으로 바로 화면을 열고 뒤에서 다시 확인한다.
-  //    데이터는 웹앱이 토큰으로 따로 막으므로 기억한 권한이 틀려도 데이터가 새지 않는다 (해제되면 다시 확인 후 잠김)
+  // 3. 계정이 바뀌거나 다시 확인을 요청하면 열람 권한을 웹앱에 묻는다 (기억한 권한이 있으면 바로 열고 뒤에서 다시 확인 — useAccessRole)
   const userKey = user ? `${user.id}|${user.isDevAdmin ? 'dev' : ''}` : '';
-  useEffect(() => {
-    if (sessionLoading) return;
-    let alive = true;
-    if (!userKey) {
-      setRole('guest');
-      setRoleLoading(false);
-      return;
-    }
-    if (userKey.endsWith('|dev')) {
-      setRole('admin');
-      setRoleLoading(false);
-      return;
-    }
-    const uid = userKey.split('|')[0];
-    const remembered = readRoleCache(uid);
-    if (remembered) {
-      setRole(remembered);
-      setRoleLoading(false);
-    } else setRoleLoading(true);
-    currentAccessToken()
-      .then((token) => {
-        // 기억한 권한이 없어 확인을 기다리는 동안 데이터 요청도 함께 출발시킨다 (확인 2~4초 + 데이터 5~7초가 겹치게)
-        if (!remembered && prefetchedFor.current !== uid) {
-          prefetchedFor.current = uid;
-          prefetchDashboardData(token);
-        }
-        return fetchAccessRole(token);
-      })
-      .then((next) => {
-        if (!alive) return;
-        // 만료된 로그인은 지우고 로그인 화면으로 (setTimeout: 인증 콜백 안에서 Supabase 를 다시 부르면 멈출 수 있다)
-        if (next === 'invalid') setTimeout(() => supabase.auth.signOut(), 0);
-        // 확인에 실패(null)했는데 기억한 권한이 있으면 그대로 둔다 — 웹앱 일시 장애로 잠기지 않게
-        if (next === null && remembered) return;
-        setRole(next);
-        writeRoleCache(uid, next);
-      })
-      .finally(() => alive && setRoleLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [sessionLoading, userKey, roleTick]);
+  const { role, roleLoading } = useAccessRole(sessionLoading, userKey, roleTick);
 
   // 볼 권한이 없으면 이 브라우저에 남은 지난 응답도 지운다
   const canView = canViewRole(role);
@@ -316,15 +212,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signInWithPassword({ email: toLoginEmail(loginId), password });
     if (error) {
       console.error('Login error:', error.message);
-      if (/rate|too many/i.test(error.message)) return { error: '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.' };
+      if (isRateLimited(error.message)) return { error: RATE_LIMITED_TEXT };
       return { error: '이메일 또는 비밀번호가 맞지 않습니다. 잊으셨으면 "비밀번호를 잊으셨나요?"에서 새로 정해 주세요.' };
     }
     return {};
   };
 
   const verifyEmailCode = async (email: string, code: string): Promise<{ error?: string }> => {
-    const token = code.replace(/\D/g, '');
-    if (token.length < 6) return { error: '메일로 받은 6자리 인증번호를 입력해 주세요.' };
+    const token = otpDigits(code);
+    const short = otpLengthError(token);
+    if (short) return { error: short };
     // 인증되면 곧바로 로그인 상태가 되므로, 그 전에 '가입 도중'으로 표시해 접속 화면이 가입 폼을 그대로 두게 한다
     setSignupInProgress(true);
     const { data, error } = await supabase.auth.verifyOtp({ email: toLoginEmail(email), token, type: 'email' });
@@ -340,7 +237,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const missing = missingProfileText(name, company, team);
     if (missing) return { error: missing };
     if (!password) return { error: '비밀번호를 입력해 주세요.' };
-    if (password.length < 6) return { error: '비밀번호는 6자 이상으로 정해 주세요.' };
+    const shortPw = passwordLengthError(password);
+    if (shortPw) return { error: shortPw };
     // 인증으로 로그인된 세션에 비밀번호·이름·소속을 정한다 — 다음부터 비밀번호로 로그인한다
     const pw = await supabase.auth.updateUser({ password, data: { name: name.trim(), company: company.trim(), team: team.trim() } });
     if (pw.error) {
@@ -348,8 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: passwordErrorText(pw.error.message) };
     }
     // 인증된 로그인 토큰으로 열람 승인을 요청한다 — 웹앱이 토큰의 이메일로 명단에 올린다
-    const token = await currentAccessToken();
-    const req = await postMemberAction({ action: 'requestAccess', access_token: token, email: pw.data.user?.email, name: name.trim(), team: affiliationText(company, team) }).catch(() => ({ error: 'network' }));
+    const req = await postAuthedAction('requestAccess', { email: pw.data.user?.email, name: name.trim(), team: affiliationText(company, team) });
     if (req.error) return { error: req.error === 'too_many' ? '요청이 많아 잠시 막혔습니다. 한 시간 뒤 다시 시도해 주세요.' : '열람 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     setSignupInProgress(false);
     refreshRole();
@@ -362,9 +259,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPasswordWithCode = async (email: string, code: string, newPassword: string): Promise<{ error?: string }> => {
-    const token = code.replace(/\D/g, '');
-    if (token.length < 6) return { error: '메일로 받은 6자리 인증번호를 입력해 주세요.' };
-    if (newPassword.length < 6) return { error: '새 비밀번호는 6자 이상으로 정해 주세요.' };
+    const token = otpDigits(code);
+    const invalid = otpLengthError(token) || passwordLengthError(newPassword, true);
+    if (invalid) return { error: invalid };
     const { data, error } = await supabase.auth.verifyOtp({ email: toLoginEmail(email), token, type: 'email' });
     if (error || !data.session) {
       console.error('Verify code error:', error?.message);
@@ -381,7 +278,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const requestAccess = async (name: string, company: string, team: string): Promise<{ error?: string }> => {
     const missing = missingProfileText(name, company, team);
     if (!user?.email || missing) return { error: missing || '로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.' };
-    const req = await postMemberAction({ action: 'requestAccess', access_token: await currentAccessToken(), email: user.email, name: name.trim(), team: affiliationText(company, team) }).catch(() => ({ error: 'network' }));
+    const req = await postAuthedAction('requestAccess', { email: user.email, name: name.trim(), team: affiliationText(company, team) });
     if (req.error) return { error: '승인 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     refreshRole();
     return {};
@@ -391,14 +288,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { error: '로그인이 필요합니다.' };
     if (user.isDevAdmin) return { error: DEV_ACCOUNT_ERROR };
     const next = { name: name.trim().slice(0, 40), company: company.trim().slice(0, 40), team: team.trim().slice(0, 40) };
-    if (!next.name || !next.company || !next.team) return { error: '이름·회사·팀을 모두 입력해 주세요.' };
+    const missing = missingProfileText(next.name, next.company, next.team);
+    if (missing) return { error: missing };
     const res = await supabase.auth.updateUser({ data: next });
     if (res.error) {
       console.error('Update profile error:', res.error.message);
       return { error: '저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
     }
     // 관리자가 보는 명단에도 같은 이름·소속을 적는다 — 실패해도 계정에는 저장돼 있다
-    const sync = await postMemberAction({ action: 'updateProfile', access_token: await currentAccessToken(), name: next.name, team: affiliationText(next.company, next.team) }).catch(() => ({ error: 'network' }));
+    const sync = await postAuthedAction('updateProfile', { name: next.name, team: affiliationText(next.company, next.team) });
     if (sync.error) {
       console.warn('Profile sync error:', sync.error);
       return { warning: '계정에는 저장됐지만 관리자 명단에는 아직 반영되지 않았습니다. 잠시 뒤 한 번 더 저장해 주세요.' };
@@ -410,13 +308,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user?.email) return { error: '로그인이 필요합니다.' };
     if (user.isDevAdmin) return { error: DEV_ACCOUNT_ERROR };
     if (!current) return { error: '현재 비밀번호를 입력해 주세요.' };
-    if (next.length < 6) return { error: '새 비밀번호는 6자 이상으로 정해 주세요.' };
-    if (current === next) return { error: '지금 쓰는 비밀번호와 다른 비밀번호로 정해 주세요.' };
+    const shortPw = passwordLengthError(next, true);
+    if (shortPw) return { error: shortPw };
+    if (current === next) return { error: SAME_PASSWORD_TEXT };
     // 자리를 비운 사이 남이 바꾸지 못하게 현재 비밀번호를 먼저 확인한다 (같은 계정으로 다시 로그인)
     const check = await supabase.auth.signInWithPassword({ email: user.email, password: current });
     if (check.error) {
       console.error('Check password error:', check.error.message);
-      if (/rate|too many/i.test(check.error.message)) return { error: '요청이 많아 잠시 막혔습니다. 1분 뒤 다시 시도해 주세요.' };
+      if (isRateLimited(check.error.message)) return { error: RATE_LIMITED_TEXT };
       return { error: '현재 비밀번호가 맞지 않습니다. 잊으셨으면 로그아웃한 뒤 "비밀번호를 잊으셨나요?"에서 새로 정해 주세요.' };
     }
     const pw = await supabase.auth.updateUser({ password: next });
@@ -463,21 +362,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: '관리자 (Admin)',
       isDevAdmin: true,
     };
-    try {
-      localStorage.setItem(DEV_ADMIN_KEY, JSON.stringify(devUser));
-    } catch {
-      // ignore
-    }
+    writeJSON(DEV_ADMIN_KEY, devUser);
     setUser(devUser);
   };
 
   const logout = async () => {
     setSignupInProgress(false);
-    try {
-      localStorage.removeItem(DEV_ADMIN_KEY);
-    } catch {
-      // ignore
-    }
+    removeKey(DEV_ADMIN_KEY);
     writeRoleCache('', null);
     await clearCachedPayloads();
     await supabase.auth.signOut();

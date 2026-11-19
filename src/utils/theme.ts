@@ -1,13 +1,11 @@
+import { readString, removeKey, writeString } from './storage';
+
 /** 처음 열 때 다크 모드 여부 — 저장한 테마가 있으면 그것, 없으면 시스템 설정 */
 export function getInitialDark(): boolean {
-  try {
-    const t = localStorage.getItem('theme');
-    if (t) {
-      document.documentElement.dataset.theme = t;
-      return t === 'dark';
-    }
-  } catch {
-    // ignore
+  const t = readString('theme');
+  if (t) {
+    document.documentElement.dataset.theme = t;
+    return t === 'dark';
   }
   const r = document.documentElement;
   return r.dataset.theme ? r.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
@@ -17,11 +15,7 @@ export function getInitialDark(): boolean {
 export function applyTheme(dark: boolean): void {
   const theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
-  try {
-    localStorage.setItem('theme', theme);
-  } catch {
-    // ignore
-  }
+  writeString('theme', theme);
 }
 
 /** 테마 고르기 — light·dark 는 저장해 고정, system 은 저장을 지우고 시스템 설정(다크 모드 여부)을 따른다 */
@@ -29,12 +23,8 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 /** 지금 고른 테마 — 저장한 값이 없으면 system */
 export function getThemeMode(): ThemeMode {
-  try {
-    const t = localStorage.getItem('theme');
-    if (t === 'light' || t === 'dark') return t;
-  } catch {
-    // ignore
-  }
+  const t = readString('theme');
+  if (t === 'light' || t === 'dark') return t;
   return 'system';
 }
 
@@ -45,10 +35,6 @@ export function applyThemeMode(mode: ThemeMode): boolean {
     return mode === 'dark';
   }
   delete document.documentElement.dataset.theme;
-  try {
-    localStorage.removeItem('theme');
-  } catch {
-    // ignore
-  }
+  removeKey('theme');
   return window.matchMedia('(prefers-color-scheme:dark)').matches;
 }

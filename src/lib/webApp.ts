@@ -1,4 +1,5 @@
 import type { SiteId } from '../types/dashboard';
+import { readJSON } from '../utils/storage';
 
 /** 아이티켓 수집기 웹앱(Apps Script) 주소 — 환경 변수·localStorage('adi_cfg')로 바꿀 수 있다 */
 export const DEFAULT_URL =
@@ -23,12 +24,7 @@ export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
   if (site !== 'itket') return SITE_SOURCES[site];
   const envUrl = import.meta.env?.VITE_ADI_URL;
   const envKey = import.meta.env?.VITE_ADI_KEY;
-  let s: { url?: string; key?: string } = {};
-  try {
-    s = JSON.parse(localStorage.getItem('adi_cfg') || '{}');
-  } catch {
-    // ignore
-  }
+  const s = readJSON<{ url?: string; key?: string }>('adi_cfg', {});
   const pick = (...vals: Array<unknown>) => {
     for (const v of vals) {
       if (v && String(v).trim()) return String(v).trim();
@@ -49,5 +45,8 @@ export function siteConnected(site: SiteId): boolean {
 /** 웹앱 주소에 조회 값을 붙인다 — 비밀키는 있을 때만 (새 웹앱은 데이터 조회에 키를 보지 않는다, 2026-11-19 보안 점검) */
 export const webAppUrl = (c: { url: string; key: string }, params: Record<string, string> = {}): string => {
   const q = new URLSearchParams(c.key ? { key: c.key, ...params } : params).toString();
-  return q ? `${c.url}${c.url.includes('?') ? '&' : '?'}${q}` : c.url;
+  return q ? appendQuery(c.url, q) : c.url;
 };
+
+/** 주소 뒤에 이미 인코딩된 조회 문자열('a=1&b=2')을 붙인다 — 주소에 '?' 가 있으면 '&' 로 잇는다 */
+export const appendQuery = (url: string, query: string): string => `${url}${url.includes('?') ? '&' : '?'}${query}`;
