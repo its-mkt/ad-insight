@@ -27,19 +27,19 @@ const MASK = '***';
 const maskDigits = (v: string): string =>
   v.replace(TOKEN, (m: string, at: number) => (/[-/]/.test(m) || /^\s*[년월일]/.test(v.slice(at + m.length)) ? m : MASK));
 
-/** 값 글자를 모자이크로 덮는 표시 — 이 속성이 붙은 요소에 _views.scss 가 픽셀 모자이크 필터(#pv-mosaic)를 건다 */
-const MOSAIC_ATTR = 'data-pv-mosaic';
+/** 값 글자를 덮는 표시 — 이 속성이 붙은 요소에 _views.scss 가 반투명 회색 막대를 덮는다 */
+const MASK_ATTR = 'data-pv-mask';
 
 /**
  * 값만 있는 짧은 글자인지 — ***·단위(원·건·회·개·만·억)·기호(% ▲▼ 괄호 등)를 빼면 글자가 두 자 이하일 때.
- * ***원 · ▲***% · ***만 (***%) 는 모자이크, '(11월 · ***건)'·안내 문장처럼 다른 말이 섞인 글자는 *** 만 둔다
+ * ***원 · ▲***% · ***만 (***%) 는 덮고, '(11월 · ***건)'·안내 문장처럼 다른 말이 섞인 글자는 *** 만 둔다
  */
 const isValueText = (text: string): boolean => text.replace(/\*+|[\s원건회개만억%.,()▲▼+\-·/:|~]/g, '').length <= 2;
 const MASK_ATTRS = ['title', 'aria-label', 'data-tip', 'data-tip-desc'];
 
 /**
- * 숫자 자리의 글자를 *** 로 바꾸고(개발자 도구에서도 숫자가 보이지 않게) 그 글자를 픽셀 모자이크로 덮는다(어느 정도 수치인지 감도 오지 않게).
- * 미리보기 숫자는 예시라 실제 값은 아니지만 실제 실적으로 오해하지 않게 한다 (2026-11-19 사용자 결정 — * 는 개발자 도구용, 모자이크는 크기 짐작 방지용).
+ * 숫자 자리의 글자를 *** 로 바꾸고(개발자 도구에서도 숫자가 보이지 않게) 그 글자를 반투명 막대로 덮는다(어느 정도 수치인지 감도 오지 않게).
+ * 미리보기 숫자는 예시라 실제 값은 아니지만 실제 실적으로 오해하지 않게 한다 (2026-11-19 사용자 결정 — * 는 개발자 도구용, 덮개는 크기 짐작 방지용. 픽셀 모자이크는 보기 싫다고 해 반투명 막대로).
  * React 가 값을 다시 그려도 바로 다시 가린다.
  */
 function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
@@ -62,9 +62,9 @@ function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
       if (!v || !parent?.closest(MASKED)) return;
       const masked = /\d/.test(v) ? maskDigits(v) : v;
       if (masked !== v) node.nodeValue = masked;
-      // 가린 값이 든 글자는 화면에서도 모자이크로 덮어 어느 정도 수치인지 감도 오지 않게 한다 (React 가 다루지 않는 속성이라 다시 그려도 남는다)
-      // 차트(SVG) 글자는 필터가 제대로 걸리지 않아 사라지므로 *** 만 둔다. 문장 속 숫자도 *** 만 — 값만 있는 짧은 글자에만 모자이크
-      if (masked.includes(MASK) && !(parent instanceof SVGElement) && isValueText(parent.textContent || '') && !parent.hasAttribute(MOSAIC_ATTR)) parent.setAttribute(MOSAIC_ATTR, '');
+      // 가린 값이 든 글자는 화면에서도 반투명 막대로 덮어 어느 정도 수치인지 감도 오지 않게 한다 (React 가 다루지 않는 속성이라 다시 그려도 남는다)
+      // 차트(SVG) 글자와 문장 속 숫자는 *** 만 둔다 — 값만 있는 짧은 글자만 덮는다
+      if (masked.includes(MASK) && !(parent instanceof SVGElement) && isValueText(parent.textContent || '') && !parent.hasAttribute(MASK_ATTR)) parent.setAttribute(MASK_ATTR, '');
     };
     const maskTree = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) return maskText(node);
@@ -118,20 +118,6 @@ export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = fals
       <div className="preview-mode" ref={rootRef}>
         {app}
       </div>
-      {/* 값 글자용 픽셀 모자이크 필터 — 글자를 번지게 한 뒤 진하게 하고, 6px 칸마다 가운데 한 점의 색으로 칸을 채운다 (가는 획이 사라지지 않게) */}
-      <svg className="pv-mosaic-defs" aria-hidden="true" focusable="false">
-        <filter id="pv-mosaic" x="-10%" y="-25%" width="120%" height="150%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="soft" />
-          <feComponentTransfer in="soft" result="solid">
-            <feFuncA type="linear" slope="4" />
-          </feComponentTransfer>
-          <feFlood x="3" y="3" width="1" height="1" />
-          <feComposite width="6" height="6" />
-          <feTile result="grid" />
-          <feComposite in="solid" in2="grid" operator="in" />
-          <feMorphology operator="dilate" radius="3" />
-        </filter>
-      </svg>
       {!(open || keepOpen) && (
         <div className="preview-lock">
           <button type="button" className="preview-badge" data-btn="preview-login" onClick={() => setOpen(true)}>

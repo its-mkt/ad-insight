@@ -1552,22 +1552,38 @@ tr.kw-more-row td {
   }
 }
 
-// 미리보기의 값 글자(*** 로 바꾼 자리)를 픽셀 모자이크로 덮는다 — 어느 정도 수치인지 감도 오지 않게 (GuestPreview 의 #pv-mosaic, 2026-11-19 사용자 결정)
-.preview-mode [data-pv-mosaic] {
-  filter: url('#pv-mosaic');
+// 미리보기의 값 글자(*** 로 바꾼 자리)를 반투명 회색 막대로 덮는다 — 어느 정도 수치인지 감도 오지 않게
+// (GuestPreview 의 data-pv-mask, 2026-11-19 사용자 결정: 픽셀 모자이크 대신 적당한 불투명도로만)
+.preview-mode [data-pv-mask] {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0.05em -0.12em;
+    background: var(--sub);
+    opacity: 0.32;
+    border-radius: 0.25rem;
+    pointer-events: none;
+  }
 }
 
-// 인라인 글자(<b>·<span> 등)에는 필터가 그려지지 않아 상자로 만든다 (표 칸·블록 요소는 그대로)
-.preview-mode :is(b, span, strong, small, em, i, a)[data-pv-mosaic] {
+// 막대가 글자 길이만큼만 덮이게 — 인라인 글자는 상자로, 블록(KPI 큰 값 등)은 글자 폭만큼
+.preview-mode :is(b, span, strong, small, em, i, a)[data-pv-mask] {
   display: inline-block;
 }
 
-// 모자이크 필터 정의만 담는 보이지 않는 svg
-.pv-mosaic-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+.preview-mode :is(div, p)[data-pv-mask] {
+  width: fit-content;
+  max-width: 100%;
+}
+
+// 표 숫자 칸은 칸 전체가 아니라 오른쪽 정렬된 글자 자리만 덮는다
+.preview-mode td[data-pv-mask]::after {
+  inset: 50% 0.5rem auto auto;
+  width: min(4.5rem, calc(100% - 1rem));
+  height: 1.1em;
+  transform: translateY(-50%);
 }
 
 // 미리보기 아래쪽 가운데에 띄우는 예시 데이터 표시 — 누르면 로그인·회원가입 창을 연다 (사이드바 오른쪽 본문 기준)
