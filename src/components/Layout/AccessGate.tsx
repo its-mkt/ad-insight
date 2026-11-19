@@ -289,7 +289,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
     <GateCard
       icon={<ShieldOff size="1.25rem" aria-hidden="true" />}
       title={role === 'none' ? '승인 요청이 필요합니다' : '열람 권한이 없습니다'}
-      desc={role === 'none' ? '이름과 소속을 적어 관리자에게 승인을 요청해 주세요.' : '관리자가 열람 권한을 승인하지 않았거나 해제했습니다. 필요하면 다시 요청해 주세요.'}
+      desc={role === 'none' ? '담당자와 소속을 적어 관리자에게 승인을 요청해 주세요.' : '관리자가 열람 권한을 승인하지 않았거나 해제했습니다. 필요하면 다시 요청해 주세요.'}
     >
       <RequestAgainForm />
       <GateActions />

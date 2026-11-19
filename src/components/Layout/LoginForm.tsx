@@ -125,7 +125,7 @@ export const ProfileFields: React.FC<ProfileFieldsProps> = ({ name, company, tea
   const cls = `gate-input${err ? ' err' : ''}`;
   return (
     <>
-      <TextInput className={cls} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => onName(e.target.value)} autoFocus={autoFocus} />
+      <TextInput className={cls} name="name" autoComplete="name" placeholder="담당자" value={name} onChange={(e) => onName(e.target.value)} autoFocus={autoFocus} />
       <TextInput className={cls} name="company" autoComplete="organization" placeholder="회사" value={company} onChange={(e) => onCompany(e.target.value)} />
       <TextInput className={cls} name="team" autoComplete="organization-title" placeholder="팀" value={team} onChange={(e) => onTeam(e.target.value)} />
     </>

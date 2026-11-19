@@ -234,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeSignup = async ({ name, company, team, password }: SignUpInfo): Promise<{ error?: string }> => {
-    const missing = missingProfileText(name, company, team);
+    const missing = missingProfileText(name, company, team, '담당자');
     if (missing) return { error: missing };
     if (!password) return { error: '비밀번호를 입력해 주세요.' };
     const shortPw = passwordLengthError(password);
@@ -276,7 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const requestAccess = async (name: string, company: string, team: string): Promise<{ error?: string }> => {
-    const missing = missingProfileText(name, company, team);
+    const missing = missingProfileText(name, company, team, '담당자');
     if (!user?.email || missing) return { error: missing || '로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.' };
     const req = await postAuthedAction('requestAccess', { email: user.email, name: name.trim(), team: affiliationText(company, team) });
     if (req.error) return { error: '승인 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };

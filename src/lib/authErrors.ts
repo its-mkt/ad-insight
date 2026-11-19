@@ -22,9 +22,12 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 /** 명단(members 탭)·알림의 소속 칸 — 회사와 팀을 '회사 · 팀' 한 칸으로 적는다 (회사가 없으면 팀만) */
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
-/** 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열 */
-export const missingProfileText = (name: string, company: string, team: string): string =>
-  !name.trim() || !company.trim() || !team.trim() ? '이름·회사·팀을 모두 입력해 주세요.' : '';
+/**
+ * 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열.
+ * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청은 '담당자', 내 계정 설정은 '이름' (2026-11-19 사용자 결정)
+ */
+export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
+  !name.trim() || !company.trim() || !team.trim() ? `${nameLabel}·회사·팀을 모두 입력해 주세요.` : '';
 
 /** 입력한 인증번호에서 숫자만 남긴다 */
 export const otpDigits = (code: string): string => code.replace(/\D/g, '');
