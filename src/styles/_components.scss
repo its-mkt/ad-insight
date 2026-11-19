@@ -2102,7 +2102,7 @@ td.future {
 
 .act-menu-pop {
   z-index: 40;
-  min-width: 9rem;
+  min-width: 6rem; // 글자 길이만큼만 — 짧은 메뉴(승인·삭제)는 좁게
   padding: 0.25rem;
   background: var(--card);
   border: 1px solid var(--line2);
