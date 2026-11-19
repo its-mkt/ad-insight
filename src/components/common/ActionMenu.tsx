@@ -27,13 +27,15 @@ interface ActionMenuProps {
   icon?: LucideIcon;
   /** 처리 중이라 누를 수 없을 때 */
   disabled?: boolean;
+  /** 메뉴를 버튼의 어느 끝에 맞출지 — start: 왼쪽 끝 · end: 오른쪽 끝(기본) */
+  align?: 'start' | 'end';
 }
 
 /**
  * 아이콘 버튼을 누르면 할 일 목록을 띄우는 메뉴 — 표 줄마다 버튼 여러 개를 늘어놓는 대신 쓴다.
  * 표 스크롤 영역에 잘리지 않게 화면 기준으로 띄우고(아래가 모자라면 위로), 바깥 클릭·Esc·스크롤에 닫는다
  */
-export const ActionMenu: React.FC<ActionMenuProps> = ({ items, ariaLabel, icon: Icon = Settings, disabled }) => {
+export const ActionMenu: React.FC<ActionMenuProps> = ({ items, ariaLabel, icon: Icon = Settings, disabled, align = 'end' }) => {
   const [open, setOpen] = useState(false);
   const [armed, setArmed] = useState('');
   const [style, setStyle] = useState<React.CSSProperties>();
@@ -47,7 +49,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, ariaLabel, icon: 
   };
   useDismiss(rootRef, open, close);
 
-  // 버튼 오른쪽 끝에 맞춰 아래로, 공간이 모자라면 위로 펼친다
+  // 버튼 한쪽 끝(align)에 맞춰 아래로, 공간이 모자라면 위로 펼친다
   useLayoutEffect(() => {
     if (!open || !btnRef.current || !menuRef.current) {
       setStyle(undefined);
@@ -61,11 +63,11 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, ariaLabel, icon: 
     const down = offsetHeight <= below || below >= b.top - GAP - MARGIN;
     setStyle({
       position: 'fixed',
-      left: Math.max(MARGIN, Math.min(b.right - offsetWidth, window.innerWidth - offsetWidth - MARGIN)),
+      left: Math.max(MARGIN, Math.min(align === 'start' ? b.left : b.right - offsetWidth, window.innerWidth - offsetWidth - MARGIN)),
       top: down ? b.bottom + GAP : 'auto',
       bottom: down ? 'auto' : window.innerHeight - b.top + GAP,
     });
-  }, [open]);
+  }, [open, align]);
 
   // 화면 기준으로 띄운 메뉴는 버튼을 따라가지 않으므로 바깥이 스크롤·크기 변경되면 닫는다
   useEffect(() => {

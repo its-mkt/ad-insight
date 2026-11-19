@@ -1307,9 +1307,9 @@ tr.kw-more-row td {
 // 가입 요청·열람 권한 카드 — 견적 관리 위에 둔다
 // 계정 관리 화면 — 승인·거절·해제 버튼 칸
 .members-view {
-  // 승인·거절·해제·삭제는 설정 버튼 메뉴(ActionMenu)로 — 칸은 버튼 하나만큼 오른쪽에 붙인다
+  // 승인·거절·해제·삭제는 설정 버튼 메뉴(ActionMenu)로 — 다른 칸처럼 왼쪽에 맞춘다
   .member-actions {
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
 }

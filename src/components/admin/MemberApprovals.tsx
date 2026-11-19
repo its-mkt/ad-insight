@@ -110,7 +110,7 @@ export const MemberApprovals: React.FC = () => {
                     if (isSuperAdmin)
                       items.push({ key: 'delete', label: '삭제', icon: Trash2, danger: true, confirmLabel: '한 번 더 누르면 삭제', onSelect: () => void deleteMember(r.email) });
                     return items.length ? (
-                      <ActionMenu items={items} ariaLabel={`${r.name || r.email} 관리`} disabled={busy === r.email} />
+                      <ActionMenu items={items} ariaLabel={`${r.name || r.email} 관리`} disabled={busy === r.email} align="start" />
                     ) : (
                       '–'
                     );

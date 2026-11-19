@@ -53,7 +53,7 @@
 | 월별 표 한 줄 / 월 머리글 | `MonthRow`, `MonthHeadCells` |
 | 빈 상태 | `EmptyState` (`message`, `subMessage`) — 표 안 한 줄이면 `EmptyRow` (`colSpan`, `common/TableRows`) |
 | 로딩 자리표시 | `SkelBar`, `SkelRows`, `SkelTable`, `SkeletonView` — 화면 안에서 값을 받는 동안은 KPI 칸 `SkelKpi` · 차트 카드 `SkelChartCard` · 막대 목록 `SkelList` (글자 "…"·"불러오는 중"·"수집 전"으로 대신하지 않는다) |
-| 표 줄 끝 설정(톱니) 버튼 + 할 일 메뉴 (승인·해제·삭제 등, 위험 항목은 두 번 눌러 실행) | `ActionMenu` (`items`, `ariaLabel`, `icon`, 항목 `danger`·`confirmLabel`) — 줄마다 버튼을 늘어놓지 않는다 |
+| 표 줄 끝 설정(톱니) 버튼 + 할 일 메뉴 (승인·해제·삭제 등, 위험 항목은 두 번 눌러 실행) | `ActionMenu` (`items`, `ariaLabel`, `icon`, `align`, 항목 `danger`·`confirmLabel`) — 줄마다 버튼을 늘어놓지 않는다 |
 | 알림 박스 | `Notice` |
 | 저장·승인 등 결과 알림 (헤더 아래 가운데, 성공은 3초 뒤 자동 닫힘) | `showToast(message, tone)` (`common/Toast`, 자리는 App 의 `ToastHost`) — 계속 보여야 하는 경고는 `Notice` |
 | 화면 위에 띄우는 창 (흐린 바탕·닫기·Esc) | `Modal` (`open`, `onClose`, `labelledBy`, `className`) — 로그인 창·내 계정 설정 |
