@@ -29,6 +29,7 @@ import { MembersView } from './views/MembersView';
 import { applyTheme, applyThemeMode, getInitialDark, getThemeMode, type ThemeMode } from './utils/theme';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
+import { ToastHost } from './components/common/Toast';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
 import { openPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
@@ -594,6 +595,8 @@ export const App: React.FC = () => {
       </div>
       <Tooltip />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+      {/* 저장·승인 결과 알림 (showToast) — 헤더 바로 아래 가운데 */}
+      <ToastHost />
       {searchOpen && (
         <SearchDialog
           data={data}
