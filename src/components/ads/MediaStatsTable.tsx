@@ -16,6 +16,7 @@ import { TabBar, TabButton } from '../common/TabButton';
 import { CardChartTableTabs, SegmentedControl, type ChartTableMode } from '../common/SegmentedControl';
 import { RowBarsChart, type RowBarsRow } from '../charts/RowBarsChart';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
+import { LIST_LIMIT, ShowMoreButton } from '../common/MoreButton';
 
 /** 광고 구분 — 키워드 검색광고(SA, 쇼핑검색 제외) · 네이버 쇼핑검색(SA) · 디스플레이(DA) */
 export type SaSegment = 'search' | 'shopping' | 'display';
@@ -327,6 +328,8 @@ interface MediaStatsTableProps {
   tabs?: React.ReactNode;
   /** 카드 제목 줄 오른쪽 끝에 놓을 것 (SA·DA 전환 등) */
   tools?: React.ReactNode;
+  /** 처음에 보여 줄 캠페인 수 — 넘으면 표 아래 '캠페인 더보기' (없으면 전부) */
+  limit?: number;
 }
 
 /** 매체 하나(또는 네이버 쇼핑검색)의 광고 성과 표 — 캠페인 줄을 누르면 광고그룹이 펼쳐진다 */
@@ -340,9 +343,11 @@ export const MediaStatsTable: React.FC<MediaStatsTableProps> = ({
   cardId,
   tabs,
   tools,
+  limit,
 }) => {
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('cost');
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
   const withDelta = !!prevRows;
   const label =
     segment === 'shopping' ? '네이버 쇼핑검색' : segment === 'display' ? `${MEDIA_KO[media]} 디스플레이(DA)` : `${MEDIA_KO[media]} 검색광고(SA)`;
@@ -444,7 +449,7 @@ export const MediaStatsTable: React.FC<MediaStatsTableProps> = ({
             />
           ) : (
             <>
-              {sortList(camps).map((c) => {
+              {sortList(camps).slice(0, showAll || !limit ? undefined : limit).map((c) => {
                 const isOpen = open.has(c.name);
                 return (
                   <React.Fragment key={c.name}>
@@ -476,6 +481,7 @@ export const MediaStatsTable: React.FC<MediaStatsTableProps> = ({
           )}
         </tbody>
       </table>
+      {!!limit && <ShowMoreButton noun="캠페인" total={camps.length} limit={limit} expanded={showAll} onToggle={() => setShowAll((v) => !v)} dataBtn={`${id}-more`} />}
       <TableFootnote
         unit="원·회"
         basis={`산출 근거: ${periodLabel} 실적(당월은 수집 시점까지${segment === 'search' && media === 'Naver' ? ', 쇼핑검색 제외' : ''}) · 비중 = 표 안 광고비 몫${withDelta ? ` · 증감 = ${cmpLabel} 대비` : ''}`}
@@ -539,6 +545,8 @@ export const MediaStatsTabs: React.FC<MediaStatsTabsProps> = (props) => {
       media={tab.media}
       segment={tab.segment}
       cardId="media-stats"
+      // 캠페인이 많으면 광고비 상위 10개만 보이고 '캠페인 더보기'로 펼친다 (탭을 바꾸면 key 가 바뀌어 다시 접힌다)
+      limit={LIST_LIMIT}
       tabs={
         <TabBar>
           {list.map((t) => (
