@@ -22,6 +22,12 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 /** 명단(members 탭)·알림의 소속 칸 — 회사와 팀을 '회사 · 팀' 한 칸으로 적는다 (회사가 없으면 팀만) */
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
+/** affiliationText 로 합친 소속을 회사·팀으로 다시 나눈다 — 구분점이 없는 옛 값은 팀으로만 본다 */
+export const splitAffiliation = (text: string): { company: string; team: string } => {
+  const i = text.indexOf(' · ');
+  return i < 0 ? { company: '', team: text.trim() } : { company: text.slice(0, i).trim(), team: text.slice(i + 3).trim() };
+};
+
 /**
  * 이름·회사·팀 중 빈 칸이 있거나 '.'·'-' 처럼 뜻 없는 값이면 안내 문구, 아니면 빈 문자열.
  * 흔히 쓰는 기호는 받되 실제 글자가 있어야 한다 (2026-11-19 사용자 결정 — 가입 때 귀찮아서 기호만 적는 것을 막는 목적).

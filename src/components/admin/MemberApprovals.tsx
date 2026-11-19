@@ -11,6 +11,7 @@ import { Notice } from '../common/Notice';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { useAuth } from '../../context/AuthContext';
+import { splitAffiliation } from '../../lib/authErrors';
 import { OwnerTransferModal } from './OwnerTransferModal';
 import { RoleChangeModal, type RoleChange } from './RoleChangeModal';
 import { decideMember, deleteMember, loadMembers, sendPasswordGuide, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
@@ -75,7 +76,8 @@ export const MemberApprovals: React.FC = () => {
         <thead>
           <tr>
             <Th className="col-mem-name">담당자</Th>
-            <Th className="col-mem-org">소속</Th>
+            <Th className="col-mem-company">회사</Th>
+            <Th className="col-mem-team">팀</Th>
             <Th className="col-mem-email">이메일</Th>
             <Th className="col-mem-status">상태</Th>
             <Th className="col-mem-role" tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
@@ -86,17 +88,20 @@ export const MemberApprovals: React.FC = () => {
         </thead>
         <tbody>
           {!rows ? (
-            <SkelRows rows={3} widths={['4rem', '6rem', '10rem', '4rem', '4rem', '6rem', '6rem', '1.5rem']} />
+            <SkelRows rows={3} widths={['4rem', '5rem', '4rem', '10rem', '4rem', '4rem', '6rem', '6rem', '1.5rem']} />
           ) : (
             rows.map((r) => {
               const role: MemberRole = r.role === 'manager' ? 'manager' : 'member';
               // 관리자는 다른 관리자·자기 자신을 바꾸지 못한다
               const canDecide = isSuperAdmin || (role !== 'manager' && r.email.toLowerCase() !== myEmail);
+              // 명단에는 '회사 · 팀' 한 칸으로 저장돼 있어 화면에서 나눈다
+              const org = splitAffiliation(r.team || '');
               return (
               <tr key={r.email}>
                 <td>{r.name}</td>
-                <td>{r.team}</td>
-                <td>{r.email}</td>
+                <td title={org.company || undefined}>{org.company || '–'}</td>
+                <td title={org.team || undefined}>{org.team || '–'}</td>
+                <td title={r.email}>{r.email}</td>
                 <td>
                   {(() => {
                     // 바꿀 권한이 없으면 뱃지만

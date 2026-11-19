@@ -1370,8 +1370,8 @@ tr.kw-more-row td {
     // 열 너비는 모두 비율 — 넓은 화면에서 남는 폭이 소속·이메일 두 칸에만 몰려 빈칸이 커지지 않고 모든 칸에 고르게 나뉜다.
     // 비율은 최소 너비(58rem, 1280px 화면 카드 폭)에서 날짜·토글·선택칸이 한 줄에 들어가게 잡았다 (칸 여백 양쪽 8px 포함)
     min-width: 58rem;
-    // 이름·소속·이메일만 넘치면 말줄임 — 등급·관리 칸은 펼침 메뉴가 잘리지 않게 두지 않는다
-    td:nth-child(-n + 3) {
+    // 담당자·회사·팀·이메일만 넘치면 말줄임 (마우스를 올리면 전체) — 등급·관리 칸은 펼침 메뉴가 잘리지 않게 두지 않는다
+    td:nth-child(-n + 4) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1379,11 +1379,15 @@ tr.kw-more-row td {
     .col-mem-name {
       width: 9.5%;
     }
-    .col-mem-org {
-      width: 15%;
+    // 소속을 회사·팀으로 나눔 (예전 소속 15%와 이메일 일부를 나눠 쓴다)
+    .col-mem-company {
+      width: 8.5%;
+    }
+    .col-mem-team {
+      width: 7.5%;
     }
     .col-mem-email {
-      width: 18%;
+      width: 17%;
     }
     .col-mem-status {
       width: 12%; // 승인·해제 두 칸 토글이 들어가게
