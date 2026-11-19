@@ -1552,31 +1552,6 @@ tr.kw-more-row td {
   }
 }
 
-// 미리보기의 차트·비중 막대 카드에 흐린 '예시' 워터마크 — 선 모양·막대 길이는 예시 숫자로 그린 것이라 실제 추이로 오해하지 않게
-// (숫자는 * 로 가리지만 모양은 남으므로, 2026-11-19 사용자 결정). 실제 비중을 보여 주는 기기별 표(.preview-real)는 빼고, 클릭은 막지 않는다
-.preview-mode main .card:not(.preview-real):is(.card-chart, :has(.src-bars-wrap, .cpa-bar)) {
-  position: relative;
-
-  &::after {
-    content: '예시';
-    // 글자 크기만 한 상자를 가운데에서 돌린다 — 카드 전체 상자를 돌리면 모서리가 카드 밖으로 넘쳐 가로 스크롤이 생긴다
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    font-size: 4.5rem;
-    line-height: 1;
-    white-space: nowrap;
-    font-weight: 800;
-    letter-spacing: 0.5rem;
-    color: var(--sub);
-    opacity: 0.14;
-    transform: translate(-50%, -50%) rotate(-12deg);
-    pointer-events: none;
-    user-select: none;
-    z-index: 1;
-  }
-}
-
 // 미리보기 아래쪽 가운데에 띄우는 예시 데이터 표시 — 누르면 로그인·회원가입 창을 연다 (사이드바 오른쪽 본문 기준)
 .preview-lock {
   position: fixed;
