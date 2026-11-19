@@ -39,14 +39,14 @@ const goDashboard = (id: DashboardId) => {
   if (d) window.location.href = import.meta.env.DEV ? d.local : d.live;
 };
 
-/** 사이트 선택 — 막아 둔 사이트(route.ts SITE_ENABLED)와, 로그인 전의 온코어는 고를 수 없게 둔다 */
-const siteOptions = (isLoggedIn: boolean): SegmentOption<SiteId>[] => [
+/** 사이트 선택 — 막아 둔 사이트(route.ts SITE_ENABLED)만 고를 수 없게 둔다. 로그인 전에도 온코어 미리보기(예시 데이터)를 볼 수 있다 (2026-11-19) */
+const siteOptions = (): SegmentOption<SiteId>[] => [
   { value: 'itket', label: '아이티켓' },
   {
     value: 'oncore',
     label: '온코어',
-    title: !SITE_ENABLED.oncore ? '온코어 데이터 연결 준비 중' : isLoggedIn ? undefined : '로그인하면 온코어 데이터를 볼 수 있습니다',
-    disabled: !SITE_ENABLED.oncore || !isLoggedIn,
+    title: !SITE_ENABLED.oncore ? '온코어 데이터 연결 준비 중' : undefined,
+    disabled: !SITE_ENABLED.oncore,
   },
 ];
 
@@ -194,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Dropdown<DashboardId> className="brand-dd" id="dd-dashboard" ariaLabel="대시보드 선택" options={DASHBOARD_OPTIONS} value="ad-insight" onChange={goDashboard} />
         </div>
         <div className="site-switch">
-          <SegmentedControl<SiteId> id="seg-site" options={siteOptions(isLoggedIn)} value={site} onChange={onSiteChange} />
+          <SegmentedControl<SiteId> id="seg-site" options={siteOptions()} value={site} onChange={onSiteChange} />
         </div>
         <div className="sm">
           <div className="lbl">대시보드</div>

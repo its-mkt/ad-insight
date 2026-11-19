@@ -1,5 +1,6 @@
 import type { DashboardData, KeywordRow } from '../types/dashboard';
 import { ym } from './format';
+import { mediaKo } from './constants';
 
 /** 기간 선택의 '전체' 를 쓸 수 있는 화면 — 연도 '전체' 는 전 기간, 월 '전체' 는 선택 연도 합계 */
 export const TOTAL_PERIOD_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes', 'purchases', 'devices', 'admin', 'usage'];
@@ -73,15 +74,13 @@ export function uncollectedMedia(
   });
 }
 
-const MEDIA_LABELS: Record<string, string> = { Naver: '네이버', Google: '구글' };
-
 /** KPI 카드 하단에 덧붙이는 항목 — 합계가 미수집 매체를 뺀 값임을 밝힌다 */
 export const uncollectedItems = (
   spend: { media: string; month: string }[],
   months: string[],
   medias?: string[]
 ): [string, string][] =>
-  uncollectedMedia(spend, months, medias).map((media) => [MEDIA_LABELS[media] ?? media, '미수집']);
+  uncollectedMedia(spend, months, medias).map((media) => [mediaKo(media), '미수집']);
 
 export interface PeriodStarts {
   /** 아이티켓 견적의 첫 달 — 다른 사이트·전화문의를 합친 건수의 시작 달은 그 데이터에서 따로 구한다 */

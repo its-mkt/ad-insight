@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/dashboard';
 import {
   rowsByPeriod,
@@ -14,7 +14,7 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteDetailsPending, quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
+import { quoteDetailsPending, useQuoteStats } from '../hooks/useDashboardData';
 import { inDayRange, type DayPeriod } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
@@ -73,10 +73,8 @@ const ORIGIN_COLORS: Record<string, string> = {
 export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useQuoteStats(data);
-  const trend = useMemo(() => (monthly ? quoteStatsOf(monthly) : null), [monthly]);
+  const { quotes: trendQuotes, quotesRaw: trendRaw } = useQuoteStats(monthly ?? data);
   const [mode, setMode] = useState<ChartTableMode>('chart');
-  const trendQuotes = trend?.quotes ?? quotes;
-  const trendRaw = trend?.quotesRaw ?? quotesRaw;
 
   if (!quotes.length) {
     return (
@@ -117,7 +115,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const allTotal = sumBy(quotes, (r) => r.count);
 
   const totM = (mo: string) =>
-    quotes.filter((r) => r.month === mo).reduce((a, r) => a + r.count, 0);
+    sumBy(quotes.filter((r) => r.month === mo), (r) => r.count);
   const curTot = totM(curM);
   const pvTot = totM(pv);
   const ytdQuotes = sumBy(
@@ -189,7 +187,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
   // 카테고리는 분류표 1차 기준 (2차는 1차에 합산). 최다 카테고리는 '기타'를 빼고 고른다
   // 선택한 달까지만 본다 — 비중의 분모인 누적 견적(1~선택 월)과 기간을 맞춘다
-  const yrQuotes = trendQuotes.filter((r) => r.month.startsWith(yr) && r.month <= curM);
+  const yrQuotes = rowsByPeriod(trendQuotes)(yr).filter((r) => r.month <= curM);
   const topCatKey = quoteCat1Order(yrQuotes).find((c) => c !== '기타');
   const topCat = topCatKey
     ? { k: topCatKey, c: sumBy(yrQuotes.filter((r) => cat1Of(r.category) === topCatKey), (r) => r.count) }
@@ -204,7 +202,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
   // KPI 카드 범위: 월 선택 → 당월, 연도 전체 → 연간 (차트는 항상 yrQuotes 사용)
   const kpiQuotes = yearTotal
-    ? quotes.filter((r) => r.month.startsWith(yr) && r.month <= curM)
+    ? rowsByPeriod(quotes)(yr).filter((r) => r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
   const cmp = period ? period.cmpLabel : '전월';

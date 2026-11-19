@@ -89,3 +89,9 @@ export const EXTERNAL_LINKS = {
   quotesRawSheet:
     'https://docs.google.com/spreadsheets/d/18tMYBQLuIhkmX_x_c8MK-aNXlGvOgz1TWauvqo8Dmjg/edit?gid=0#gid=0',
 } as const;
+
+/** 매체 영문 이름 → 한글 표기 (검색·표·안내 문구 공용) */
+export const MEDIA_KO: Record<string, string> = { Google: '구글', Naver: '네이버', Meta: '메타' };
+
+/** 매체 한글 표기 — 목록에 없는 매체는 받은 이름 그대로 */
+export const mediaKo = (media: string): string => MEDIA_KO[media] ?? media;

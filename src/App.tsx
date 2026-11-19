@@ -31,7 +31,7 @@ import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
-import { focusPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
+import { openPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
 import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
@@ -55,11 +55,11 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState(() => parseRoute().query);
   const [searchTab, setSearchTab] = useState<SearchTab | undefined>();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { isLoggedIn, isSuperAdmin, loading: authLoading } = useAuth();
+  const { isLoggedIn, isSuperAdmin, canView, loading: authLoading } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
-  // 로그인 전 미리보기(예시 데이터) — 로그인 버튼은 모달 대신 화면 위 로그인 카드로 보낸다
+  // 로그인 전 미리보기(예시 데이터) — 로그인·검색 버튼은 접속 화면의 로그인·회원가입 창을 연다 (검색 창은 예시 숫자를 가리지 못해 열지 않는다)
   const preview = usePreviewMode();
-  const openLogin = preview ? focusPreviewLogin : () => setLoginOpen(true);
+  const openLogin = preview ? openPreviewLogin : () => setLoginOpen(true);
   const wasLoggedIn = useRef(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   // 로그인 상태마다 목록이 따로라 바뀌면 다시 읽는다
@@ -322,8 +322,8 @@ export const App: React.FC = () => {
     }
     // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
     else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
-    // 온코어는 로그인한 관리자만 — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
-    if (site === 'oncore' && !isLoggedIn) {
+    // 온코어는 승인된 계정(등급 무관)과 로그인 전 미리보기(예시 데이터)에서 볼 수 있다. 그 밖에는 아이티켓으로 + 로그인 모달
+    if (site === 'oncore' && !canView && !preview) {
       setSite('itket');
       window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
       if (!wasLoggedIn.current && !preview) setLoginOpen(true);
@@ -331,7 +331,7 @@ export const App: React.FC = () => {
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
     if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
     wasLoggedIn.current = isLoggedIn;
-  }, [authLoading, isLoggedIn, isSuperAdmin, currentView, site, preview]);
+  }, [authLoading, isLoggedIn, isSuperAdmin, canView, currentView, site, preview]);
 
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
@@ -437,7 +437,7 @@ export const App: React.FC = () => {
             onThemeMode={handleThemeMode}
             onNavigate={handleNavigate}
             onLogin={openLogin}
-            onSearch={preview ? focusPreviewLogin : () => setSearchOpen(true)}
+            onSearch={preview ? openPreviewLogin : () => setSearchOpen(true)}
           />
           {/* 데이터 연결·계정 관리는 기간과 상관없는 화면이라 기간 바를 두지 않는다 */}
           {currentView !== 'data' && currentView !== 'members' && !oncorePending && (

@@ -218,9 +218,9 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onExistingAccount }) => 
           <TextInput className={`gate-input${err}`} type="password" name="new-password" autoComplete="new-password" placeholder="비밀번호 (6자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
           <TextInput className={`gate-input${err}`} type="password" name="new-password2" autoComplete="new-password" placeholder="비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
           {error && <GateError message={error} />}
-          <button type="submit" className="btn acc btn-login" data-btn="signup-complete" disabled={submitting}>
+          <Button variant="primary" type="submit" className="btn-login" data-btn="signup-complete" disabled={submitting}>
             {submitting ? '보내는 중...' : '회원가입 및 열람 요청'}
-          </button>
+          </Button>
           <Button variant="link" data-btn="signup-cancel" onClick={() => void cancelSignup()}>
             처음부터 다시 하기
           </Button>
@@ -281,9 +281,9 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onExistingAccount }) => 
               </Button>
             </div>
           ) : (
-            <button type="submit" className="btn acc btn-login" data-btn={sentTo ? 'signup-verify' : 'signup-send-code'} disabled={submitting}>
+            <Button variant="primary" type="submit" className="btn-login" data-btn={sentTo ? 'signup-verify' : 'signup-send-code'} disabled={submitting}>
               {submitting ? (sentTo ? '확인 중...' : '보내는 중...') : sentTo ? '인증하고 다음 단계로' : '이메일 인증번호 받기'}
-            </button>
+            </Button>
           )}
         </form>
       )}
@@ -339,9 +339,9 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ onDone, initialEma
       >
         <TextInput className={`gate-input${err}`} type="email" name="email" autoComplete="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         {error && <GateError message={error} />}
-        <button type="submit" className="btn acc btn-login" data-btn="reset-send-code" disabled={submitting}>
+        <Button variant="primary" type="submit" className="btn-login" data-btn="reset-send-code" disabled={submitting}>
           {submitting ? '보내는 중...' : '인증번호 받기'}
-        </button>
+        </Button>
       </form>
     );
   }
@@ -370,9 +370,9 @@ export const EmailCodeForm: React.FC<EmailCodeFormProps> = ({ onDone, initialEma
       <TextInput className={`gate-input${err}`} type="password" name="new-password" autoComplete="new-password" placeholder="새 비밀번호 (6자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
       <TextInput className={`gate-input${err}`} type="password" name="new-password2" autoComplete="new-password" placeholder="새 비밀번호 확인" value={password2} onChange={(e) => setPassword2(e.target.value)} />
       {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn="reset-verify" disabled={submitting}>
+      <Button variant="primary" type="submit" className="btn-login" data-btn="reset-verify" disabled={submitting}>
         {submitting ? '확인 중...' : '비밀번호 바꾸고 로그인'}
-      </button>
+      </Button>
     </form>
   );
 };
@@ -411,9 +411,9 @@ const PasswordLoginForm: React.FC<{ initialEmail?: string; onDone?: (email: stri
         autoFocus={!!initialEmail}
       />
       {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn="login-submit" disabled={submitting}>
+      <Button variant="primary" type="submit" className="btn-login" data-btn="login-submit" disabled={submitting}>
         {submitting ? '확인 중...' : '로그인'}
-      </button>
+      </Button>
     </form>
   );
 };

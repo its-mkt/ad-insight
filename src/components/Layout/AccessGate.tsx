@@ -93,9 +93,9 @@ const RequestAgainForm: React.FC = () => {
     <form className="gate-form" onSubmit={handleSubmit}>
       <ProfileFields name={name} company={company} team={team} onName={setName} onCompany={setCompany} onTeam={setTeam} err={!!error} autoFocus />
       {error && <GateError message={error} />}
-      <button type="submit" className="btn acc btn-login" data-btn="request-access" disabled={submitting}>
+      <Button variant="primary" type="submit" className="btn-login" data-btn="request-access" disabled={submitting}>
         {submitting ? '보내는 중...' : '승인 요청 보내기'}
-      </button>
+      </Button>
     </form>
   );
 };
@@ -106,9 +106,9 @@ const GateActions: React.FC = () => {
   return (
     <div className="gate-actions">
       {user?.email && <span className="gate-account">{user.email}</span>}
-      <button type="button" className="btn" data-btn="gate-logout" onClick={() => void logout()}>
+      <Button type="button" data-btn="gate-logout" onClick={() => void logout()}>
         로그아웃
-      </button>
+      </Button>
     </div>
   );
 };
@@ -214,7 +214,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview app={children}>
+      <GuestPreview app={children} keepOpen={signingUp}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
           title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
@@ -268,9 +268,9 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
   if (role === null) {
     return (
       <GateCard icon={<ShieldOff size="1.25rem" aria-hidden="true" />} title="권한을 확인하지 못했습니다" desc="잠시 뒤 다시 시도해 주세요.">
-        <button type="button" className="btn acc btn-login" data-btn="access-retry" onClick={refreshRole}>
+        <Button variant="primary" type="button" className="btn-login" data-btn="access-retry" onClick={refreshRole}>
           다시 시도
-        </button>
+        </Button>
         <GateActions />
       </GateCard>
     );

@@ -509,15 +509,13 @@ export function quoteCountFor(
   cat: string,
   catSpend: Record<string, number>
 ): number {
-  const direct = quotesForMonth.filter((r) => r.category === cat).reduce((a, r) => a + r.count, 0);
+  const direct = sumBy(quotesForMonth.filter((r) => r.category === cat), (r) => r.count);
   if (direct > 0) return direct;
 
   const quoteCat = AD_TO_QUOTE_CAT[cat];
   if (!quoteCat) return 0;
 
-  const groupTotal = quotesForMonth
-    .filter((r) => r.category === quoteCat)
-    .reduce((a, r) => a + r.count, 0);
+  const groupTotal = sumBy(quotesForMonth.filter((r) => r.category === quoteCat), (r) => r.count);
   if (!groupTotal) return 0;
 
   const siblings = Object.keys(AD_TO_QUOTE_CAT).filter((k) => AD_TO_QUOTE_CAT[k] === quoteCat);

@@ -2,7 +2,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 import { toggledSet } from '../../utils/toggleSet';
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../../types/dashboard';
-import { ctrText as ctr, fmt, mLabel, THIS_M } from '../../utils/format';
+import { ctrText as ctr, fmt, mLabel, sumBy, THIS_M } from '../../utils/format';
+import { mediaKo } from '../../utils/constants';
 import { MediaPill } from '../common/MediaPill';
 import { TableFootnote } from '../common/TableFootnote';
 import { MoreButton } from '../common/MoreButton';
@@ -36,7 +37,6 @@ interface KeywordAccordionTableProps {
   detailed?: boolean;
 }
 
-const mediaKo = (m: string) => (m === 'Naver' ? '네이버' : m === 'Google' ? '구글' : m);
 // 평균 CPC = 광고비 ÷ 클릭 (클릭 0 이면 – , 정렬에서는 맨 뒤로 가도록 -1)
 const cpc = (cost: number, clk: number) => (clk ? cost / clk : undefined);
 const cpcSort = (cost: number, clk: number) => (clk ? cost / clk : -1);
@@ -79,9 +79,9 @@ const groupTotals = (g: KeywordGroup) => {
   let t = groupTotalsCache.get(g);
   if (!t) {
     t = {
-      imp: g.list.reduce((sum, k) => sum + k.imp, 0),
-      clk: g.list.reduce((sum, k) => sum + k.clk, 0),
-      conv: g.list.reduce((sum, k) => sum + k.conv, 0),
+      imp: sumBy(g.list, (k) => k.imp),
+      clk: sumBy(g.list, (k) => k.clk),
+      conv: sumBy(g.list, (k) => k.conv),
     };
     groupTotalsCache.set(g, t);
   }

@@ -29,59 +29,13 @@ import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
 import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../lib/access';
+import { takePrefetched } from '../lib/prefetch';
+import { getCfg, webAppUrl } from '../lib/webApp';
 import { usePreviewMode } from '../context/PreviewModeContext';
 import { isPreviewDeviceShares, previewPayload, setPreviewRealDevices } from '../data/previewPayload';
 
-export const DEFAULT_URL =
-  'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
-export const DEFAULT_KEY = '2d3b0cc2b04a4873a835583968ca7a0b';
-
-/**
- * 아이티켓이 아닌 사이트의 수집기 웹앱 (사이트마다 Apps Script 프로젝트·데이터 시트가 따로다, apps-script/Code.gs 머리말 참고).
- * 주소·키가 비어 있으면 그 사이트는 '데이터 연결 준비 중' 안내만 보여 준다.
- */
-export const SITE_SOURCES: Record<Exclude<SiteId, 'itket'>, { url: string; key: string }> = {
-  oncore: {
-    url:
-      import.meta.env?.VITE_ONCORE_URL ||
-      'https://script.google.com/macros/s/AKfycbzG-C3hj6HF_JuKzzjUGOvtRIzM5KLqGrJCBeDfNsQnzw7dHqw60T5Wm3yUunmBUrbT/exec',
-    key: import.meta.env?.VITE_ONCORE_KEY || 'b3be208f75a04416914854086cfb72e5',
-  },
-};
-
-/** 그 사이트의 수집기 웹앱이 연결돼 있는지 — 데이터는 로그인 토큰으로 받으므로 주소만 있으면 된다 */
-export function siteConnected(site: SiteId): boolean {
-  return !!getCfg(site).url;
-}
-
-/** 웹앱 주소에 조회 값을 붙인다 — 비밀키는 있을 때만 (새 웹앱은 데이터 조회에 키를 보지 않는다, 2026-11-19 보안 점검) */
-const webAppUrl = (c: { url: string; key: string }, params: Record<string, string> = {}): string => {
-  const q = new URLSearchParams(c.key ? { key: c.key, ...params } : params).toString();
-  return q ? `${c.url}${c.url.includes('?') ? '&' : '?'}${q}` : c.url;
-};
-
-export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
-  if (site !== 'itket') return SITE_SOURCES[site];
-  const c = window.ADI || {};
-  const envUrl = import.meta.env?.VITE_ADI_URL;
-  const envKey = import.meta.env?.VITE_ADI_KEY;
-  let s: { url?: string; key?: string } = {};
-  try {
-    s = JSON.parse(localStorage.getItem('adi_cfg') || '{}');
-  } catch {
-    // ignore
-  }
-  const pick = (...vals: Array<unknown>) => {
-    for (const v of vals) {
-      if (v && String(v).trim()) return String(v).trim();
-    }
-    return '';
-  };
-  return {
-    url: pick(s.url, envUrl, c.url) || DEFAULT_URL,
-    key: pick(s.key, envKey, c.key) || DEFAULT_KEY,
-  };
-}
+// 웹앱 설정(getCfg·siteConnected 등)은 lib/webApp.ts — App 등 기존 import 를 위해 siteConnected 만 다시 내보낸다
+export { siteConnected } from '../lib/webApp';
 
 function emptyData(): DashboardData {
   return {
@@ -639,9 +593,15 @@ export function useDashboardData(site: SiteId = 'itket') {
     try {
       const fetchUrl = webAppUrl(c);
       // 승인된 계정에만 데이터가, 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins·members 명단을 확인)
-      const res = await fetch(withAccessToken(fetchUrl, await currentAccessToken()));
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const j = (await res.json()) as RawApiPayload;
+      const url = withAccessToken(fetchUrl, await currentAccessToken());
+      const fetchJson = async () => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as RawApiPayload;
+      };
+      // 처음 접속이면 권한 확인과 함께 미리 보낸 요청(AuthContext)의 응답을 쓴다 — 실패했으면 다시 받는다
+      const pre = takePrefetched<RawApiPayload>(url);
+      const j = (pre && (await pre.catch(() => null))) || (await fetchJson());
       // 쓰는 도중 승인이 해제되거나 로그인이 만료되면 권한을 다시 확인해 로그인 화면으로 돌린다
       if (j.error === 'login_required') window.dispatchEvent(new Event(ACCESS_CHANGED_EVENT));
       if (j.error) throw new Error(j.error);

@@ -40,21 +40,13 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     {
-      name: 'serve-local-data-and-config',
+      name: 'serve-local-data',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
           if (LOCAL_DATA_URL.test(req.url || '')) {
             const filePath = path.resolve(__dirname, 'data/latest.json');
             if (fs.existsSync(filePath)) {
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              fs.createReadStream(filePath).pipe(res);
-              return;
-            }
-          }
-          if (req.url?.startsWith('/js/config.js')) {
-            const filePath = path.resolve(__dirname, 'js/config.js');
-            if (fs.existsSync(filePath)) {
-              res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
               fs.createReadStream(filePath).pipe(res);
               return;
             }

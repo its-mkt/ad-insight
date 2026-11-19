@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { toggledSet } from '../../utils/toggleSet';
 import type { SpendRow } from '../../types/dashboard';
 import { ctrText, fmt } from '../../utils/format';
-import { EXTERNAL_LINKS } from '../../utils/constants';
+import { EXTERNAL_LINKS, MEDIA_KO } from '../../utils/constants';
 import { useSort } from '../../hooks/useSort';
 import { Card } from '../common/Card';
 import { SortableTh } from '../common/SortableTh';
@@ -48,7 +48,6 @@ interface CampaignStat extends Stat {
 
 type SortKey = 'name' | 'cost' | 'share' | 'imp' | 'clk' | 'ctr' | 'cpc' | 'conv' | 'cpa';
 
-const MEDIA_KO = { Naver: '네이버', Google: '구글' } as const;
 const SOURCE = {
   Naver: { label: '네이버 검색광고', href: EXTERNAL_LINKS.naverSearchAd },
   Google: { label: 'Google Ads', href: EXTERNAL_LINKS.googleAds },

@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, isStaffRole, currentAccessToken, fetchAccessRole, postMemberAction } from '../lib/access';
+import { ACCESS_CHANGED_EVENT, type AccessRole, canViewRole, isStaffRole, currentAccessToken, fetchAccessRole, postMemberAction, prefetchDashboardData } from '../lib/access';
 import { clearCachedPayloads } from '../utils/payloadCache';
 import { squareJpeg } from '../utils/image';
 
@@ -192,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
   const refreshRole = useCallback(() => setRoleTick((n) => n + 1), []);
+  // 데이터 요청을 미리 보낸 계정 — 계정마다 첫 확인 때 한 번만 (승인 대기 화면의 30초 재확인마다 보내지 않게)
+  const prefetchedFor = useRef('');
 
   useEffect(() => {
     // 예전 방식(코드 내장 비밀번호)으로 운영에 남은 로컬 세션 제거
@@ -255,7 +257,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoleLoading(false);
     } else setRoleLoading(true);
     currentAccessToken()
-      .then(fetchAccessRole)
+      .then((token) => {
+        // 기억한 권한이 없어 확인을 기다리는 동안 데이터 요청도 함께 출발시킨다 (확인 2~4초 + 데이터 5~7초가 겹치게)
+        if (!remembered && prefetchedFor.current !== uid) {
+          prefetchedFor.current = uid;
+          prefetchDashboardData(token);
+        }
+        return fetchAccessRole(token);
+      })
       .then((next) => {
         if (!alive) return;
         // 만료된 로그인은 지우고 로그인 화면으로 (setTimeout: 인증 콜백 안에서 Supabase 를 다시 부르면 멈출 수 있다)
@@ -284,7 +293,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (signup) {
       const reg = await supabase.rpc('email_registered', { p_email: mail });
       if (reg.error) console.error('Check registered error:', reg.error.message);
-      else if (reg.data === true) return { error: '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 찾아 주세요.', registered: true };
+      else if (reg.data === true) {
+        // 로그인 계정이 남아 있어도 관리자가 명단에서 삭제한 이메일이면 다시 가입할 수 있다 (웹앱이 명단을 확인).
+        // 웹앱 확인이 안 되면(옛 버전·네트워크) 지금처럼 가입된 이메일로 안내한다
+        const st = await postMemberAction<{ listed?: boolean }>({ action: 'signupStatus', email: mail }).catch(() => null);
+        if (!st || st.error || st.listed !== false) return { error: '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 찾아 주세요.', registered: true };
+      }
     }
     const { error } = await supabase.auth.signInWithOtp({
       email: mail,

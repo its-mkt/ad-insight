@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SpendRow, SyncStatus } from '../types/dashboard';
 import {
   rowsByPeriod,
@@ -18,7 +18,7 @@ import {
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { quoteStatsOf, useQuoteStats } from '../hooks/useDashboardData';
+import { useQuoteStats } from '../hooks/useDashboardData';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
 import { View } from '../components/common/View';
@@ -75,7 +75,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
   const stats = useQuoteStats(data);
-  const trendStats = useMemo(() => (monthly ? quoteStatsOf(monthly) : stats), [monthly, stats]);
+  const trendStats = useQuoteStats(monthly ?? data);
   const hasSpend = data.spend.length > 0;
   const hasQuotes = data.quotes.length > 0;
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
@@ -217,7 +217,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       k,
       c: quoteSeriesColor(k, ci),
       v: quoteAxis.map((key) =>
-        quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k).reduce((a, r) => a + r.count, 0)
+        sumBy(quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
       ),
     }))
     .filter((s) => s.v.some((x) => x));

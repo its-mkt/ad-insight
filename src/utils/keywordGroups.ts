@@ -1,6 +1,7 @@
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../types/dashboard';
+import { sumBy } from './format';
 
-const sumClk = (list: KeywordRow[]) => list.reduce((a, k) => a + k.clk, 0);
+const sumClk = (list: KeywordRow[]) => sumBy(list, (k) => k.clk);
 
 /** 키워드 행을 광고그룹별로 묶는다 (광고비 큰 순, 같으면 클릭 많은 순) */
 export function groupKeywordRows(rows: KeywordRow[]): KeywordGroup[] {

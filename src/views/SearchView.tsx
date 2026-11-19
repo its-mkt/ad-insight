@@ -6,6 +6,7 @@ import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, 
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
 import { campaignBuckets } from '../utils/keywordGroups';
+import { mediaKo } from '../utils/constants';
 import { adStatKey, groupAdsByAdgroup, type AdStat } from '../utils/creativeImage';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
@@ -288,7 +289,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
   // 광고비 카드 하단: 매체별 금액
   const mediaCost = (['Naver', 'Google', 'Meta'] as const)
-    .map((m): [string, number] => [m === 'Naver' ? '네이버' : m === 'Google' ? '구글' : '메타', sumBy(result.spendRows.filter((r) => r.media === m), (r) => r.cost)])
+    .map((m): [string, number] => [mediaKo(m), sumBy(result.spendRows.filter((r) => r.media === m), (r) => r.cost)])
     .filter(([k, v]) => v > 0 || k !== '메타') // 집행이 없어도 구글·네이버는 0 으로 보여 준다
     .map(([k, v]): [string, string] => [k, fmtWon(v)]);
   // 견적 카드 하단: 접수처별 건수

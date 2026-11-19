@@ -5,7 +5,7 @@ import type {
   DashboardData,
   SyncStatus,
 } from '../types/dashboard';
-import { catSum, catsOf, ctrText, fmt, fmtWon, mLabel, THIS_M } from '../utils/format';
+import { catSum, catsOf, ctrText, fmt, fmtWon, mLabel, sumBy, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
@@ -110,10 +110,10 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     );
   }
 
-  const totalCost = rows.reduce((s, r) => s + r.cost, 0);
-  const totalClk  = rows.reduce((s, r) => s + r.clk, 0);
-  const totalImp  = rows.reduce((s, r) => s + r.imp, 0);
-  const totalConv = rows.reduce((s, r) => s + r.conv, 0);
+  const totalCost = sumBy(rows, (r) => r.cost);
+  const totalClk  = sumBy(rows, (r) => r.clk);
+  const totalImp  = sumBy(rows, (r) => r.imp);
+  const totalConv = sumBy(rows, (r) => r.conv);
   const kpiCtr = ctrText(totalClk, totalImp);
   const kpiCpc = totalClk > 0 ? Math.round(totalCost / totalClk) : 0;
   const kpiAdCpa = totalConv > 0 ? Math.round(totalCost / totalConv) : 0;
@@ -130,19 +130,19 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     return r.month === pvMo && pass(r);
   });
   const hasPvData = pvRows.length > 0;
-  const pvCost = pvRows.reduce((s, r) => s + r.cost, 0);
-  const pvClk  = pvRows.reduce((s, r) => s + r.clk, 0);
-  const pvConv = pvRows.reduce((s, r) => s + r.conv, 0);
+  const pvCost = sumBy(pvRows, (r) => r.cost);
+  const pvClk  = sumBy(pvRows, (r) => r.clk);
+  const pvConv = sumBy(pvRows, (r) => r.conv);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
   const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');
   const googleRows = rows.filter((r) => r.media === 'Google');
-  const naverCost  = naverRows.reduce((s, r) => s + r.cost, 0);
-  const googleCost = googleRows.reduce((s, r) => s + r.cost, 0);
-  const naverClk   = naverRows.reduce((s, r) => s + r.clk, 0);
-  const googleClk  = googleRows.reduce((s, r) => s + r.clk, 0);
+  const naverCost  = sumBy(naverRows, (r) => r.cost);
+  const googleCost = sumBy(googleRows, (r) => r.cost);
+  const naverClk   = sumBy(naverRows, (r) => r.clk);
+  const googleClk  = sumBy(googleRows, (r) => r.clk);
   const naverCpc   = naverClk  > 0 ? Math.round(naverCost  / naverClk)  : 0;
   const googleCpc  = googleClk > 0 ? Math.round(googleCost / googleClk) : 0;
   // 광고비 비교 모드 detail: 클릭·전환 / allPeriod detail: 매체별 비용
