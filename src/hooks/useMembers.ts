@@ -1,5 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { postAuthedAction } from '../lib/access';
+import { ACCESS_CHANGED_EVENT, postAuthedAction } from '../lib/access';
+import { affiliationText } from '../lib/authErrors';
+import { supabase } from '../lib/supabase';
 import { showToast } from '../components/common/Toast';
 
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
@@ -169,4 +171,51 @@ export function useMembers(enabled = true): MembersState & { pending: number } {
     if (!enabled && state.rows) setState({ rows: null, owners: [], error: '', checkedAt: '' });
   }, [enabled]);
   return { ...snap, pending: snap.rows?.filter((r) => r.status === 'pending').length || 0 };
+}
+
+/** 소유자 넘기기 결과 — 실패면 문구와 다시 보여 줄 단계 */
+export interface OwnerTransferResult {
+  error?: string;
+  /** 실패했을 때 돌아갈 창 단계 (받는 사람 확인·비밀번호) */
+  step?: 'confirm' | 'password';
+}
+
+/**
+ * 소유자 권한 넘기기 (소유자만) — 내 비밀번호로 다시 로그인해 새 토큰을 받은 뒤 웹앱에 보낸다.
+ * 웹앱은 10분 안에 비밀번호로 로그인한 토큰만 받는다. 넘기면 나는 운영자가 되므로 권한을 다시 확인한다
+ */
+export async function transferOwner(
+  email: string,
+  confirm: string,
+  password: string,
+  me: { email?: string; name?: string; company?: string; team?: string; isDevAdmin?: boolean } | null
+): Promise<OwnerTransferResult> {
+  if (!me?.email || me.isDevAdmin) return { error: '실제 소유자 계정으로 로그인해야 넘길 수 있습니다.' };
+  const check = await supabase.auth.signInWithPassword({ email: me.email, password });
+  if (check.error) return { error: '비밀번호가 맞지 않습니다.', step: 'password' };
+  const who = whoOf(email);
+  setState({ busy: email });
+  const res = await postAuthedAction<{ usage?: string }>('transferOwner', {
+    email,
+    confirm,
+    name: me.name || '',
+    team: affiliationText(me.company || '', me.team || ''),
+  });
+  setState({ busy: '' });
+  if (res.error) {
+    const text: Record<string, OwnerTransferResult> = {
+      reauth_required: { error: '본인 확인이 끝나지 않았습니다. 비밀번호를 다시 입력해 주세요.', step: 'password' },
+      confirm_mismatch: { error: '받는 사람 이메일이 맞지 않습니다.', step: 'confirm' },
+      not_manager: { error: '승인된 운영자에게만 넘길 수 있습니다. 먼저 등급을 운영자로 바꿔 주세요.' },
+      not_found: { error: '명단에 없는 계정입니다. 새로 고침한 뒤 다시 시도해 주세요.' },
+      forbidden: { error: '소유자만 넘길 수 있습니다.' },
+      busy: { error: '다른 변경을 처리하는 중입니다. 잠시 뒤 다시 시도해 주세요.' },
+    };
+    return text[res.error] || { error: '넘기지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
+  }
+  showToast(`${who}에게 소유자 권한을 넘겼습니다. 이제 운영자 권한으로 보입니다.`);
+  // 내 등급이 운영자로 바뀌었으니 화면 권한을 다시 확인하고, 명단도 다시 받는다
+  window.dispatchEvent(new Event(ACCESS_CHANGED_EVENT));
+  await loadMembers();
+  return {};
 }

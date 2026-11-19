@@ -1,5 +1,5 @@
-import React from 'react';
-import { KeyRound, RefreshCw, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
+import React, { useState } from 'react';
+import { Crown, KeyRound, RefreshCw, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -10,6 +10,7 @@ import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { useAuth } from '../../context/AuthContext';
+import { OwnerTransferModal } from './OwnerTransferModal';
 import { decideMember, deleteMember, loadMembers, sendPasswordGuide, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
 
 const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> = {
@@ -39,6 +40,8 @@ export const MemberApprovals: React.FC = () => {
   // 소유자는 명단(members 탭)이 아니라 admins 탭에 있어 바꿀 수 없는 줄로 맨 위에 보여 준다. 옛 웹앱이 소유자를 보내지 않으면 소유자 본인만 자기 줄을 본다
   const ownerEmails = owners.length ? owners : isSuperAdmin && myEmail ? [myEmail] : [];
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
+  // 소유자 권한을 넘길 운영자 (창이 열려 있을 때만)
+  const [transferTo, setTransferTo] = useState<{ email: string; name: string } | null>(null);
 
   return (
     <Card
@@ -135,6 +138,9 @@ export const MemberApprovals: React.FC = () => {
                     if (canDecide && r.status === 'pending') items.push({ key: 'reject', label: '거절', icon: UserX, onSelect: () => decide(r.email, 'rejected') });
                     if (canDecide && r.status === 'approved') items.push({ key: 'password', label: '비밀번호 재설정 안내 보내기', icon: KeyRound, onSelect: () => void sendPasswordGuide(r.email) });
                     if (canDecide && r.status === 'approved') items.push({ key: 'revoke', label: '열람 권한 해제', icon: UserMinus, onSelect: () => decide(r.email, 'revoked') });
+                    // 소유자 넘기기는 승인된 운영자에게만 (뷰어는 먼저 운영자로 바꾼다)
+                    if (isSuperAdmin && r.status === 'approved' && role === 'manager')
+                      items.push({ key: 'owner', label: '소유자 권한 넘기기', icon: Crown, onSelect: () => setTransferTo({ email: r.email, name: r.name }) });
                     if (isSuperAdmin)
                       items.push({ key: 'delete', label: '삭제', icon: Trash2, danger: true, confirmLabel: '한 번 더 누르면 삭제', onSelect: () => void deleteMember(r.email) });
                     return items.length ? (
@@ -151,6 +157,7 @@ export const MemberApprovals: React.FC = () => {
         </tbody>
       </table>
       {rows && rows.length === 0 && !error && <EmptyState message="가입 요청이 없습니다." />}
+      <OwnerTransferModal target={transferTo} onClose={() => setTransferTo(null)} />
     </Card>
   );
 };

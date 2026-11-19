@@ -25,7 +25,7 @@ const ResultLine: React.FC<{ result: AccountResult | null; okText: string }> = (
 };
 
 /** 이름표 + 입력칸 한 줄 */
-const Field: React.FC<{ label: string; help?: string; children: React.ReactNode }> = ({ label, help, children }) => (
+export const Field: React.FC<{ label: string; help?: string; children: React.ReactNode }> = ({ label, help, children }) => (
   <label className="acct-field">
     <span className="acct-label">{label}</span>
     {children}

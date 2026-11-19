@@ -1712,6 +1712,77 @@ function setMemberRole_(accessToken, email, role) {
     return { success: true, email, role, usage: syncUsageAdmin_(email, role === 'manager') };
   } finally { lock.releaseLock(); }
 }
+/**
+ * 소유자 — 소유자 권한 넘기기. 받는 사람은 승인된 운영자(manager)만, 넘긴 사람은 운영자가 된다 (되돌리기는 새 소유자만 할 수 있다).
+ * 실수 방지: 화면이 받는 사람 이메일을 다시 입력받아 confirm 으로 보내고, 10분 안에 비밀번호로 다시 로그인한 토큰만 받는다.
+ * admins 탭의 내 줄을 받는 사람 이메일로 바꾸고, members 탭은 받는 사람 줄을 지우고(소유자는 목록에 나오지 않는다) 내 줄을 승인된 운영자로 둔다.
+ * owner_log 탭에 기록하고 Teams·메일로 알린다. 앱 안의 권한만 넘어가며 시트·Apps Script·Supabase 소유권은 그대로다
+ */
+function transferOwner_(data) {
+  const acc = accessOf_(data.access_token);
+  if (acc.role !== 'admin') return { error: 'forbidden' };
+  if (!recentPasswordLogin_(data.access_token, 10 * 60)) return { error: 'reauth_required' };
+  const from = acc.email;
+  const to = String(data.email || '').trim().toLowerCase();
+  if (!to || String(data.confirm || '').trim().toLowerCase() !== to) return { error: 'confirm_mismatch' };
+  if (to === from) return { error: 'self' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const ss = authSheet_();
+    if (adminEmails_(ss).includes(to)) return { error: 'already_owner' };
+    const target = memberRows_(ss).find((r) => r.email === to);
+    if (!target) return { error: 'not_found' };
+    if (target.status !== 'approved' || target.role !== 'manager') return { error: 'not_manager' };
+    const adminSh = ss.getSheetByName('admins');
+    const adminVals = adminSh ? adminSh.getRange(1, 1, adminSh.getLastRow(), 1).getValues() : [];
+    const adminRow = adminVals.findIndex((r) => String(r[0]).trim().toLowerCase() === from);
+    if (adminRow < 0) return { error: 'forbidden' };
+    const now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
+    const name = String(data.name || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40) || from.split('@')[0];
+    const team = String(data.team || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 90) || '-';
+    // 1) 넘긴 사람을 승인된 운영자로 (명단 줄이 있으면 고치고, 없으면 만든다)
+    const sh = membersSheet_(ss);
+    const mine = memberRows_(ss).find((r) => r.email === from);
+    const myRow = [from, mine ? mine.name || name : name, mine ? mine.team || team : team, 'approved', mine ? mine.requested_at : now, now, 'owner-transfer', 'manager'];
+    if (mine) sh.getRange(mine.row, 1, 1, MEMBER_HEAD_.length).setValues([myRow]);
+    else sh.appendRow(myRow);
+    // 2) 받는 사람을 소유자로 — admins 탭 내 줄을 바꾸고, 명단 줄은 지운다
+    adminSh.getRange(adminRow + 1, 1).setValue(to);
+    const t = memberRows_(ss).find((r) => r.email === to);
+    if (t) sh.deleteRow(t.row);
+    const cache = CacheService.getScriptCache();
+    cache.removeAll(['acc:' + from, 'acc:' + to]);
+    // 3) 이용 현황 계정별 조회 권한은 둘 다 그대로 (운영자·소유자 모두 볼 수 있다)
+    const usage = syncUsageAdmin_(from, true);
+    let log = ss.getSheetByName('owner_log');
+    if (!log) { log = ss.insertSheet('owner_log'); log.appendRow(['at', 'from', 'to']); log.setFrozenRows(1); }
+    log.appendRow([now, from, to]);
+    sendAccessNotice_({
+      title: '광고 인사이트 소유자 변경',
+      facts: [{ title: '이전 소유자', value: from + ' → 운영자' }, { title: '새 소유자', value: target.name + ' (' + to + ')' }, { title: '시각', value: now }],
+      note: '계정 관리 화면에서 소유자 권한을 넘겼습니다. 본인이 한 일이 아니면 새 소유자에게 되돌려 달라고 하거나 권한 시트 admins 탭을 직접 고쳐 주세요.',
+      action: '계정 관리 열기',
+      subject: '[광고 인사이트] 소유자 변경 — ' + from + ' → ' + to,
+      text: '광고 인사이트 소유자 변경 (' + now + ')\n이전 소유자: ' + from + ' → 운영자\n새 소유자: ' + target.name + ' (' + to + ')\n\n본인이 한 일이 아니면 권한 시트 admins 탭을 직접 고쳐 주세요.',
+    });
+    return { success: true, from, to, usage };
+  } finally { lock.releaseLock(); }
+}
+/**
+ * 로그인 토큰이 sec 초 안에 비밀번호로 로그인해 받은 것인지 — Supabase 토큰 안 amr(로그인 방식·시각)을 본다.
+ * 토큰 자체가 진짜인지는 accessOf_ → tokenEmail_ 가 Supabase 에 물어 이미 확인했다
+ */
+function recentPasswordLogin_(accessToken, sec) {
+  try {
+    const part = String(accessToken).split('.')[1];
+    const payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(part + '==='.slice((part.length + 3) % 4))).getDataAsString());
+    const now = Date.now() / 1000;
+    return (payload.amr || []).some((a) => a && a.method === 'password' && now - Number(a.timestamp) <= sec);
+  } catch (err) {
+    return false;
+  }
+}
 /** 비밀번호 재설정 안내 메일의 바로가기 — 접속하면 로그인 창이 '비밀번호 찾기'로 열린다 */
 const PASSWORD_GUIDE_URL_ = 'https://its.itket.com/ad-insight/itket/summary?reset=1';
 /**
@@ -1911,6 +1982,7 @@ function memberPost_(e) {
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
   if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));
   if (data.action === 'setMemberRole') return json_(setMemberRole_(data.access_token, data.email, data.role));
+  if (data.action === 'transferOwner') return json_(transferOwner_(data));
   if (data.action === 'sendPasswordGuide') return json_(sendPasswordGuide_(data.access_token, data.email));
   return null;
 }
