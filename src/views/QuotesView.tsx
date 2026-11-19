@@ -7,9 +7,7 @@ import {
   mLabel,
   prevM,
   cat1Of,
-  quoteSeriesColor,
   quoteCat1Order,
-  quoteChartCats,
   sumBy,
   ym,
 } from '../utils/format';
@@ -33,6 +31,7 @@ import { MonthlyQuotesTable } from '../components/quotes/MonthlyQuotesTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearsOf } from '../utils/allPeriod';
+import { quoteSeriesOf } from '../utils/chartSeries';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 
 interface QuotesViewProps {
@@ -267,20 +266,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const trendTitle = allPeriod ? '연도별 견적 접수 수' : '월별 견적 접수 수';
 
   // 추이 차트: 건수 상위 6개 1차 카테고리 + 그 외
-  const chartCats = quoteChartCats(yrQuotes);
   const yrQuotesAt = rowsByPeriod(yrQuotes);
-  const series = chartCats.keys
-    .map((k, ci) => ({
-      k,
-      c: quoteSeriesColor(k, ci),
-      v: axisKeys.map((key) =>
-        sumBy(
-          yrQuotesAt(key).filter((r) => chartCats.keyOf(r.category) === k),
-          (r) => r.count
-        )
-      ),
-    }))
-    .filter((s) => s.v.some((x) => x));
+  const series = quoteSeriesOf(yrQuotes, axisKeys, yrQuotesAt);
 
   // 추이 표: 차트와 달리 '그 외'로 묶지 않고 1차 카테고리를 모두 펼친다
   const trendTableSeries = quoteCat1Order(yrQuotes)

@@ -15,7 +15,7 @@ import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../da
 import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, salesCutoff, salesInMonths } from '../data/godomallOrders';
 import { daysOfMonth } from '../utils/dayRange';
 import { fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
-import { monthsUpTo } from '../utils/allPeriod';
+import { lastYearMonth, monthsUpTo, ymLabel } from '../utils/allPeriod';
 
 interface PurchasesViewProps {
   status: SyncStatus;
@@ -36,7 +36,6 @@ const TITLE = '구매 상세';
 const known = (month: string) => salesInMonths([month]);
 const countOf = (month: string) => known(month) ?? 0;
 const totalOf = (months: string[]) => sumBy(months, countOf);
-const lastYearOf = (month: string) => ym(+month.slice(0, 4) - 1, +month.slice(5));
 const countText = (n: number) => `${fmt(n)}건`;
 const PENDING = '수집 전';
 const avgText = (n: number) => `${n.toFixed(1)}건`;
@@ -59,7 +58,7 @@ const peakCard = (months: string[]) => {
   // 고도몰 주문을 아직 수집하지 않은 사이트는 '수집 전'
   if (!months.some((m) => m in GODOMALL_ORDERS)) return <KpiCard label="최다 판매 월" value={PENDING} />;
   const peak = peakOf(months);
-  return <KpiCard label="최다 판매 월" value={countText(countOf(peak))} sub={`${peak.slice(0, 4)}년 ${mLabel(peak)}`} />;
+  return <KpiCard label="최다 판매 월" value={countText(countOf(peak))} sub={ymLabel(peak)} />;
 };
 
 /** 고도몰 주문통계의 구매건수 (결제완료일 기준) */
@@ -95,7 +94,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const mm = +selectedMonth.slice(5, 7);
   const ytd = monthsUpTo(selectedMonth);
   const ytdTotal = totalOf(ytd);
-  const lastYtd = ytd.map(lastYearOf);
+  const lastYtd = ytd.map(lastYearMonth);
   const hasLastYtd = lastYtd.some((m) => m in GODOMALL_ORDERS);
   const lastYtdTotal = hasLastYtd ? totalOf(lastYtd) : null;
   const monthCount = countOf(selectedMonth);
@@ -115,7 +114,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   // 월 보기 — 쇼핑몰에서 결제된 주문의 값만 쓴다 (견적·광고비와 섞지 않는다)
   const monthName = mLabel(selectedMonth);
   const pv = prevM(selectedMonth);
-  const lastYear = lastYearOf(selectedMonth);
+  const lastYear = lastYearMonth(selectedMonth);
   // 비로그인 매월 1일처럼 마지막 날이 그 달 말일이면 끝난 달이다
   const partial = selectedMonth === AS_OF_MONTH && !(AS_OF === cutoffDay && AS_OF_DAY === daysOfMonth(AS_OF_MONTH));
   const amountOf = (mo: string) => {

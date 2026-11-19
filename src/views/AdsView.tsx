@@ -7,14 +7,13 @@ import {
   mLabel,
   NOW_MONTH,
   prevM,
-  SERIES_DEFS,
   sumBy,
   THIS_M,
   THIS_Y,
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import type { DayPeriod } from '../utils/dayRange';
+import { daysOfMonth, type DayPeriod } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
@@ -26,7 +25,8 @@ import { SpendDetailTable } from '../components/ads/SpendDetailTable';
 import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
-import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel } from '../utils/allPeriod';
+import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel, ymLabel } from '../utils/allPeriod';
+import { spendSeriesOf } from '../utils/chartSeries';
 
 interface AdsViewProps {
   data: DashboardData;
@@ -140,12 +140,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
     return c ? tot(mo) / c : 0;
   };
 
-  const series = SERIES_DEFS.map((s) => ({
-    ...s,
-    raw: months.map((mo) => sumBy(trendAt(mo).filter(s.f), (r) => r.cost)),
-  }))
-    .filter((s) => s.raw.some((v) => v))
-    .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
+  const series = spendSeriesOf(trendAt, months);
 
   const lastY = (mo: string) => trendTot(ym(Y - 1, +mo.slice(5)));
 
@@ -190,8 +185,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   const curMetaCost   = sumBy(at(curM).filter((r) => r.media === 'Meta'),   (r) => r.cost);
   const mdfRatioPct   = tot(curM) > 0 ? ((mdfCost(curM) / tot(curM)) * 100).toFixed(1) : null;
   // 일평균: 진행 중인 달은 오늘까지의 날짜 수로 나눠, 다 끝난 전월과 같은 기준으로 비교한다
-  const daysInMonth = (mo: string) => new Date(+mo.slice(0, 4), +mo.slice(5), 0).getDate();
-  const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysInMonth(mo));
+  const elapsedDays = (mo: string) => (mo === THIS_M ? new Date().getDate() : daysOfMonth(mo));
   const dailySpend = (mo: string) => tot(mo) / (period ? (mo === pv ? period.prevDays : period.days) : elapsedDays(mo));
   // 수동 입력 MDF 는 달 전체 금액이라, 같은 날짜 비교에서는 일수 비율만큼만 쓴다
   const pvMdf = mdfCost(pv);
@@ -201,7 +195,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
   // 증감 비교 기간 — KPI 카드와 같다 (연도 합계는 전년 동기, 달·일 기간은 전월·직전 같은 일수). 전체 기간은 비교하지 않는다
   const statsPrev = allPeriod ? null : data.spend.filter((r) => (yearTotal ? lastYrMonths : [pv]).includes(r.month));
   const statsCmp = yearTotal ? '전년 동기' : cmp;
-  const statsLabel = allPeriod ? '전체 기간' : yearTotal ? yearLabel : period ? period.label : `${curM.slice(0, 4)}년 ${mLabel(curM)}`;
+  const statsLabel = allPeriod ? '전체 기간' : yearTotal ? yearLabel : period ? period.label : ymLabel(curM);
 
   return (
     <View name="ads" title="매체 광고비">
@@ -318,10 +312,10 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               items={[
                 ...(curM === THIS_M && !period
                   ? ([
-                      ['월말 예상', fmtWon(dailySpend(curM) * daysInMonth(curM))],
-                      ['경과', `${elapsedDays(curM)}/${daysInMonth(curM)}일`],
+                      ['월말 예상', fmtWon(dailySpend(curM) * daysOfMonth(curM))],
+                      ['경과', `${elapsedDays(curM)}/${daysOfMonth(curM)}일`],
                     ] as [string, string][])
-                  : ([['기간', `${period ? period.days : daysInMonth(curM)}일`]] as [string, string][])),
+                  : ([['기간', `${period ? period.days : daysOfMonth(curM)}일`]] as [string, string][])),
               ]}
             />
           }

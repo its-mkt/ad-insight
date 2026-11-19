@@ -34,7 +34,7 @@ import { CatEfficiencyTable } from '../components/cat-efficiency/CatEfficiencyTa
 import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
-import { dotYm, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel } from '../utils/allPeriod';
+import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, monthsUpTo, periodStartsOf, yearRangeLabel } from '../utils/allPeriod';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 
 interface CatEfficiencyViewProps {
@@ -137,7 +137,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
     .filter((mo) => mo && mo >= cpaFrom)
     .sort();
   const curMonths = allPeriod ? efficiencyMonths : yearTotal ? monthsUpTo(curM) : [curM];
-  const prevMonths = allPeriod ? [] : yearTotal ? sameMonthsLastYear(curMonths) : [pv];
+  const prevMonths = compareMonthsOf({ allPeriod, yearTotal, months: curMonths, curM });
   const periodLabel = allPeriod ? `${dotYm(cpaFrom)} 이후` : yearTotal ? yearRangeLabel(curM) : period ? period.label : mLabel(curM);
   const prevLabel = yearTotal ? '전년 동기' : period ? period.cmpLabel : mLabel(pv);
 
@@ -226,7 +226,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   const avgCpa = totQuotes > 0 ? totSpend / totQuotes : 0;
 
   // KPI 비교 기준: 월 선택은 전월, 연도 전체는 전년 동기. 전체 기간은 비교하지 않는다
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
+  const cmpLabel = cmpLabelOf({ allPeriod, yearTotal, period });
   const prevInputs = prevMonths.map((mo) => ({
     rows: quotesByMonth.get(mo) || [],
     spend: catSum(categoryMap, spendByMonth.get(mo) || [], (r) => r.cost),

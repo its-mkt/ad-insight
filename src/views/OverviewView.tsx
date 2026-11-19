@@ -9,10 +9,7 @@ import {
   fmtWon,
   mLabel,
   prevM,
-  quoteSeriesColor,
-  quoteChartCats,
   withSourceCompare,
-  SERIES_DEFS,
   sumBy,
   THIS_M,
   ym,
@@ -35,7 +32,8 @@ import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { formatCategoryScope, formatSourceScope } from '../utils/search';
 import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { Card } from '../components/common/Card';
-import { dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { cmpLabelOf, dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 
 interface OverviewViewProps {
@@ -195,27 +193,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const spendAxis = allPeriod ? spendYears : months;
   const spendAt = rowsByPeriod((monthly ?? data).spend);
-  const spendSeries = SERIES_DEFS.map((s) => ({
-    ...s,
-    raw: spendAxis.map((key) => sumBy(spendAt(key).filter(s.f), (r) => r.cost)),
-  }))
-    .filter((s) => s.raw.some((v) => v))
-    .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
+  const spendSeries = spendSeriesOf(spendAt, spendAxis);
 
   // 견적 추이: 올해 건수 상위 6개 1차 카테고리 + 그 외 (2차는 1차에 합산)
   const yrQuoteRows = allPeriod ? trendStats.quotes : trendStats.quotes.filter((r) => r.month >= ym(+yr, 1) && r.month <= curM);
   const quoteAxis = allPeriod ? quoteYears : months;
-  const quoteCats = quoteChartCats(yrQuoteRows);
-  const quoteAt = rowsByPeriod(yrQuoteRows);
-  const quoteSeries = quoteCats.keys
-    .map((k, ci) => ({
-      k,
-      c: quoteSeriesColor(k, ci),
-      v: quoteAxis.map((key) =>
-        sumBy(quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
-      ),
-    }))
-    .filter((s) => s.v.some((x) => x));
+  const quoteSeries = quoteSeriesOf(yrQuoteRows, quoteAxis);
 
   // 카테고리별 소진 vs 견적 (새 카테고리 기준, 견적 비례 배분 적용)
   const catsMap = (mo: string) => catSum(categoryMap, atSpend(mo), (r) => r.cost);
@@ -280,7 +263,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // 유입 매체 비중
   // 월별: 선택한 달 vs 전월 / 연간: 1~선택월 vs 전년 동기 / 전체 기간: 비교 없음
   const srcRaw = stats.quotesRaw || [];
-  const srcCompareLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : cmp;
+  const srcCompareLabel = cmpLabelOf({ allPeriod, yearTotal, period });
   const srcCur = allPeriod
     ? buildSourceShareData(srcRaw, '', stats.quotes)
     : yearTotal
@@ -452,7 +435,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             id="lgOverviewCat"
             unit="만원"
             curLabel={allPeriod ? '전체 기간' : `${yearTotal ? yearLabel : period ? period.label : '기준월'} (굵은 막대)`}
-            prevLabel={allPeriod ? undefined : yearTotal ? '전년 동기' : cmp}
+            prevLabel={srcCompareLabel}
           />
           <ShowMoreButton
             total={fullList.length}

@@ -2,8 +2,9 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 import { toggledSet } from '../../utils/toggleSet';
 import type { CampaignKeywordBucket, KeywordGroup, KeywordRow } from '../../types/dashboard';
-import { ctrText as ctr, fmt, mLabel, sumBy, THIS_M } from '../../utils/format';
+import { ctrText as ctr, fmt, sumBy, THIS_M } from '../../utils/format';
 import { mediaKo } from '../../utils/constants';
+import { ymLabel } from '../../utils/allPeriod';
 import { MediaPill } from '../common/MediaPill';
 import { TableFootnote } from '../common/TableFootnote';
 import { MoreButton } from '../common/MoreButton';
@@ -208,7 +209,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
     `${c.medias.map(mediaKo).join('·')} · ${c.campaign} (${c.groups.length}개 그룹)`;
   const campIcons = (c: CampaignKeywordBucket) =>
     c.medias.map((m) => <MediaPill key={m} media={m} iconOnly size="0.625rem" />);
-  const periodLabel = periodLabelProp || `${month.slice(0, 4)}년 ${mLabel(month)}`;
+  const periodLabel = periodLabelProp || ymLabel(month);
 
   return (
     <Card
