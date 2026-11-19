@@ -73,7 +73,7 @@ export async function decideMember(email: string, status: Exclude<MemberStatus, 
   const res = await postAuthedAction('decideMember', { email, status });
   setState({ busy: '' });
   if (res.error) {
-    showToast(res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. 관리자 계정은 최고 관리자만 바꿀 수 있습니다.' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
+    showToast(res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. 운영자 계정은 소유자만 바꿀 수 있습니다.' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
     return;
   }
   const done: Record<typeof status, string> = {
@@ -95,7 +95,7 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
     showToast(res.error === 'not_approved' ? '승인된 계정만 등급을 바꿀 수 있습니다.' : '등급을 바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
     return;
   }
-  const roleText = role === 'manager' ? '관리자로' : '일반으로';
+  const roleText = role === 'manager' ? '운영자로' : '뷰어로';
   // 이용 현황 권한을 못 맞췄으면 직접 확인해야 하므로 닫을 때까지 남는 주의 알림으로
   if (res.usage === 'failed' || res.usage === 'kept')
     showToast(`${who}의 등급을 ${roleText} 바꿨지만, 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. Supabase usage_admins 를 확인해 주세요.`, 'warn');
@@ -113,7 +113,7 @@ export async function deleteMember(email: string): Promise<void> {
   const res = await postAuthedAction<{ account?: string }>('deleteMember', { email });
   setState({ busy: '' });
   if (res.error) {
-    showToast(res.error === 'admin_protected' ? '최고 관리자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
+    showToast(res.error === 'admin_protected' ? '소유자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
     return;
   }
   // 로그인 계정이 남았거나 못 지웠으면 닫을 때까지 남는 주의 알림으로

@@ -15,7 +15,7 @@ import { showToast } from '../components/common/Toast';
 /** 카테고리 저장 실패 → 알림 문구 */
 const saveErrorText = (error?: string): string =>
   error === 'forbidden'
-    ? '카테고리를 저장할 권한이 없습니다. 최고 관리자만 저장할 수 있습니다.'
+    ? '카테고리를 저장할 권한이 없습니다. 소유자만 저장할 수 있습니다.'
     : error === 'network'
       ? '네트워크 문제로 저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.'
       : '카테고리를 저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';

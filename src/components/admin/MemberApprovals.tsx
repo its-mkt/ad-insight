@@ -19,7 +19,7 @@ const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> =
   revoked: { label: '해제', level: 'err' },
 };
 
-const ROLE_TEXT: Record<MemberRole, string> = { member: '일반', manager: '관리자' };
+const ROLE_TEXT: Record<MemberRole, string> = { member: '뷰어', manager: '운영자' };
 const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
   { value: 'member', label: ROLE_TEXT.member, title: '대시보드만' },
   { value: 'manager', label: ROLE_TEXT.manager, title: '대시보드 + 원문 데이터·계정 관리·이용 현황·데이터 연결' },
@@ -59,7 +59,7 @@ export const MemberApprovals: React.FC = () => {
             <Th>소속</Th>
             <Th>이메일</Th>
             <Th>상태</Th>
-            <Th tip="등급|일반: 대시보드만 · 관리자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (최고 관리자만 바꾼다)">등급</Th>
+            <Th tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
             <Th>요청</Th>
             <Th>처리</Th>
             <Th>관리</Th>
