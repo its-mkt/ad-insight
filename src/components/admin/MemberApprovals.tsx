@@ -9,7 +9,7 @@ import { EmptyState } from '../common/EmptyState';
 import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
-import { Switch } from '../common/Switch';
+import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { useAuth } from '../../context/AuthContext';
 import { OwnerTransferModal } from './OwnerTransferModal';
 import { decideMember, deleteMember, loadMembers, sendPasswordGuide, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
@@ -38,7 +38,7 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 가입 요청·열람 권한 관리 — 관리자만 보인다 (계정 관리 화면).
  * 명단은 데이터 시트 members 탭이고, 승인·거절·해제는 웹앱이 관리자 토큰을 확인한 뒤 바꾼다.
  * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers).
- * 승인 대기는 승인·거절 버튼, 결정한 뒤는 열람 허용 스위치(켜면 승인·끄면 해제)로 바꾸고 (2026-11-19 사용자 요청 — 뱃지 드롭다운 대신), 비밀번호 안내·소유자 넘기기·삭제는 줄 끝 설정 버튼 메뉴에 둔다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
+ * 승인·거절·해제는 상태 칸의 두 칸 토글(승인 / 해제·거절)로 바꾸고 (2026-11-19 사용자 요청 — 뱃지 드롭다운 대신), 비밀번호 안내·소유자 넘기기·삭제는 줄 끝 설정 버튼 메뉴에 둔다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
@@ -96,7 +96,6 @@ export const MemberApprovals: React.FC = () => {
                 <td>{r.email}</td>
                 <td>
                   {(() => {
-                    const who = r.name || r.email;
                     // 바꿀 권한이 없으면 뱃지만
                     if (!canDecide || !STATUS_TEXT[r.status]) {
                       return (
@@ -105,31 +104,18 @@ export const MemberApprovals: React.FC = () => {
                         </StatusBadge>
                       );
                     }
-                    // 승인 대기 — 승인·거절 두 버튼으로 바로 결정한다
-                    if (r.status === 'pending') {
-                      return (
-                        <span className="member-decide">
-                          <Button size="xs" variant="primary" disabled={busy === r.email} data-btn="member-approve" title={STATUS_TITLE.approved} aria-label={`${who} 승인`} onClick={() => decide(r.email, 'approved')}>
-                            승인
-                          </Button>
-                          <Button size="xs" disabled={busy === r.email} data-btn="member-reject" title={STATUS_TITLE.rejected} aria-label={`${who} 거절`} onClick={() => decide(r.email, 'rejected')}>
-                            거절
-                          </Button>
-                        </span>
-                      );
-                    }
-                    // 결정한 뒤 — 열람 허용 스위치 (켜면 승인, 끄면 해제. 거절한 요청도 켜서 승인할 수 있다)
-                    const on = r.status === 'approved';
+                    // 승인/해제 두 칸 토글 — 지금 상태 칸이 칠해지고 다른 칸을 누르면 바뀐다.
+                    // 승인 대기는 승인·거절 둘 다 비어 있고, 거절한 요청은 거절 칸이 칠해진다 (눌러서 승인할 수 있다)
+                    const off: Exclude<MemberStatus, 'pending' | 'approved'> = r.status === 'approved' || r.status === 'revoked' ? 'revoked' : 'rejected';
+                    const disabled = busy === r.email;
+                    const options: SegmentOption<MemberStatus>[] = [
+                      { value: 'approved', label: r.status === 'approved' ? '승인됨' : '승인', title: STATUS_TITLE.approved, disabled },
+                      { value: off, label: STATUS_TEXT[off].label, title: STATUS_TITLE[off], disabled },
+                    ];
                     return (
-                      <Switch
-                        checked={on}
-                        label={STATUS_TEXT[r.status].label}
-                        ariaLabel={`${who} 열람 허용`}
-                        title={on ? '끄면 열람 권한을 해제합니다' : '켜면 열람을 승인합니다'}
-                        disabled={busy === r.email}
-                        dataBtn="member-access"
-                        onChange={(next) => decide(r.email, next ? 'approved' : 'revoked')}
-                      />
+                      <span className={`member-status-seg is-${r.status}`}>
+                        <SegmentedControl<MemberStatus> mini options={options} value={r.status} onChange={(s) => s !== 'pending' && s !== r.status && decide(r.email, s)} />
+                      </span>
                     );
                   })()}
                 </td>

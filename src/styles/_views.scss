@@ -1380,7 +1380,7 @@ tr.kw-more-row td {
       width: 7rem;
     }
     .col-mem-status {
-      width: 7.5rem; // 승인·거절 버튼 두 개가 들어가게
+      width: 7.5rem; // 승인·해제 두 칸 토글이 들어가게
     }
     .col-mem-role {
       width: 7.5rem;
@@ -1399,14 +1399,34 @@ tr.kw-more-row td {
     .dd .dd-trigger {
       height: 1.5rem;
     }
-    // 승인 대기 줄의 승인·거절 버튼 — 한 줄에 나란히
-    .member-decide {
-      display: inline-flex;
-      gap: 0.25rem;
+    // 상태 두 칸 토글 (승인 / 해제·거절) — 표 줄에 맞게 낮게, 칠해진 칸은 상태 색 (승인 초록 · 해제·거절 회색)
+    .member-status-seg {
+      .seg {
+        padding: 0.125rem;
+        gap: 0.125rem;
+      }
 
-      // 거절도 누르는 버튼인 걸 알 수 있게 테두리를 보인다 (작은 기본 버튼은 테두리가 투명)
-      .btn:not(.acc) {
-        border-color: var(--line2);
+      .seg button {
+        height: 1.25rem;
+        padding: 0 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      .seg-btn-approved.on {
+        background: var(--ok);
+        border-color: var(--ok);
+      }
+
+      .seg-btn-revoked.on,
+      .seg-btn-rejected.on {
+        background: var(--sub);
+        border-color: var(--sub);
+      }
+
+      // 승인 대기 — 아직 고른 칸이 없으니 승인 칸을 강조색 글자로 눈에 띄게
+      &.is-pending .seg-btn-approved {
+        color: var(--ok);
+        font-weight: 600;
       }
     }
   }
