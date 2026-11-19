@@ -31,6 +31,7 @@
 | 버튼 / 링크 모양 버튼 | `Button`, `ButtonLink` |
 | 새 탭 외부 링크 | `ExtLink` (직접 `target="_blank"` 쓰지 않는다) |
 | 광고 API 출처 각주 | `AdApiSource` + `TableFootnote` |
+| 켜기·끄기 스위치 (두 상태를 오가는 설정) | `Switch` (`checked`, `onChange`, `label`, `ariaLabel`) — 계정 관리 열람 허용 |
 | 탭 / 구간 선택 | `TabButton`, `SegmentedControl` — 밑줄 탭 바 틀(`.kw-tabs`)은 `TabBar` (`common/TabButton`, `className`·`id`·`ref`) |
 | 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |

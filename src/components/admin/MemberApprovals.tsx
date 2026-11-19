@@ -9,6 +9,7 @@ import { EmptyState } from '../common/EmptyState';
 import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
+import { Switch } from '../common/Switch';
 import { useAuth } from '../../context/AuthContext';
 import { OwnerTransferModal } from './OwnerTransferModal';
 import { decideMember, deleteMember, loadMembers, sendPasswordGuide, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
@@ -20,13 +21,6 @@ const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> =
   revoked: { label: '해제', level: 'err' },
 };
 
-/** 지금 상태에서 바꿀 수 있는 상태 — 결정한 요청을 '승인 대기'로 되돌리지는 않는다 */
-const NEXT_STATUS: Record<MemberStatus, Exclude<MemberStatus, 'pending'>[]> = {
-  pending: ['approved', 'rejected'],
-  approved: ['revoked'],
-  rejected: ['approved'],
-  revoked: ['approved'],
-};
 const STATUS_TITLE: Record<MemberStatus, string> = {
   pending: '아직 승인하지 않은 요청',
   approved: '데이터를 볼 수 있다',
@@ -44,7 +38,7 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 가입 요청·열람 권한 관리 — 관리자만 보인다 (계정 관리 화면).
  * 명단은 데이터 시트 members 탭이고, 승인·거절·해제는 웹앱이 관리자 토큰을 확인한 뒤 바꾼다.
  * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers).
- * 승인·거절·해제는 상태 뱃지를 눌러 고르고(지금 상태에서 갈 수 있는 상태만), 비밀번호 안내·소유자 넘기기·삭제는 줄 끝 설정 버튼 메뉴에 둔다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
+ * 승인 대기는 승인·거절 버튼, 결정한 뒤는 열람 허용 스위치(켜면 승인·끄면 해제)로 바꾸고 (2026-11-19 사용자 요청 — 뱃지 드롭다운 대신), 비밀번호 안내·소유자 넘기기·삭제는 줄 끝 설정 버튼 메뉴에 둔다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
@@ -77,7 +71,7 @@ export const MemberApprovals: React.FC = () => {
       <table className="stk member-table">
         <thead>
           <tr>
-            <Th className="col-mem-name">이름</Th>
+            <Th className="col-mem-name">담당자</Th>
             <Th>소속</Th>
             <Th>이메일</Th>
             <Th className="col-mem-status">상태</Th>
@@ -102,25 +96,39 @@ export const MemberApprovals: React.FC = () => {
                 <td>{r.email}</td>
                 <td>
                   {(() => {
-                    const badge = (
-                      <StatusBadge level={STATUS_TEXT[r.status]?.level || 'warn'} size="sm">
-                        {STATUS_TEXT[r.status]?.label || r.status}
-                      </StatusBadge>
-                    );
-                    const next = NEXT_STATUS[r.status];
-                    // 바꿀 권한이 없거나 갈 상태가 없으면 뱃지만
-                    if (!canDecide || !next?.length) return badge;
-                    const options: DropdownOption<MemberStatus>[] = [r.status, ...next].map((s) => ({ value: s, label: STATUS_TEXT[s].label, title: STATUS_TITLE[s] }));
+                    const who = r.name || r.email;
+                    // 바꿀 권한이 없으면 뱃지만
+                    if (!canDecide || !STATUS_TEXT[r.status]) {
+                      return (
+                        <StatusBadge level={STATUS_TEXT[r.status]?.level || 'warn'} size="sm">
+                          {STATUS_TEXT[r.status]?.label || r.status}
+                        </StatusBadge>
+                      );
+                    }
+                    // 승인 대기 — 승인·거절 두 버튼으로 바로 결정한다
+                    if (r.status === 'pending') {
+                      return (
+                        <span className="member-decide">
+                          <Button size="xs" variant="primary" disabled={busy === r.email} data-btn="member-approve" title={STATUS_TITLE.approved} aria-label={`${who} 승인`} onClick={() => decide(r.email, 'approved')}>
+                            승인
+                          </Button>
+                          <Button size="xs" disabled={busy === r.email} data-btn="member-reject" title={STATUS_TITLE.rejected} aria-label={`${who} 거절`} onClick={() => decide(r.email, 'rejected')}>
+                            거절
+                          </Button>
+                        </span>
+                      );
+                    }
+                    // 결정한 뒤 — 열람 허용 스위치 (켜면 승인, 끄면 해제. 거절한 요청도 켜서 승인할 수 있다)
+                    const on = r.status === 'approved';
                     return (
-                      <Dropdown<MemberStatus>
-                        className="dd-badge"
-                        options={options}
-                        value={r.status}
-                        valueLabel={badge}
-                        onChange={(s) => s !== 'pending' && s !== r.status && decide(r.email, s)}
-                        ariaLabel={`${r.name || r.email} 열람 상태 바꾸기`}
+                      <Switch
+                        checked={on}
+                        label={STATUS_TEXT[r.status].label}
+                        ariaLabel={`${who} 열람 허용`}
+                        title={on ? '끄면 열람 권한을 해제합니다' : '켜면 열람을 승인합니다'}
                         disabled={busy === r.email}
-                        fixedMenu
+                        dataBtn="member-access"
+                        onChange={(next) => decide(r.email, next ? 'approved' : 'revoked')}
                       />
                     );
                   })()}

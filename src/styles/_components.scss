@@ -2178,3 +2178,70 @@ td.future {
     animation: none;
   }
 }
+
+/* ── 켜기·끄기 스위치 (common/Switch) — 헤더 테마 전환(.tgl)처럼 각진 모양, 켜지면 승인 뱃지와 같은 초록 ── */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sub);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  .switch-track {
+    position: relative;
+    flex: none;
+    width: 1.75rem;
+    height: 1rem;
+    background: var(--line2);
+    transition: background 0.15s ease;
+  }
+
+  .switch-thumb {
+    position: absolute;
+    top: 0.125rem;
+    left: 0.125rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    background: #fff;
+    transition: transform 0.15s ease;
+  }
+
+  &.on {
+    color: var(--ok);
+
+    .switch-track {
+      background: var(--ok);
+    }
+
+    .switch-thumb {
+      transform: translateX(0.75rem);
+    }
+  }
+
+  &:hover:not(:disabled) .switch-track {
+    filter: brightness(0.92);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch .switch-track,
+  .switch .switch-thumb {
+    transition: none;
+  }
+}

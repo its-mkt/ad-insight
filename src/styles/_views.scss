@@ -1380,7 +1380,7 @@ tr.kw-more-row td {
       width: 7rem;
     }
     .col-mem-status {
-      width: 6rem;
+      width: 7.5rem; // 승인·거절 버튼 두 개가 들어가게
     }
     .col-mem-role {
       width: 7.5rem;
@@ -1395,20 +1395,15 @@ tr.kw-more-row td {
     .dd .dd-trigger {
       height: 1.5rem;
     }
-    // 상태 뱃지 드롭다운 — 뱃지 모양 그대로, 눌러서 바꿀 수 있다는 표시로 작은 ▾ 만 붙인다
-    .dd.dd-badge .dd-trigger {
+    // 승인 대기 줄의 승인·거절 버튼 — 한 줄에 나란히
+    .member-decide {
+      display: inline-flex;
       gap: 0.25rem;
-      height: auto;
-      padding: 0.125rem;
-      border-color: transparent;
-      background: transparent;
 
-      &:hover:not(:disabled) {
+      // 거절도 누르는 버튼인 걸 알 수 있게 테두리를 보인다 (작은 기본 버튼은 테두리가 투명)
+      .btn:not(.acc) {
         border-color: var(--line2);
       }
-    }
-    .dd.dd-badge.open .dd-trigger {
-      border-color: var(--acc);
     }
   }
   .member-actions {
@@ -3177,8 +3172,8 @@ tr.kw-more-row td {
       justify-content: center;
       width: 2.5rem;
       height: 2.5rem;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.16);
+      // 사이드바 로고처럼 바탕 없이 아이콘만 — 파란 판 위라 강조색 대신 흰색
+      color: #fff;
     }
 
     .gate-brand-name {
