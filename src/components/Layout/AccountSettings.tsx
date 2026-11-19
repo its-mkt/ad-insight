@@ -10,7 +10,7 @@ import { Notice } from '../common/Notice';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { TextInput } from '../common/TextInput';
 import { GateError } from './LoginForm';
-import { isCompanyText, isLetterText } from '../../lib/authErrors';
+import { isOrgName, isPersonName } from '../../lib/authErrors';
 
 /** 설정 창 탭 — 기본 정보 · 비밀번호 */
 type AccountTab = 'profile' | 'password';
@@ -43,8 +43,8 @@ const ProfilePanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<AccountResult | null>(null);
   const dirty = name.trim() !== (user?.name || '') || company.trim() !== (user?.company || '') || team.trim() !== (user?.team || '');
-  // 저장에 실패했을 때 비어 있거나 한글·영문이 아닌 칸만 붉게
-  const err = (v: string, ok = isLetterText) => (result?.error && (!v.trim() || !ok(v)) ? ' err' : '');
+  // 저장에 실패했을 때 비어 있거나 규칙에 맞지 않는 칸만 붉게 (이름은 isPersonName, 회사·팀은 isOrgName)
+  const err = (v: string, ok = isOrgName) => (result?.error && (!v.trim() || !ok(v)) ? ' err' : '');
 
   const save = async () => {
     setSaving(true);
@@ -64,10 +64,10 @@ const ProfilePanel: React.FC = () => {
         <TextInput className="gate-input" value={user?.email || ''} readOnly disabled />
       </Field>
       <Field label="이름">
-        <TextInput className={`gate-input${err(name)}`} name="name" autoComplete="name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+        <TextInput className={`gate-input${err(name, isPersonName)}`} name="name" autoComplete="name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field label="회사">
-        <TextInput className={`gate-input${err(company, isCompanyText)}`} name="organization" autoComplete="organization" value={company} maxLength={40} placeholder="예: 아이티켓" onChange={(e) => setCompany(e.target.value)} />
+        <TextInput className={`gate-input${err(company)}`} name="organization" autoComplete="organization" value={company} maxLength={40} placeholder="예: 아이티켓" onChange={(e) => setCompany(e.target.value)} />
       </Field>
       <Field label="팀">
         <TextInput className={`gate-input${err(team)}`} name="team" value={team} maxLength={40} placeholder="예: 마케팅팀" onChange={(e) => setTeam(e.target.value)} />

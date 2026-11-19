@@ -23,24 +23,28 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
 /**
- * 이름·회사·팀 중 빈 칸이 있거나 허용하지 않는 글자가 있으면 안내 문구, 아니면 빈 문자열.
- * 이름·팀은 한글·영문만, 회사는 '(주)아이티켓'·'3M' 처럼 숫자와 회사명 기호도 받는다 (2026-11-19 사용자 결정).
+ * 이름·회사·팀 중 빈 칸이 있거나 '.'·'-' 처럼 뜻 없는 값이면 안내 문구, 아니면 빈 문자열.
+ * 흔히 쓰는 기호는 받되 실제 글자가 있어야 한다 (2026-11-19 사용자 결정 — 가입 때 귀찮아서 기호만 적는 것을 막는 목적).
  * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청은 '담당자', 내 계정 설정은 '이름' (2026-11-19 사용자 결정)
  */
 export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
   !name.trim() || !company.trim() || !team.trim()
     ? `${nameLabel}·회사·팀을 모두 입력해 주세요.`
-    : !isLetterText(name) || !isLetterText(team)
-      ? `${nameLabel}·팀은 한글이나 영문으로만 입력해 주세요. 숫자·기호는 쓸 수 없습니다.`
-      : !isCompanyText(company)
-        ? '회사는 한글·영문·숫자와 ㈜ ( ) & . , - 기호만 쓸 수 있습니다.'
+    : !isPersonName(name)
+      ? `${nameLabel} 칸은 한글이나 영문 이름으로 2자 이상 입력해 주세요.`
+      : !isOrgName(company) || !isOrgName(team)
+        ? '회사·팀은 실제 이름으로 입력해 주세요. 한글·영문이 들어간 2자 이상이어야 하고, 기호만 적을 수는 없습니다.'
         : '';
 
-/** 한글(완성형)·영문과 단어 사이 띄어쓰기만 있는지 — 담당자명·팀 칸 (2026-11-19 사용자 결정) */
-export const isLetterText = (v: string): boolean => /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/.test(v.trim().replace(/\s+/g, ' '));
+/** 한글(완성형)·영문 글자 수 — 자음·모음만 쓴 'ㅎㅎ' 는 세지 않는다 */
+const letterCount = (v: string): number => (v.match(/[가-힣a-zA-Z]/g) || []).length;
 
-/** 회사 칸 — 한글·영문·숫자·띄어쓰기와 회사명에 쓰는 기호 ㈜ ( ) & . , - 만, 글자나 숫자가 하나는 있어야 한다 */
-export const isCompanyText = (v: string): boolean => /^[가-힣a-zA-Z0-9 ㈜()&.,-]+$/.test(v.trim()) && /[가-힣a-zA-Z0-9]/.test(v);
+/** 담당자명 — 한글·영문 2자 이상, 띄어쓰기와 이름에 쓰는 . - ' 만 (숫자 없음) */
+export const isPersonName = (v: string): boolean => /^[가-힣a-zA-Z .'-]+$/.test(v.trim()) && letterCount(v) >= 2;
+
+/** 회사·팀 — 한글·영문·숫자와 흔히 쓰는 기호(㈜ ( ) & . , - _ ' / · +), 한글·영문 1자 이상 포함 글자·숫자 2자 이상 ('3M'·'영업1팀' 통과, '.'·'-'·'12' 막음) */
+export const isOrgName = (v: string): boolean =>
+  /^[가-힣a-zA-Z0-9 ㈜()&.,\-_'/·+]+$/.test(v.trim()) && letterCount(v) >= 1 && (v.match(/[가-힣a-zA-Z0-9]/g) || []).length >= 2;
 
 /** 입력한 인증번호에서 숫자만 남긴다 */
 export const otpDigits = (code: string): string => code.replace(/\D/g, '');
