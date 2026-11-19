@@ -3,7 +3,7 @@ import type { DashboardData, SiteId, SyncStatus, ViewId } from '../../types/dash
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { SITE_ENABLED } from '../../utils/route';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, ChartColumnIncreasing, ChartLine, Database, DollarSign, FileText, LayoutGrid, Lock, MonitorSmartphone, Search, ShoppingCart, UserCog, X } from 'lucide-react';
+import { Activity, ChartColumnIncreasing, ChartLine, ClipboardList, Database, DollarSign, FileText, LayoutGrid, MonitorSmartphone, Search, ShoppingCart, UserCog, X } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { Button } from '../common/Button';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
@@ -109,10 +109,10 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** 설정·연동 메뉴 — 최고 관리자·관리자에게 보인다 (어드민 관리는 최고 관리자만) */
+/** 설정·연동 메뉴 — 최고 관리자·관리자에게 보인다 (견적 원본 관리는 최고 관리자만) */
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'data', label: '데이터 연결', icon: <Database /> },
-  { id: 'admin', label: '어드민 관리', icon: <Lock /> },
+  { id: 'admin', label: '견적 원본 관리', icon: <ClipboardList /> },
   { id: 'members', label: '계정 관리', icon: <UserCog /> },
   { id: 'usage', label: '이용 현황', icon: <Activity /> },
 ];

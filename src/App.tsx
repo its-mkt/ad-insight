@@ -314,7 +314,7 @@ export const App: React.FC = () => {
       handleNavigate('overview');
       if (!wasLoggedIn.current) setLoginOpen(true);
     }
-    // 어드민 관리는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
+    // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
     else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
     // 온코어는 로그인한 관리자만 — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
     if (site === 'oncore' && !isLoggedIn) {

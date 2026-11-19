@@ -28,7 +28,7 @@ interface AuthContextType {
   loading: boolean;
   /** 최고 관리자·관리자로 로그인했는지 — 원문 데이터·설정 화면이 열린다 (예전부터 쓰던 이름이라 그대로 둔다) */
   isLoggedIn: boolean;
-  /** 최고 관리자인지 — 어드민 관리 화면·계정 등급 변경·계정 삭제 */
+  /** 최고 관리자인지 — 견적 원본 관리 화면·계정 등급 변경·계정 삭제 */
   isSuperAdmin: boolean;
   /** 로그인했는지 (권한과 상관없이) */
   isSignedIn: boolean;

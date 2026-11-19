@@ -1423,7 +1423,7 @@ function maskFreeText_(v) {
 
 /* ── 열람 권한: 가입 요청 → 관리자 승인 ──
  * 명단은 아이티켓 데이터 시트 한 곳에 둔다 (온코어 프로젝트도 같은 명단을 읽는다).
- *  - admins  탭: A열 이메일 — 최고 관리자 (원문 데이터·승인·등급 변경·삭제·어드민 관리)
+ *  - admins  탭: A열 이메일 — 최고 관리자 (원문 데이터·승인·등급 변경·삭제·견적 원본 관리)
  *  - members 탭: email · name · team · status(pending·approved·rejected·revoked) · requested_at · decided_at · decided_by · role
  *    role: '' (일반) · manager (관리자 — 원문 데이터·계정 관리(일반 계정 승인·거절·해제)·이용 현황·데이터 연결). 승인된 줄에서만 쓴다
  * Supabase 로그인 토큰으로 이메일을 확인하고, 명단에서 권한을 찾는다. 확인 결과는 5분 캐시해 요청마다 느려지지 않게 한다. */
@@ -1541,7 +1541,7 @@ function requestAccess_(data) {
 }
 /** 가입 요청 알림 — Teams 마케팅팀 채널(웹훅) + 관리자 메일. 알림이 실패해도 요청은 저장돼 있다 */
 function notifyAccessRequest_(email, name, team) {
-  const url = 'https://its.itket.com/ad-insight/itket/admin';
+  const url = 'https://its.itket.com/ad-insight/itket/members'; // 계정 관리 (관리자 등급도 열 수 있는 화면)
   const text = '광고 인사이트 가입 요청: ' + name + ' (' + team + ') · ' + email;
   const hook = PROPS.getProperty('TEAMS_WEBHOOK_URL');
   if (hook) {
@@ -1561,7 +1561,7 @@ function notifyAccessRequest_(email, name, team) {
   }
   try {
     GmailApp.sendEmail(ACCESS_NOTIFY_TO_, '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
-      text + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n관리자 화면에서 승인하거나 거절해 주세요.\n' + url);
+      text + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n계정 관리 화면에서 승인하거나 거절해 주세요.\n' + url);
   } catch (err) { console.warn('가입 요청 메일 실패: ' + err.message); }
 }
 /** 최고 관리자·관리자 — 가입 요청 목록 (role: member · manager) */
