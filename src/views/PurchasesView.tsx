@@ -15,6 +15,7 @@ import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../da
 import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, salesCutoff, salesInMonths } from '../data/godomallOrders';
 import { daysOfMonth } from '../utils/dayRange';
 import { fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
+import { monthsUpTo } from '../utils/allPeriod';
 
 interface PurchasesViewProps {
   status: SyncStatus;
@@ -92,7 +93,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   const AS_OF_DAY = +AS_OF.slice(8, 10);
   const yr = selectedMonth.slice(0, 4);
   const mm = +selectedMonth.slice(5, 7);
-  const ytd = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
+  const ytd = monthsUpTo(selectedMonth);
   const ytdTotal = totalOf(ytd);
   const lastYtd = ytd.map(lastYearOf);
   const hasLastYtd = lastYtd.some((m) => m in GODOMALL_ORDERS);

@@ -35,7 +35,8 @@ import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { formatCategoryScope, formatSourceScope } from '../utils/search';
 import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { Card } from '../components/common/Card';
-import { dotYm, firstMonth, inMonths, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { cpaInMonths, cpaSince } from '../utils/cpa';
 
 interface OverviewViewProps {
   data: DashboardData;
@@ -114,7 +115,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const cmp = period ? period.cmpLabel : '전월';
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
-  const months = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
+  const months = monthsUpTo(curM);
 
   const atSpend = (mo: string) => data.spend.filter((r) => r.month === mo);
   const totSpend = (mo: string) => sumBy(atSpend(mo), (r) => r.cost);
@@ -166,19 +167,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const quoteYears = yearsOf(stats.quotes.map((r) => r.month));
   const allSpend = sumBy(data.spend, (r) => r.cost);
   const allQuotes = sumBy(stats.quotes, (r) => r.count);
-  const cpaSpend = sumBy(data.spend.filter((r) => r.month >= starts.cpaFrom), (r) => r.cost);
-  const cpaQuotes = sumBy(stats.quotes.filter((r) => r.month >= starts.cpaFrom), (r) => r.count);
-  const allCpa = cpaQuotes > 0 ? cpaSpend / cpaQuotes : 0;
+  const { spend: cpaSpend, quotes: cpaQuotes, cpa: allCpa } = cpaSince(data.spend, stats.quotes, starts.cpaFrom);
 
   // 연도 합계: 1월~선택 연도 최신 달을 전년 같은 달들과 비교한다. CPA 는 전체 기간과 같은 기준으로 계산한다
   const lastYrMonths = sameMonthsLastYear(months);
   const yearLabel = yearRangeLabel(curM);
   const quotesIn = (list: string[]) => sumBy(stats.quotes.filter(inMonths(list)), (r) => r.count);
-  const cpaIn = (list: string[]) => {
-    const valid = list.filter((mo) => mo >= starts.cpaFrom);
-    const q = sumBy(stats.quotes.filter(inMonths(valid)), (r) => r.count);
-    return q > 0 ? sumBy(data.spend.filter(inMonths(valid)), (r) => r.cost) / q : 0;
-  };
+  const cpaIn = (list: string[]) => cpaInMonths(data.spend, stats.quotes, list, starts.cpaFrom);
   const ytdQuotes = quotesIn(months);
   const ytdCpa = cpaIn(months);
   const ytdValidMonths = months.filter((mo) => mo >= starts.cpaFrom);

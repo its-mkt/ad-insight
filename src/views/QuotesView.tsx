@@ -31,7 +31,8 @@ import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { MonthlyQuotesTable } from '../components/quotes/MonthlyQuotesTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
-import { dotYm, inMonths, periodStartsOf, sameMonthsLastYear, yearsOf } from '../utils/allPeriod';
+import { dotYm, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearsOf } from '../utils/allPeriod';
+import { cpaInMonths, cpaSince } from '../utils/cpa';
 
 interface QuotesViewProps {
   data: DashboardData;
@@ -107,7 +108,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   const pv = prevM(curM);
   // 전체 기간이면 달 대신 연도 단위로 본다
   const labels = allPeriod ? years.map((y) => `${y}년`) : Array.from({ length: mm }, (_, i) => `${i + 1}월`);
-  const axisKeys = allPeriod ? years : Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
+  const axisKeys = allPeriod ? years : monthsUpTo(last);
   const months = axisKeys;
   const allMonths = allPeriod ? years : Array.from({ length: 12 }, (_, i) => ym(yr, i + 1));
   const firstM = allAvailable[0] || '';
@@ -130,18 +131,11 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
 
   const starts = periodStartsOf(data);
-  const cpaMonths = yr ? Array.from({ length: mm }, (_, i) => ym(yr, i + 1)) : [];
+  const cpaMonths = yr ? monthsUpTo(last) : [];
   const lastYrMonths = sameMonthsLastYear(cpaMonths);
-  const cpaIn = (list: string[]) => {
-    const valid = list.filter((mo) => mo >= starts.cpaFrom);
-    const q = sumBy(quotes.filter(inMonths(valid)), (r) => r.count);
-    return q > 0 ? sumBy(data.spend.filter(inMonths(valid)), (r) => r.cost) / q : 0;
-  };
-  const ytdCpa = cpaIn(cpaMonths);
-  const lastYrCpa = cpaIn(lastYrMonths);
-  const cpaSpend = sumBy(data.spend.filter((r) => r.month >= starts.cpaFrom), (r) => r.cost);
-  const cpaQuotesCount = sumBy(quotes.filter((r) => r.month >= starts.cpaFrom), (r) => r.count);
-  const allCpa = cpaQuotesCount > 0 ? cpaSpend / cpaQuotesCount : 0;
+  const ytdCpa = cpaInMonths(data.spend, quotes, cpaMonths, starts.cpaFrom);
+  const lastYrCpa = cpaInMonths(data.spend, quotes, lastYrMonths, starts.cpaFrom);
+  const { spend: cpaSpend, quotes: cpaQuotesCount, cpa: allCpa } = cpaSince(data.spend, quotes, starts.cpaFrom);
 
   /** 최다 접수 담당자 카드 — 미지정은 순위·평균에서 빼고, 하단 줄에는 담당 현황만 보여 준다 */
   const repCard = (label: string, rows: QuoteRawRow[], prevRows: QuoteRawRow[] | null = null, withAverage = true) => {
