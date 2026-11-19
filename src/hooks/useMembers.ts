@@ -23,6 +23,10 @@ interface MembersState {
   error: string;
   /** 승인·거절·해제·삭제를 보내는 중인 이메일 */
   busy: string;
+  /** 명단을 다시 받는 중 (새로 고침 버튼이 돈다) */
+  refreshing: boolean;
+  /** 마지막으로 명단을 받은 시각 (HH:mm, 한국 시간) */
+  checkedAt: string;
 }
 
 // 승인 대기를 맨 위로, 그다음 최근 요청 순
@@ -32,7 +36,7 @@ const ORDER: Record<MemberStatus, number> = { pending: 0, approved: 1, rejected:
  * 가입 요청 명단 — 계정 관리 화면과 사이드바 승인 대기 뱃지가 같은 명단을 쓴다.
  * 한 곳에서 승인·거절하면 다른 곳도 바로 바뀌도록 화면 밖(모듈)에 한 벌만 둔다
  */
-let state: MembersState = { rows: null, error: '', busy: '' };
+let state: MembersState = { rows: null, error: '', busy: '', refreshing: false, checkedAt: '' };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -56,12 +60,17 @@ const whoOf = (email: string): string => {
 export function loadMembers(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
-    setState({ error: '' });
+    setState({ error: '', refreshing: true });
     const res = await postAuthedAction<{ members?: MemberRow[] }>('listMembers');
     if (res.error || !res.members) setState({ error: '가입 요청 목록을 불러오지 못했습니다.', rows: state.rows ?? [] });
-    else setState({ rows: [...res.members].sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.requested_at.localeCompare(a.requested_at)) });
+    else
+      setState({
+        rows: [...res.members].sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.requested_at.localeCompare(a.requested_at)),
+        checkedAt: new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }),
+      });
   })().finally(() => {
     loading = null;
+    setState({ refreshing: false });
   });
   return loading;
 }
@@ -103,10 +112,6 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
   await loadMembers();
 }
 
-/**
- * 이용자 삭제 (해제와 별도) — 명단에서 지우고, 웹앱에 Supabase 관리자 키가 있으면 로그인 계정도 지운다.
- * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
- */
 /** 비밀번호 재설정 안내 메일을 보낸다 — 비밀번호는 보거나 바꾸지 않고, 본인이 '비밀번호 찾기'에서 새로 정한다 */
 export async function sendPasswordGuide(email: string): Promise<void> {
   const who = whoOf(email);
@@ -120,11 +125,15 @@ export async function sendPasswordGuide(email: string): Promise<void> {
   const text: Record<string, string> = {
     too_many: '같은 계정에는 한 시간에 3번까지 보낼 수 있습니다. 잠시 뒤 다시 시도해 주세요.',
     not_approved: '승인된 계정에만 보낼 수 있습니다.',
-    forbidden: '이 계정에 보낼 권한이 없습니다. 관리자 계정은 최고 관리자만 보낼 수 있습니다.',
+    forbidden: '이 계정에 보낼 권한이 없습니다. 운영자 계정은 소유자만 보낼 수 있습니다.',
   };
   showToast(text[res.error] || '안내 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
 }
 
+/**
+ * 이용자 삭제 (해제와 별도) — 명단에서 지우고, 웹앱에 Supabase 관리자 키가 있으면 로그인 계정도 지운다.
+ * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
+ */
 export async function deleteMember(email: string): Promise<void> {
   const who = whoOf(email);
   setState({ busy: email });
@@ -154,7 +163,7 @@ export function useMembers(enabled = true): MembersState & { pending: number } {
   useEffect(() => {
     if (enabled && !state.rows && !loading) void loadMembers();
     // 로그아웃하면 받아 둔 명단을 지운다
-    if (!enabled && state.rows) setState({ rows: null, error: '' });
+    if (!enabled && state.rows) setState({ rows: null, error: '', checkedAt: '' });
   }, [enabled]);
   return { ...snap, pending: snap.rows?.filter((r) => r.status === 'pending').length || 0 };
 }

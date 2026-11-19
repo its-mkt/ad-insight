@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyRound, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
+import { KeyRound, RefreshCw, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -33,7 +33,7 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
-  const { rows, error, busy, pending } = useMembers();
+  const { rows, error, busy, pending, refreshing, checkedAt } = useMembers();
   const { isSuperAdmin, user } = useAuth();
   const myEmail = (user?.email || '').toLowerCase();
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
@@ -42,8 +42,13 @@ export const MemberApprovals: React.FC = () => {
     <Card
       name="members"
       title="가입 요청·열람 권한"
-      subtitle={rows ? `승인 대기 ${pending}건 · 전체 ${rows.length}명` : undefined}
-      tools={<Button size="sm" onClick={() => void loadMembers()}>새로 고침</Button>}
+      subtitle={rows ? `승인 대기 ${pending}건 · 전체 ${rows.length}명${checkedAt ? ` · ${checkedAt} 기준` : ''}` : undefined}
+      tools={
+        // 받는 동안 아이콘이 돌고 다시 누를 수 없다 — 끝나면 제목 줄의 '○○:○○ 기준'이 바뀐다
+        <Button size="sm" icon={RefreshCw} className={refreshing ? 'is-spinning' : undefined} disabled={refreshing} aria-busy={refreshing} data-btn="members-refresh" onClick={() => void loadMembers()}>
+          새로 고침
+        </Button>
+      }
       tableWrap
     >
       {error && <Notice tone="warn">{error}</Notice>}

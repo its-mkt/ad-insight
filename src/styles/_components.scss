@@ -2161,3 +2161,20 @@ td.future {
     font-weight: 700;
   }
 }
+
+// 새로 고침처럼 받는 동안 아이콘을 돌리는 버튼 (Button icon + className="is-spinning")
+.btn.is-spinning svg {
+  animation: btn-spin 0.9s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-spinning svg {
+    animation: none;
+  }
+}
