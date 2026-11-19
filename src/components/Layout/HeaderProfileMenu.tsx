@@ -98,12 +98,15 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
           <div className="pm-user">
             <Avatar src={user?.avatarUrl} name={user?.name || user?.email} size="lg" as="div" />
             <div className="pm-user-info">
-              <div className="pm-user-name">{user?.name || roleLabel}</div>
+              {/* 등급 뱃지는 이름 바로 오른쪽에 붙인다 (이메일이 줄 전체 폭을 쓰게) */}
+              <div className="pm-user-head">
+                <span className="pm-user-name">{user?.name || roleLabel}</span>
+                <StatusBadge level={isLoggedIn ? 'ok' : 'man'} size="sm">
+                  {roleLabel}
+                </StatusBadge>
+              </div>
               <div className="pm-user-email">{user?.email}</div>
             </div>
-            <StatusBadge level={isLoggedIn ? 'ok' : 'man'} size="sm">
-              {roleLabel}
-            </StatusBadge>
           </div>
 
           <div className="pm-group" role="group" aria-label="계정">

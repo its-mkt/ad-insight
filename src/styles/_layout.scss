@@ -611,7 +611,7 @@ main {
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
-    width: 16.75rem; // 테마 두 개 + 이메일(itsmkt1307@gmail.com)·등급 뱃지가 잘리지 않는 폭
+    width: 14.5rem; // 테마 두 개와 이메일(itsmkt1307@gmail.com)이 잘리지 않는 폭 — 등급 뱃지는 이름 옆이라 폭에 영향 없음
     padding: 0.5rem;
     background: var(--card);
     border: 1px solid var(--line2);
@@ -633,6 +633,14 @@ main {
   .pm-user-info {
     min-width: 0;
     flex: 1;
+  }
+
+  // 이름 + 등급 뱃지 한 줄 — 이름이 길면 이름만 줄임표
+  .pm-user-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
   }
 
   .pm-user-name,
