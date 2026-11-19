@@ -601,7 +601,7 @@ main {
     top: calc(100% + 0.5rem);
     right: 0;
     width: 18rem;
-    padding: 1rem;
+    padding: 0.5rem;
     background: var(--card);
     border: 1px solid var(--line2);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -612,8 +612,11 @@ main {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--line);
+    padding: 0.5rem 0.5rem 0.75rem;
+
+    .st {
+      flex: none;
+    }
   }
 
   .pm-user-info {
@@ -638,28 +641,57 @@ main {
     color: var(--sub);
   }
 
-  .pm-foot {
+  // 메뉴 묶음 — 묶음 사이를 줄로 나눈다
+  .pm-group {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding-top: 0.75rem;
+    padding: 0.25rem 0;
+    border-top: 1px solid var(--line);
   }
 
-  // 내 계정 설정 열기 — 로그아웃 위, 같은 폭
-  .btn-account {
+  .pm-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
     width: 100%;
-    justify-content: center;
-    height: auto;
     padding: 0.5rem;
-    font-size: 0.875rem;
+    border: 0;
+    background: transparent;
     color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+
+    svg {
+      flex: none;
+      color: var(--sub);
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--bg);
+    }
   }
 
-  .btn-logout {
-    width: 100%;
+  // 테마 — 이름 왼쪽, 라이트·다크·시스템 고르기 오른쪽
+  .pm-theme {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     padding: 0.5rem;
     font-size: 0.875rem;
-    color: var(--sub);
+
+    .pm-theme-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.625rem;
+
+      svg {
+        color: var(--sub);
+      }
+    }
   }
 }
 
