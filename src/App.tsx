@@ -9,6 +9,9 @@ import { Header } from './components/Layout/Header';
 import { Tooltip } from './components/Layout/Tooltip';
 import { PeriodNav } from './components/common/PeriodNav';
 import { lastMonthOfYear, TOTAL_PERIOD_VIEWS } from './utils/allPeriod';
+
+/** 진행 중인 달을 전월 동기간과 비교하는 화면 (광고비·견적 증감을 보여 주는 화면) */
+const MTD_COMPARE_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes'];
 import { categoryOfQuery, type SearchTab } from './utils/search';
 import { addRecentSearch, clearRecentSearches, loadFavoriteSearches, sameSearch, toggleFavoriteSearch } from './utils/recentSearches';
 import { Star } from 'lucide-react';
@@ -33,8 +36,8 @@ import { ToastHost } from './components/common/Toast';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
 import { openPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
-import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
-import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
+import { dayPeriodOf, monthToDateCompareOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
+import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withPrevSamePeriod } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
@@ -163,8 +166,23 @@ export const App: React.FC = () => {
     setDailyHist({ rows: [], months: [] });
     dailyFailed.current.clear();
   }, [site]);
+  // 진행 중인 달 보기 — 당월 1일~마지막 자료 날짜를 전월 같은 날짜와 비교한다 (2026-11-19 사용자 요청, 전월 전체와 비교하면 늘 하락으로 보임).
+  // 마지막 자료 날짜는 일별 광고비·견적 중 늦은 날 (뷰어는 웹앱이 어제까지만 보내므로 저절로 어제가 된다)
+  const mtdTo = useMemo(() => {
+    if (searchDay || allPeriod || yearTotal || viewMonth !== THIS_M || !MTD_COMPARE_VIEWS.includes(currentView)) return null;
+    let to = '';
+    const take = (d?: string) => {
+      const day = (d || '').slice(0, 10);
+      if (day.startsWith(THIS_M) && day > to) to = day;
+    };
+    fullData.spendDaily.forEach((r) => take(r.date));
+    fullData.quotesRaw.forEach((r) => take(r.date));
+    return to || null;
+  }, [searchDay, allPeriod, yearTotal, viewMonth, currentView, fullData]);
+  const mtdPrevRange = useMemo(() => (mtdTo ? monthToDateCompareOf(mtdTo).prevRange : null), [mtdTo]);
   useEffect(() => {
-    const need = searchDay ? dailyMonthsToLoad(fullData, searchDay).filter((m) => !dailyFailed.current.has(m)).slice(0, 48) : [];
+    const range = searchDay ?? mtdPrevRange;
+    const need = range ? dailyMonthsToLoad(fullData, range).filter((m) => !dailyFailed.current.has(m)).slice(0, 48) : [];
     if (!need.length) {
       setDailyLoading(false);
       return;
@@ -183,12 +201,14 @@ export const App: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [searchDay, fullData]);
+  }, [searchDay, mtdPrevRange, fullData]);
   const dayCovered = !!searchDay && rangeCovered(fullData, searchDay);
-  // 진행 중인 달도 전월 전체와 비교한다 (전월 같은 날짜까지만 자르는 '전월 동기간' 비교는 2026-11-11 사용자 요청으로 끔)
+  // 진행 중인 달은 전월 동기간(전월 1일~같은 날짜)과 비교한다 — 전달 자리만 그 구간 값으로 바꾸고, 추이 그래프는 월 합계(monthly)로 그린다
+  const mtdData = useMemo(() => (mtdPrevRange ? withPrevSamePeriod(fullData, mtdPrevRange) : null), [fullData, mtdPrevRange]);
+  const mtdCompare = useMemo(() => (mtdData && mtdTo ? monthToDateCompareOf(mtdTo) : undefined), [mtdData, mtdTo]);
   const viewData = useMemo(
-    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : baseData),
-    [baseData, fullData, searchDay, currentView]
+    () => (searchDay && currentView !== 'admin' && currentView !== 'data' ? applyDayRange(fullData, searchDay, { quotes: currentView !== 'search' }) : mtdData ?? baseData),
+    [baseData, fullData, searchDay, currentView, mtdData]
   );
   const period = useMemo(() => (searchDay && dayCovered ? dayPeriodOf(searchDay) : undefined), [searchDay, dayCovered]);
 
@@ -240,7 +260,8 @@ export const App: React.FC = () => {
             : currentView === 'devices'
               ? `${until} (GA4 방문·전환과 구글 광고는 마감 후 반영)`
               : `${until}${dropped}`;
-    return `${head} · 오늘 값은 로그인 후 확인할 수 있습니다`;
+    // 데이터는 승인된 계정만 보므로 '로그인 후 확인' 안내는 붙이지 않는다 — 뷰어도 이미 로그인한 상태다 (2026-11-19 사용자 결정)
+    return head;
   })();
 
   // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다
@@ -499,7 +520,7 @@ export const App: React.FC = () => {
                 />
               )}
               {viewReady && currentView === 'overview' && (
-                <OverviewView monthly={period ? baseData : undefined} period={period}
+                <OverviewView monthly={period || mtdCompare ? baseData : undefined} period={period} compare={mtdCompare}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -510,7 +531,7 @@ export const App: React.FC = () => {
                 />
               )}
               {viewReady && currentView === 'ads' && (
-                <AdsView monthly={period ? baseData : undefined} period={period}
+                <AdsView monthly={period || mtdCompare ? baseData : undefined} period={period} compare={mtdCompare}
                   data={viewData}
                   status={status}
                   selectedMonth={viewMonth}
@@ -519,7 +540,7 @@ export const App: React.FC = () => {
                 />
               )}
               {viewReady && currentView === 'cat-efficiency' && (
-                <CatEfficiencyView period={period}
+                <CatEfficiencyView period={period} compare={mtdCompare}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -529,7 +550,7 @@ export const App: React.FC = () => {
                 />
               )}
               {viewReady && currentView === 'keywords' && (
-                <KeywordsView period={period}
+                <KeywordsView period={period} compare={mtdCompare}
                   data={viewData}
                   categoryMap={categoryMap}
                   status={status}
@@ -540,7 +561,7 @@ export const App: React.FC = () => {
                 />
               )}
               {viewReady && currentView === 'quotes' && (
-                <QuotesView monthly={period ? baseData : undefined} period={period}
+                <QuotesView monthly={period || mtdCompare ? baseData : undefined} period={period} compare={mtdCompare}
                   data={viewData}
                   status={status}
                   isSyncing={isSyncing}
@@ -565,7 +586,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                   dayRange={searchDay}
                   dayCovered={dayCovered}
-                  isLoggedIn={isLoggedIn}
+                  // 승인된 계정(뷰어 포함)은 견적 목록을 본다 — 뷰어는 웹앱이 고객 정보를 *** 로 가려 준다. 로그인 전 미리보기만 로그인 안내
+                  isLoggedIn={canView}
                   onLogin={openLogin}
                   onSelectAllPeriod={selectAllPeriod}
                 />

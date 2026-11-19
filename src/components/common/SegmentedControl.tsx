@@ -72,3 +72,8 @@ export const ChartTableToggle: React.FC<ChartTableToggleProps> = ({ value, onCha
     <span className="sp" />
   </div>
 );
+
+/** 카드 제목 줄 오른쪽(Card 의 tools)에 두는 작은 그래프/표 탭 — 표만 있던 카드에 그래프 보기를 더할 때 */
+export const CardChartTableTabs: React.FC<ChartTableToggleProps & { /** 탭 묶음의 요소 id */ id?: string }> = ({ value, onChange, id }) => (
+  <SegmentedControl<ChartTableMode> mini id={id} dataKey="mode" options={CHART_TABLE_OPTIONS} value={value} onChange={onChange} />
+);

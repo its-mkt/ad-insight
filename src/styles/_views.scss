@@ -1927,6 +1927,9 @@ tr.kw-more-row td {
     display: inline-flex;
     align-self: center;
   }
+  :root {
+    --hdr-btn: 2.5rem;
+  }
   .top {
     order: 1;
     position: sticky;
@@ -1935,9 +1938,7 @@ tr.kw-more-row td {
     min-height: 3.75rem;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'b t a'
-      'b u a';
+    grid-template-areas: 'b t a';
     align-content: center;
     align-items: center;
     row-gap: 0.25rem;
@@ -1952,7 +1953,7 @@ tr.kw-more-row td {
       line-height: 1.25;
       overflow: hidden;
       text-overflow: ellipsis;
-      align-self: end;
+      align-self: center;
     }
 
     .ttx,
@@ -2012,11 +2013,6 @@ tr.kw-more-row td {
       width: 1.25rem;
       height: 1.25rem;
     }
-  }
-  // 테마 전환: 옆 버튼과 같은 높이(2.5rem)
-  .tgl {
-    width: 4rem;
-    height: 2.5rem;
   }
   .side {
     position: fixed;
@@ -2210,7 +2206,6 @@ tr.kw-more-row td {
 @media print {
   .side,
   .btn,
-  .tgl,
   .seg,
   .scrim {
     display: none;
@@ -2227,16 +2222,7 @@ tr.kw-more-row td {
   }
 }
 
-// 헤더 검색
-.top .btn.btn-search {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-color: var(--line);
-}
+// 헤더 검색 — 크기·테두리는 .top .acts > .btn.ic (_layout)
 
 .search-backdrop {
   align-items: flex-start;

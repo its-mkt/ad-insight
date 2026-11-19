@@ -10,6 +10,10 @@ import { Th } from '../common/Th';
 interface TrendTableProps {
   id: string;
   title: React.ReactNode;
+  /** 제목 옆 흐린 보조 제목 (예: '(단위: 원)') */
+  subtitle?: React.ReactNode;
+  /** 맨 아래 열 합계 줄 — 방문·페이지뷰처럼 줄끼리 더하면 뜻이 없는 표는 false (기본 true) */
+  totalRow?: boolean;
   /** 첫 열 이름 */
   nameLabel: string;
   labels: string[];
@@ -20,7 +24,7 @@ interface TrendTableProps {
 }
 
 /** 추이 차트(MultiChart)의 표 보기 — 같은 labels·series 를 행·열로 펼친다 */
-export const TrendTable: React.FC<TrendTableProps> = ({ id, title, nameLabel, labels, series, emptyMessage = '표시할 데이터가 없습니다', isFuture }) => {
+export const TrendTable: React.FC<TrendTableProps> = ({ id, title, subtitle, totalRow = true, nameLabel, labels, series, emptyMessage = '표시할 데이터가 없습니다', isFuture }) => {
   const [showAll, setShowAll] = useState(false);
   const columns = labels.map((_, i) => String(i));
   // 합계 줄은 접힌 행까지 포함한 전체 합계다
@@ -28,7 +32,7 @@ export const TrendTable: React.FC<TrendTableProps> = ({ id, title, nameLabel, la
   const futureOf = (row: string | null) => (isFuture ? (key: string) => isFuture(+key, row) : undefined);
   const cell = (row: string | null, key: string, n: number) => (isFuture?.(+key, row) ? '–' : n);
   return (
-    <Card name={id} id={id} title={title}>
+    <Card name={id} id={id} title={title} subtitle={subtitle}>
       {series.length && labels.length ? (
         <div className="tw">
           <table className="stk">
@@ -43,7 +47,7 @@ export const TrendTable: React.FC<TrendTableProps> = ({ id, title, nameLabel, la
               {series.slice(0, showAll ? undefined : LIST_LIMIT).map((s) => (
                 <MonthRow key={s.k} label={s.k} columns={columns} isFuture={futureOf(s.k)} value={(key) => cell(s.k, key, s.v[+key] ?? 0)} total={sumBy(s.v, (v) => v)} totalBold />
               ))}
-              <MonthRow grp label="합계" columns={columns} isFuture={futureOf(null)} value={(key) => cell(null, key, columnTotal(key))} total={sumBy(columns, columnTotal)} totalBold />
+              {totalRow && <MonthRow grp label="합계" columns={columns} isFuture={futureOf(null)} value={(key) => cell(null, key, columnTotal(key))} total={sumBy(columns, columnTotal)} totalBold />}
             </tbody>
           </table>
           <ShowMoreButton noun={nameLabel} total={series.length} expanded={showAll} onToggle={() => setShowAll((v) => !v)} />
