@@ -24,23 +24,6 @@ section {
   }
 }
 
-.sec {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.75rem;
-  border-left: 0.25rem solid var(--acc);
-  padding-left: 0.75rem;
-
-  .muted {
-    font-size: 0.875rem;
-    font-weight: 400;
-  }
-}
-
 .lead-t {
   font-size: 0.875rem;
   color: var(--ink2);
@@ -2129,11 +2112,6 @@ tr.kw-more-row td {
       flex-shrink: 0;
     }
 
-    .sd-scope-title {
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
     /* 다른 화면의 드롭다운(common/Dropdown)을 그대로 쓰고, 칸 폭만 세 칸이 나눠 갖게 한다 */
     .sd-dd {
       flex: 1 1 0;
@@ -2802,14 +2780,6 @@ tr.kw-more-row td {
   .col-us-date {
     width: var(--col-date);
   }
-}
-
-/* 로그인해야 볼 수 있는 기간 안내 (LoginGate) */
-.login-gate-actions {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  padding-bottom: 1.5rem;
 }
 
 // 이메일 인증번호 2단계 — 보낸 주소 안내·인증번호 칸·다시 보내기/이메일 바꾸기
