@@ -2142,22 +2142,22 @@ td.future {
     cursor: not-allowed;
   }
 
-  // 삭제 — 경고색으로만 구분한다 (나누는 줄 없음). 한 번 누르면 채운 배경으로 바뀌어 한 번 더 누르게 한다
+  // 삭제 — 붉은색(--err)으로만 구분한다 (나누는 줄 없음). 한 번 누르면 채운 배경으로 바뀌어 한 번 더 누르게 한다
   &.danger {
-    color: var(--warn);
+    color: var(--err);
 
     svg {
       color: currentColor;
     }
 
     &:hover:not(:disabled) {
-      background: var(--warnbg);
-      color: var(--warn);
+      background: color-mix(in srgb, var(--err) 10%, var(--card));
+      color: var(--err);
     }
   }
 
   &.armed {
-    background: var(--warnbg);
+    background: color-mix(in srgb, var(--err) 10%, var(--card));
     font-weight: 700;
   }
 }

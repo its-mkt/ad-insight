@@ -67,7 +67,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, ariaLabel, icon: 
       top: down ? b.bottom + GAP : 'auto',
       bottom: down ? 'auto' : window.innerHeight - b.top + GAP,
     });
-  }, [open, align]);
+  }, [open, align, armed]); // "한 번 더 누르면 삭제"로 글자가 길어지면 화면 밖으로 넘치지 않게 다시 잰다
 
   // 화면 기준으로 띄운 메뉴는 버튼을 따라가지 않으므로 바깥이 스크롤·크기 변경되면 닫는다
   useEffect(() => {
