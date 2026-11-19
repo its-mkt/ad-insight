@@ -53,6 +53,9 @@ const TITLE = '기기별 통계';
 const KPI_DEVICES: DeviceKey[] = ['desktop', 'mobile', 'tablet'];
 const PENDING = '수집 전';
 const CLOSED = '마감 후 반영';
+/** 전환 종류의 화면 이름과, 그 전환을 세는 화면 (표 산출 근거) */
+const CONV_NAMES: Record<Ga4ConvId, string> = { estimate: '견적 완료', order: '주문 완료' };
+const CONV_BASIS: Record<Ga4ConvId, string> = { estimate: '견적 요청 완료 화면을 본 세션', order: '주문 완료 화면을 본 세션' };
 const pctText = (n: number | null) => (n === null ? '–' : `${n.toFixed(1)}%`);
 const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : null);
 
@@ -119,17 +122,23 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const visits = sumGa4(g, scope, pickSessions, addDevices);
   const prevVisits = sumGa4(g, prevScope, (m) => (Object.keys(m.sessions).length ? m.sessions : null), addDevices);
   const conv = (id: Ga4ConvId, months: string[]) => sumGa4(g, months, (m) => m.conv?.[id] ?? null, addDevices);
+  // 전환을 받은 달이 있는데 견적 완료가 한 번도 없으면 그 사이트는 견적 완료를 세지 않는다 (견적 완료 화면이 없는 온코어) —
+  // 그때는 '수집 전' 대신 실제로 세는 주문 완료를 기준 전환으로 보여 준다 (사이트 이름이 아니라 받은 데이터로 판단)
+  const loaded = Object.values(g);
+  const estimateUntracked = loaded.some((m) => m.conv) && !loaded.some((m) => m.conv?.estimate != null) && loaded.some((m) => m.conv?.order != null);
+  const mainConv: Ga4ConvId = estimateUntracked ? 'order' : 'estimate';
+  const convName = CONV_NAMES[mainConv];
   const estimates = conv('estimate', scope);
   const orders = conv('order', scope);
   const visitTotal = sumBy([...visits.acc.values()], (n) => n);
-  // 전환율의 분모 — 견적 완료가 수집된 달의 방문만 더한다 (방문은 더 일찍부터 수집돼 여러 달을 합치면 전환율이 낮게 나온다)
-  const visitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.conv?.estimate != null), pickSessions, addDevices);
+  // 전환율의 분모 — 기준 전환이 수집된 달의 방문만 더한다 (방문은 더 일찍부터 수집돼 여러 달을 합치면 전환율이 낮게 나온다)
+  const visitsForConv = sumGa4(g, scope.filter((mo) => g[mo]?.conv?.[mainConv] != null), pickSessions, addDevices);
 
-  // 기기 × 채널 (방문·견적 완료)
+  // 기기 × 채널 (방문·기준 전환)
   const addChannelVisits = (acc: Map<string, number>, rows: NonNullable<Ga4DeviceMonth['channels']>) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.sessions));
   const chVisits = sumGa4(g, scope, (m) => m.channels, addChannelVisits);
-  const chVisitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.convChannels?.estimate != null), (m) => m.channels, addChannelVisits);
-  const chEst = sumGa4(g, scope, (m) => m.convChannels?.estimate ?? null, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.s)));
+  const chVisitsForEst = sumGa4(g, scope.filter((mo) => g[mo]?.convChannels?.[mainConv] != null), (m) => m.channels, addChannelVisits);
+  const chEst = sumGa4(g, scope, (m) => m.convChannels?.[mainConv] ?? null, (acc, rows) => rows.forEach((r) => acc.set(`${r.device}|${r.channel}`, (acc.get(`${r.device}|${r.channel}`) ?? 0) + r.s)));
   const channelNames = [...new Set([...chVisits.acc.keys()].map((k) => k.slice(k.indexOf('|') + 1)))].sort(
     (a, b) => sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${b}`) ?? 0) - sumBy(DEVICE_KEYS, (d) => chVisits.acc.get(`${d}|${a}`) ?? 0)
   );
@@ -189,7 +198,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     };
   };
   const visitTrend = trend((m) => (Object.keys(m.sessions).length ? m.sessions : null));
-  const estimateTrend = trend((m) => m.conv?.estimate);
+  const convTrend = trend((m) => m.conv?.[mainConv]);
 
   const loading = ga4 === null;
   const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : gaWait);
@@ -200,6 +209,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
       <ViewNote>
         ※ {periodLabel} 기준. 방문·전환은 GA4(견적 요청 완료·주문 완료 화면을 본 세션), 광고는 구글·네이버 API의 기기별 실적, 판매는 고도몰 주문 형태(PC·모바일·수기 주문) 그대로입니다.
         수집되지 않은 달은 0이 아니라 "{PENDING}"으로 두고, 다른 자료로 나눠 채우지 않습니다.
+        {estimateUntracked && ' 이 사이트는 견적 요청 완료 화면이 없어 GA4가 견적 완료를 세지 않으므로, 전환은 주문 완료를 기준으로 보여 줍니다.'}
       </ViewNote>
 
       <KpiSection id="kpiDevices">
@@ -221,9 +231,13 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                 <KpiDetailItems
                   items={[
                     ['비중', pctText(share(n ?? 0, visitTotal))],
-                    // 괄호 안은 견적 전환율 (견적 완료 ÷ 방문)
-                    ['견적 완료', est === null ? gaWait : `${fmt(est)}회 (${pctText(share(est, visitsForEst.acc.get(d) ?? 0))})`],
-                    ['주문 완료', ord === null ? gaWait : `${fmt(ord)}회`],
+                    // 괄호 안은 기준 전환의 전환율 (전환 ÷ 방문). 견적 완료를 세지 않는 사이트는 견적 완료 줄을 두지 않는다
+                    ...(estimateUntracked
+                      ? [['주문 완료', ord === null ? gaWait : `${fmt(ord)}회 (${pctText(share(ord, visitsForConv.acc.get(d) ?? 0))})`] as [string, string]]
+                      : [
+                          ['견적 완료', est === null ? gaWait : `${fmt(est)}회 (${pctText(share(est, visitsForConv.acc.get(d) ?? 0))})`] as [string, string],
+                          ['주문 완료', ord === null ? gaWait : `${fmt(ord)}회`] as [string, string],
+                        ]),
                   ]}
                 />
               }
@@ -261,11 +275,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
         <MultiChart
           id="chDeviceEstimates"
-          title={allPeriod ? '연도별 기기별 견적 완료' : '월별 기기별 견적 완료'}
-          labels={estimateTrend.labels}
-          series={estimateTrend.series}
+          title={`${allPeriod ? '연도별' : '월별'} 기기별 ${convName}`}
+          labels={convTrend.labels}
+          series={convTrend.series}
           unit="회"
-          emptyMessage={`기기별 견적 완료는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
+          emptyMessage={estimateUntracked ? `이 기간에 기기별 ${convName}가 없습니다.` : `기기별 ${convName}는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
         />
           </>
         )}
@@ -297,7 +311,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                 {tableDevices.map((d) => (
                   <React.Fragment key={d}>
                     <Th className="n">방문</Th>
-                    <Th className="n">견적 완료</Th>
+                    <Th className="n">{convName}</Th>
                     <Th className="n">전환율</Th>
                   </React.Fragment>
                 ))}
@@ -340,7 +354,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         ) : (
           <EmptyState message={`기기 × 채널 유입은 ${PENDING}입니다.`} subMessage="GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다." />
         )}
-        <TableFootnote unit="회" basis="산출 근거: GA4 세션 · 견적 완료 = 견적 요청 완료 화면을 본 세션 · 전환율 = 견적 완료 ÷ 방문" sources={['출처: GA4 (itket-analytics 수집)']} />
+        <TableFootnote unit="회" basis={`산출 근거: GA4 세션 · ${convName} = ${CONV_BASIS[mainConv]} · 전환율 = ${convName} ÷ 방문`} sources={['출처: GA4 (itket-analytics 수집)']} />
       </Card>
 
       <Card key={reveal ? 'ads-real' : 'ads'} name="device-ads" id="device-ads" className={reveal ? 'preview-real' : undefined} title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap>

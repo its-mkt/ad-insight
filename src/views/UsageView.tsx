@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ViewId } from '../types/dashboard';
 import { MultiChart } from '../components/charts/MultiChart';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
@@ -8,109 +7,25 @@ import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
-import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
-import { TabButton } from '../components/common/TabButton';
+import { NumTd, TreeChildRow, TreeParentRow, childLabelOf, EmptyRow } from '../components/common/TableRows';
+import { TabBar, TabButton } from '../components/common/TabButton';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { loadUsageStats, USAGE_TRACKING_ON, type UsageDay, type UsageStats } from '../lib/usage';
-import { yearRangeLabel } from '../utils/allPeriod';
-import { VIEW_TITLES } from '../utils/constants';
-import { daysOfMonth, fromDayKey, lastDayOf, rangeLabel, sameRangeLastMonth, toDayKey, type DayRange } from '../utils/dayRange';
-import { fmt, prevM } from '../utils/format';
+import { addDays, daysBetween, toDayKey, type DayRange } from '../utils/dayRange';
+import { fmt, sumBy } from '../utils/format';
 import { toggledSet } from '../utils/toggleSet';
+import { dayWithWeekday, daySlashLabel, durationText, lastAtText, monthText, viewTitle } from '../utils/usageFormat';
+import { usagePeriodOf } from '../utils/usagePeriod';
 
 const TITLE = '이용 현황';
 
-/** 이용 현황 수집을 시작한 달 — '전체' 기간의 시작 */
-const USAGE_START = '2026-11-01';
 /** 이 일수를 넘는 기간은 그래프·표를 월 단위로 묶는다 */
 const DAILY_MAX_DAYS = 62;
 
 /** 빠른 기간 — 누르면 기간 선택 바의 일·기간이 '오늘까지 N일' 로 바뀐다 */
 const RECENT_DAYS = [1, 7, 30, 90] as const;
-
-const addDays = (key: string, n: number) => {
-  const d = fromDayKey(key);
-  d.setDate(d.getDate() + n);
-  return toDayKey(d);
-};
-
-/** 1년 전 같은 날 (2월 29일은 28일) */
-const lastYearDay = (key: string) => {
-  const md = key.slice(5) === '02-29' ? '02-28' : key.slice(5);
-  return `${+key.slice(0, 4) - 1}-${md}`;
-};
-
-/** from~to 의 날짜 목록 */
-const daysBetween = (from: string, to: string) => {
-  const out: string[] = [];
-  for (let d = from; d <= to; d = addDays(d, 1)) out.push(d);
-  return out;
-};
-
-/** 초 → "1시간 5분" · "12분 30초" · "40초" */
-const durationText = (sec: number) => {
-  const s = Math.round(sec);
-  if (s <= 0) return '–';
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (h) return m ? `${h}시간 ${m}분` : `${h}시간`;
-  if (m) return s % 60 && m < 10 ? `${m}분 ${s % 60}초` : `${m}분`;
-  return `${s}초`;
-};
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-const dayLabel = (key: string) => `${+key.slice(5, 7)}/${+key.slice(8, 10)}`;
-const dayWithWeekday = (key: string) => `${key.slice(2).replace(/-/g, '.')} (${WEEKDAYS[fromDayKey(key).getDay()]})`;
-const monthText = (key: string) => key.slice(0, 7).replace('-', '.');
-
-/** ISO 시각 → "11.19 14:32" (한국 시간) */
-const lastAtText = (iso: string) => {
-  const d = new Date(iso);
-  if (!iso || Number.isNaN(d.getTime())) return '–';
-  const k = new Date(d.getTime() + 9 * 3600 * 1000);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(k.getUTCMonth() + 1)}.${p(k.getUTCDate())} ${p(k.getUTCHours())}:${p(k.getUTCMinutes())}`;
-};
-
-const viewTitle = (id: string) => VIEW_TITLES[id as ViewId] ?? id;
-
-const sum = (rows: UsageDay[], k: 'visits' | 'pageviews' | 'seconds') => rows.reduce((a, r) => a + r[k], 0);
-
-interface UsagePeriod {
-  cur: DayRange;
-  /** 비교 기간 (전체 기간은 없음) */
-  prev: DayRange | null;
-  /** 화면에 보이는 기간 이름 */
-  label: string;
-  cmpLabel?: string;
-}
-
-/** 상단 기간 선택 → 조회할 날짜 범위와 비교 범위. 오늘 이후는 자른다 */
-function usagePeriodOf(month: string, allPeriod: boolean, yearTotal: boolean, dayRange: DayRange | null, today: string): UsagePeriod {
-  const clip = (r: DayRange): DayRange => ({ from: r.from, to: r.to > today ? today : r.to });
-  if (dayRange) {
-    const cur = clip(dayRange);
-    return { cur, prev: sameRangeLastMonth(cur), label: rangeLabel(cur), cmpLabel: '전월 동기간 대비' };
-  }
-  if (allPeriod) return { cur: { from: USAGE_START, to: today }, prev: null, label: '전체 기간' };
-  if (yearTotal) {
-    const cur = clip({ from: `${month.slice(0, 4)}-01-01`, to: lastDayOf(month) });
-    return { cur, prev: { from: lastYearDay(cur.from), to: lastYearDay(cur.to) }, label: yearRangeLabel(month), cmpLabel: '전년 동기 대비' };
-  }
-  const cur = clip({ from: `${month}-01`, to: lastDayOf(month) });
-  const pm = prevM(month);
-  // 진행 중인 달은 전월 같은 날짜까지와 비교한다
-  const partial = cur.to < lastDayOf(month);
-  const prevDay = Math.min(+cur.to.slice(8, 10), daysOfMonth(pm));
-  return {
-    cur,
-    prev: { from: `${pm}-01`, to: partial ? `${pm}-${String(prevDay).padStart(2, '0')}` : lastDayOf(pm) },
-    label: `${month.slice(0, 4)}년 ${+month.slice(5, 7)}월`,
-    cmpLabel: partial ? '전월 동기간 대비' : '전월 대비',
-  };
-}
 
 /** 상세 이용 표 탭 — 화면별 · 계정별 · 카테고리별 · 일별(월별) */
 type UsageTab = 'views' | 'accounts' | 'categories' | 'daily';
@@ -203,12 +118,12 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     );
   } else {
     const { cur, prev } = loaded;
-    const visits = sum(cur.daily, 'visits');
-    const pageviews = sum(cur.daily, 'pageviews');
-    const seconds = sum(cur.daily, 'seconds');
-    const prevVisits = prev ? sum(prev.daily, 'visits') : 0;
-    const prevPageviews = prev ? sum(prev.daily, 'pageviews') : 0;
-    const prevSeconds = prev ? sum(prev.daily, 'seconds') : 0;
+    const visits = sumBy(cur.daily, (d) => d.visits);
+    const pageviews = sumBy(cur.daily, (d) => d.pageviews);
+    const seconds = sumBy(cur.daily, (d) => d.seconds);
+    const prevVisits = prev ? sumBy(prev.daily, (d) => d.visits) : 0;
+    const prevPageviews = prev ? sumBy(prev.daily, (d) => d.pageviews) : 0;
+    const prevSeconds = prev ? sumBy(prev.daily, (d) => d.seconds) : 0;
     // 비교 기간이 수집 시작 전이면 비교하지 않는다
     const hasPrev = !!prev && !!prevRange && !!cur.since && cur.since <= prevRange.to;
     const avgSec = visits ? seconds / visits : 0;
@@ -276,7 +191,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
         <MultiChart
           id="chUsage"
           title={`${monthly ? '월별' : '일별'} 방문 · 페이지뷰`}
-          labels={buckets.map((d) => (monthly ? monthText(d.date) : dayLabel(d.date)))}
+          labels={buckets.map((d) => (monthly ? monthText(d.date) : daySlashLabel(d.date)))}
           series={
             visits || pageviews
               ? [
@@ -290,11 +205,11 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
         />
 
         <Card name="usage-detail" id="usage-detail" tableWrap title="상세 이용" subtitle={`(${label} · ${tabInfo.sort})`}>
-          <div className="kw-tabs">
+          <TabBar>
             {tabs.map((t) => (
               <TabButton key={t.id} className="btn-usage-tab" data-btn={`usage-tab-${t.id}`} active={activeTab === t.id} label={t.label} count={t.count} onClick={() => setTab(t.id)} />
             ))}
-          </div>
+          </TabBar>
           {activeTab === 'views' && (
             <>
               {cur.views.length ? (
@@ -483,11 +398,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                 </thead>
                 <tbody>
                   {buckets.length === 0 && (
-                    <tr>
-                      <td colSpan={5}>
-                        <EmptyState message="이 기간에 기록된 방문이 없습니다." />
-                      </td>
-                    </tr>
+                    <EmptyRow colSpan={5} message="이 기간에 기록된 방문이 없습니다." />
                   )}
                   {[...buckets].reverse().map((d) => (
                     <tr key={d.date}>

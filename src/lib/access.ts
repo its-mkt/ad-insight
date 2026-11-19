@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getCfg, webAppUrl } from './webApp';
+import { appendQuery, getCfg, webAppUrl } from './webApp';
 import { parseRoute } from '../utils/route';
 import { prefetchJson } from './prefetch';
 
@@ -27,14 +27,14 @@ export async function currentAccessToken(): Promise<string> {
 
 /** 웹앱 주소 뒤에 로그인 토큰을 붙인다 — 토큰이 없으면 주소 그대로 */
 export const withAccessToken = (url: string, token: string): string =>
-  token ? `${url}${url.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(token)}` : url;
+  token ? appendQuery(url, `access_token=${encodeURIComponent(token)}`) : url;
 
 /** 로그인 토큰의 권한만 묻는다 (데이터 없이 빠르게 답한다). 확인에 실패하면 null */
 export async function fetchAccessRole(token: string): Promise<AccessRole | null> {
   if (!token) return 'guest';
   try {
     const { url } = getCfg('itket');
-    const res = await fetch(withAccessToken(`${url}${url.includes('?') ? '&' : '?'}whoami=1`, token));
+    const res = await fetch(withAccessToken(appendQuery(url, 'whoami=1'), token));
     const j = (await res.json()) as { role?: AccessRole };
     return j.role || null;
   } catch {
@@ -47,6 +47,11 @@ export async function postMemberAction<T = Record<string, unknown>>(body: Record
   const { url } = getCfg('itket');
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
   return (await res.json()) as T & { error?: string };
+}
+
+/** 지금 로그인 토큰을 붙여 웹앱에 요청을 보낸다 — 요청·응답 해석이 실패하면 { error: 'network' } 로 돌려준다 */
+export async function postAuthedAction<T = Record<string, unknown>>(action: string, body: Record<string, unknown> = {}): Promise<T & { error?: string }> {
+  return postMemberAction<T>({ action, access_token: await currentAccessToken(), ...body }).catch(() => ({ error: 'network' }) as T & { error?: string });
 }
 
 /** 처음 접속 — 권한 확인과 함께 지금 주소 사이트의 데이터 요청을 미리 출발시킨다 (useDashboardData 의 첫 요청이 이어받는다) */

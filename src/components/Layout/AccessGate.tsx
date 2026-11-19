@@ -217,7 +217,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
       <GuestPreview app={children} keepOpen={signingUp}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
-          title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
+          title={tab === 'login' && !signingUp ? '로그인하면 확인할 수 있습니다' : '회원가입 및 열람 요청'}
           desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
         >
           {tab === 'login' && !signingUp ? (

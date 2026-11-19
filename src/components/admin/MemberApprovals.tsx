@@ -31,7 +31,7 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
-  const { rows, error, busy, pending, notice } = useMembers();
+  const { rows, error, busy, pending } = useMembers();
   const { isSuperAdmin, user } = useAuth();
   const myEmail = (user?.email || '').toLowerCase();
   // 삭제를 한 번 누른 줄 — 같은 줄에서 "삭제 확인"을 눌러야 지운다
@@ -47,7 +47,6 @@ export const MemberApprovals: React.FC = () => {
       tableWrap
     >
       {error && <Notice tone="warn">{error}</Notice>}
-      {notice && <Notice tone="ok">{notice}</Notice>}
       {pending > 0 && (
         <Notice tone="warn">
           이메일 인증번호로 이메일 주인은 확인됐습니다. 승인 전에 요청자가 열람해도 되는 사람인지 팀즈·전화로 확인해 주세요. 확인되지 않으면 거절합니다.

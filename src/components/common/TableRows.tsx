@@ -1,4 +1,5 @@
 import React from 'react';
+import { EmptyState, type EmptyStateProps } from './EmptyState';
 import { AccordionChevron } from './AccordionChevron';
 import { fmt } from '../../utils/format';
 
@@ -150,5 +151,17 @@ export const MonthRow: React.FC<MonthRowProps> = ({ label, columns, value, total
     {total !== undefined && (
       <td className={`n${sub ? ' sub-t' : ''}`}>{totalBold ? <b>{cellOf(total)}</b> : cellOf(total)}</td>
     )}
+  </tr>
+);
+
+/** 표가 비었을 때 한 줄 — <tr><td colSpan><EmptyState/></td></tr> */
+export const EmptyRow: React.FC<EmptyStateProps & {
+  /** 가로로 합칠 칸 수 (표의 열 수) */
+  colSpan: number;
+}> = ({ colSpan, ...empty }) => (
+  <tr>
+    <td colSpan={colSpan}>
+      <EmptyState {...empty} />
+    </td>
   </tr>
 );

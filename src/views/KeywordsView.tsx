@@ -5,7 +5,7 @@ import type {
   DashboardData,
   SyncStatus,
 } from '../types/dashboard';
-import { catSum, catsOf, ctrText, fmt, fmtWon, mLabel, sumBy, THIS_M } from '../utils/format';
+import { catSum, catsOf, ctrText, fmt, fmtWon, sumBy, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import type { DayPeriod } from '../utils/dayRange';
@@ -25,7 +25,7 @@ import { AdCreativesList } from '../components/keywords/AdCreativesList';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
-import { dotYm, inMonths, mergeKeywordMonths, monthsUpTo, uncollectedItems, yearRangeLabel } from '../utils/allPeriod';
+import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, mergeKeywordMonths, monthsUpTo, uncollectedItems, yearRangeLabel, ymLabel } from '../utils/allPeriod';
 import { campaignBuckets, groupKeywordRows, withGroupTotals } from '../utils/keywordGroups';
 
 interface KeywordsViewProps {
@@ -119,22 +119,14 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const kpiAdCpa = totalConv > 0 ? Math.round(totalCost / totalConv) : 0;
 
   // 비교 기간 계산 (전월 / 전년 동기)
-  const yr = mo.slice(0, 4);
-  const mm = parseInt(mo.slice(5, 7));
-  const pvMo = mm === 1 ? `${parseInt(yr) - 1}-12` : `${yr}-${String(mm - 1).padStart(2, '0')}`;
-  const pvRows = allPeriod ? [] : data.spend.filter((r) => {
-    if (yearTotal) {
-      const pvYr = String(parseInt(yr) - 1);
-      return r.month >= `${pvYr}-01` && r.month <= `${pvYr}-${String(mm).padStart(2, '0')}` && pass(r);
-    }
-    return r.month === pvMo && pass(r);
-  });
+  const inPv = inMonths(compareMonthsOf({ allPeriod, yearTotal, months: periodMonths, curM: mo }));
+  const pvRows = allPeriod ? [] : data.spend.filter((r) => inPv(r) && pass(r));
   const hasPvData = pvRows.length > 0;
   const pvCost = sumBy(pvRows, (r) => r.cost);
   const pvClk  = sumBy(pvRows, (r) => r.clk);
   const pvConv = sumBy(pvRows, (r) => r.conv);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
-  const cmpLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
+  const cmpLabel = cmpLabelOf({ allPeriod, yearTotal, period });
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');
@@ -208,7 +200,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
     (g) => campCost[`${g.media}\u0001${g.campaign}`] || 0
   );
 
-  const periodLabel = allPeriod ? '전체 기간' : yearTotal ? yearRangeLabel(mo) : `${mo.slice(0, 4)}년 ${mLabel(mo)}`;
+  const periodLabel = allPeriod ? '전체 기간' : yearTotal ? yearRangeLabel(mo) : ymLabel(mo);
 
   return (
     <View name="keywords" title="키워드 · 소재">

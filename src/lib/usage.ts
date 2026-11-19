@@ -1,4 +1,5 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from './supabase';
+import { readString, writeString } from '../utils/storage';
 
 /**
  * 이용 현황 기록·조회 (Supabase usage_daily — supabase/usage.sql).
@@ -21,23 +22,15 @@ let memoryDeviceId = '';
 
 /** 브라우저마다 한 번 만들어 두는 임의 기기 ID (저장소가 막힌 창은 열려 있는 동안만 같은 ID) */
 function deviceId(): string {
-  try {
-    const saved = localStorage.getItem(DEVICE_KEY);
-    if (saved) return saved;
-  } catch {
-    // 저장소가 막힌 창
-  }
+  const saved = readString(DEVICE_KEY);
+  if (saved) return saved;
   if (!memoryDeviceId) {
     memoryDeviceId =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
   }
-  try {
-    localStorage.setItem(DEVICE_KEY, memoryDeviceId);
-  } catch {
-    // 저장소가 막힌 창
-  }
+  writeString(DEVICE_KEY, memoryDeviceId);
   return memoryDeviceId;
 }
 
@@ -92,34 +85,25 @@ if (USAGE_TRACKING_ON) {
   });
 }
 
-/** track_usage 호출 — 창을 닫는 중에도 끝까지 가도록 keepalive 로 보낸다. 실패해도 화면에는 영향 없다 */
-function send(view: string, pageview: boolean, seconds: number): void {
-  if (!USAGE_TRACKING_ON) return;
+/** 기록용 Supabase RPC 호출 — 창을 닫는 중에도 끝까지 가도록 keepalive 로 보낸다. 실패는 무시한다 (함수가 아직 없어도 화면에는 영향 없다) */
+function postRpc(name: string, body: Record<string, unknown>): void {
   const headers: Record<string, string> = { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  fetch(`${SUPABASE_URL}/rest/v1/rpc/track_usage`, {
-    method: 'POST',
-    headers,
-    keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
-  }).catch(() => {
+  fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST', headers, keepalive: true, body: JSON.stringify(body) }).catch(() => {
     // 기록 실패는 무시한다
   });
+}
+
+/** track_usage 호출 — 화면 열기(pageview)와 본 시간 */
+function send(view: string, pageview: boolean, seconds: number): void {
+  if (!USAGE_TRACKING_ON) return;
+  postRpc('track_usage', { p_device: deviceId(), p_view: view, p_pageview: pageview, p_seconds: Math.round(seconds), p_fp: deviceFp() });
 }
 
 /** track_category 호출 — 카테고리를 고른 횟수(pick)와 그 카테고리로 본 시간 */
 function sendCategory(view: string, category: string, pick: boolean, seconds: number): void {
   if (!USAGE_TRACKING_ON) return;
-  const headers: Record<string, string> = { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  fetch(`${SUPABASE_URL}/rest/v1/rpc/track_category`, {
-    method: 'POST',
-    headers,
-    keepalive: true,
-    body: JSON.stringify({ p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds), p_fp: deviceFp() }),
-  }).catch(() => {
-    // 기록 실패는 무시한다 (함수가 아직 없어도 화면에는 영향 없다)
-  });
+  postRpc('track_category', { p_device: deviceId(), p_view: view, p_category: category, p_pick: pick, p_seconds: Math.round(seconds), p_fp: deviceFp() });
 }
 
 let currentView = '';

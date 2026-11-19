@@ -9,16 +9,13 @@ import {
   fmtWon,
   mLabel,
   prevM,
-  quoteSeriesColor,
-  quoteChartCats,
   withSourceCompare,
-  SERIES_DEFS,
   sumBy,
   THIS_M,
   ym,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import { useQuoteStats } from '../hooks/useDashboardData';
+import { useQuoteStats } from '../hooks/useQuoteStats';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod } from '../utils/dayRange';
 import { View } from '../components/common/View';
@@ -35,7 +32,9 @@ import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { formatCategoryScope, formatSourceScope } from '../utils/search';
 import { LIST_LIMIT, ShowMoreButton } from '../components/common/MoreButton';
 import { Card } from '../components/common/Card';
-import { dotYm, firstMonth, inMonths, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { cmpLabelOf, dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
+import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
+import { cpaInMonths, cpaSince } from '../utils/cpa';
 
 interface OverviewViewProps {
   data: DashboardData;
@@ -114,7 +113,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const cmp = period ? period.cmpLabel : '전월';
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
-  const months = Array.from({ length: mm }, (_, i) => ym(yr, i + 1));
+  const months = monthsUpTo(curM);
 
   const atSpend = (mo: string) => data.spend.filter((r) => r.month === mo);
   const totSpend = (mo: string) => sumBy(atSpend(mo), (r) => r.cost);
@@ -166,19 +165,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const quoteYears = yearsOf(stats.quotes.map((r) => r.month));
   const allSpend = sumBy(data.spend, (r) => r.cost);
   const allQuotes = sumBy(stats.quotes, (r) => r.count);
-  const cpaSpend = sumBy(data.spend.filter((r) => r.month >= starts.cpaFrom), (r) => r.cost);
-  const cpaQuotes = sumBy(stats.quotes.filter((r) => r.month >= starts.cpaFrom), (r) => r.count);
-  const allCpa = cpaQuotes > 0 ? cpaSpend / cpaQuotes : 0;
+  const { spend: cpaSpend, quotes: cpaQuotes, cpa: allCpa } = cpaSince(data.spend, stats.quotes, starts.cpaFrom);
 
   // 연도 합계: 1월~선택 연도 최신 달을 전년 같은 달들과 비교한다. CPA 는 전체 기간과 같은 기준으로 계산한다
   const lastYrMonths = sameMonthsLastYear(months);
   const yearLabel = yearRangeLabel(curM);
   const quotesIn = (list: string[]) => sumBy(stats.quotes.filter(inMonths(list)), (r) => r.count);
-  const cpaIn = (list: string[]) => {
-    const valid = list.filter((mo) => mo >= starts.cpaFrom);
-    const q = sumBy(stats.quotes.filter(inMonths(valid)), (r) => r.count);
-    return q > 0 ? sumBy(data.spend.filter(inMonths(valid)), (r) => r.cost) / q : 0;
-  };
+  const cpaIn = (list: string[]) => cpaInMonths(data.spend, stats.quotes, list, starts.cpaFrom);
   const ytdQuotes = quotesIn(months);
   const ytdCpa = cpaIn(months);
   const ytdValidMonths = months.filter((mo) => mo >= starts.cpaFrom);
@@ -200,27 +193,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const spendAxis = allPeriod ? spendYears : months;
   const spendAt = rowsByPeriod((monthly ?? data).spend);
-  const spendSeries = SERIES_DEFS.map((s) => ({
-    ...s,
-    raw: spendAxis.map((key) => sumBy(spendAt(key).filter(s.f), (r) => r.cost)),
-  }))
-    .filter((s) => s.raw.some((v) => v))
-    .map((s) => ({ ...s, v: s.raw.map((v) => v / 1e4) }));
+  const spendSeries = spendSeriesOf(spendAt, spendAxis);
 
   // 견적 추이: 올해 건수 상위 6개 1차 카테고리 + 그 외 (2차는 1차에 합산)
   const yrQuoteRows = allPeriod ? trendStats.quotes : trendStats.quotes.filter((r) => r.month >= ym(+yr, 1) && r.month <= curM);
   const quoteAxis = allPeriod ? quoteYears : months;
-  const quoteCats = quoteChartCats(yrQuoteRows);
-  const quoteAt = rowsByPeriod(yrQuoteRows);
-  const quoteSeries = quoteCats.keys
-    .map((k, ci) => ({
-      k,
-      c: quoteSeriesColor(k, ci),
-      v: quoteAxis.map((key) =>
-        sumBy(quoteAt(key).filter((r) => quoteCats.keyOf(r.category) === k), (r) => r.count)
-      ),
-    }))
-    .filter((s) => s.v.some((x) => x));
+  const quoteSeries = quoteSeriesOf(yrQuoteRows, quoteAxis);
 
   // 카테고리별 소진 vs 견적 (새 카테고리 기준, 견적 비례 배분 적용)
   const catsMap = (mo: string) => catSum(categoryMap, atSpend(mo), (r) => r.cost);
@@ -285,7 +263,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // 유입 매체 비중
   // 월별: 선택한 달 vs 전월 / 연간: 1~선택월 vs 전년 동기 / 전체 기간: 비교 없음
   const srcRaw = stats.quotesRaw || [];
-  const srcCompareLabel = allPeriod ? undefined : yearTotal ? '전년 동기' : cmp;
+  const srcCompareLabel = cmpLabelOf({ allPeriod, yearTotal, period });
   const srcCur = allPeriod
     ? buildSourceShareData(srcRaw, '', stats.quotes)
     : yearTotal
@@ -457,7 +435,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             id="lgOverviewCat"
             unit="만원"
             curLabel={allPeriod ? '전체 기간' : `${yearTotal ? yearLabel : period ? period.label : '기준월'} (굵은 막대)`}
-            prevLabel={allPeriod ? undefined : yearTotal ? '전년 동기' : cmp}
+            prevLabel={srcCompareLabel}
           />
           <ShowMoreButton
             total={fullList.length}

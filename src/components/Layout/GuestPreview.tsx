@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { ArrowRight, FlaskConical } from 'lucide-react';
 import { OPEN_PREVIEW_LOGIN_EVENT, PreviewModeContext } from '../../context/PreviewModeContext';
 import { Modal } from '../common/Modal';
 
@@ -18,17 +18,28 @@ const MASKED = [
 ].join(', ');
 
 /**
- * 숫자를 * 로 — 날짜(2026-11·11/04·11월·2026년·18일)는 어느 때 값인지 알 수 있게 그대로 둔다.
- * 숫자 덩어리(쉼표·소수점 포함)마다 보고, 날짜 모양이거나 바로 뒤에 년·월·일이 붙으면 남긴다
+ * 숫자를 *** 로 — 숫자 덩어리(쉼표·소수점 포함)마다 자릿수와 상관없이 같은 길이(***)로 바꿔 글자 수로도 크기를 짐작하지 못하게 한다
+ * (1,567,851원 → ***원). 날짜(2026-11·11/04·11월·2026년·18일)는 어느 때 값인지 알 수 있게 그대로 둔다
  */
-const TOKEN = /\d{4}-\d{2}(?:-\d{2})?|\d{1,2}\/\d{1,2}|\d[\d,.]*/g;
+// 영문자 바로 뒤 숫자(GA4 같은 이름의 일부)는 값이 아니라 남긴다
+const TOKEN = /(?<![A-Za-z\d])(?:\d{4}-\d{2}(?:-\d{2})?|\d{1,2}\/\d{1,2}|\d[\d,.]*)/g;
+const MASK = '***';
 const maskDigits = (v: string): string =>
-  v.replace(TOKEN, (m: string, at: number) => (/[-/]/.test(m) || /^\s*[년월일]/.test(v.slice(at + m.length)) ? m : m.replace(/\d/g, '*')));
+  v.replace(TOKEN, (m: string, at: number) => (/[-/]/.test(m) || /^\s*[년월일]/.test(v.slice(at + m.length)) ? m : MASK));
+
+/** 값 글자를 가리는 표시 — 이 속성이 붙은 요소는 _views.scss 가 글자를 투명하게 하고 회색 자리표시 막대로 바꾼다 */
+const MASK_ATTR = 'data-pv-mask';
+
+/**
+ * 값만 있는 짧은 글자인지 — ***·단위(원·건·회·개·만·억)·기호(% ▲▼ 괄호 등)를 빼면 글자가 두 자 이하일 때.
+ * ***원 · ▲***% · ***만 (***%) 는 덮고, '(11월 · ***건)'·안내 문장처럼 다른 말이 섞인 글자는 *** 만 둔다
+ */
+const isValueText = (text: string): boolean => text.replace(/\*+|[\s원건회개만억%.,()▲▼+\-·/:|~]/g, '').length <= 2;
 const MASK_ATTRS = ['title', 'aria-label', 'data-tip', 'data-tip-desc'];
 
 /**
- * 숫자 자리의 글자를 * 로 바꾼다 (예: 1,567,851원 → *,***,***원). 흐리게 가리지 않고 또렷하게 보여 비로그인 사람이 궁금해지게 한다.
- * 미리보기 숫자는 예시라 실제 값은 아니지만, 개발자 도구로 보고 실제 실적으로 오해하지 않게 화면 글자에서도 지운다 (2026-11-19 사용자 결정).
+ * 숫자 자리의 글자를 *** 로 바꾸고(개발자 도구에서도 숫자가 보이지 않게) 그 글자를 회색 자리표시 막대로 바꾼다(어느 정도 수치인지 감도 오지 않게).
+ * 미리보기 숫자는 예시라 실제 값은 아니지만 실제 실적으로 오해하지 않게 한다 (2026-11-19 사용자 결정 — * 는 개발자 도구용, 막대는 크기 짐작 방지용. 픽셀 모자이크·반투명 막대 대신 스켈레톤 같은 막대로).
  * React 가 값을 다시 그려도 바로 다시 가린다.
  */
 function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
@@ -47,9 +58,13 @@ function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
     };
     const maskText = (node: Node) => {
       const v = node.nodeValue;
-      if (!v || !/\d/.test(v) || !node.parentElement?.closest(MASKED)) return;
-      const masked = maskDigits(v);
+      const parent = node.parentElement;
+      if (!v || !parent?.closest(MASKED)) return;
+      const masked = /\d/.test(v) ? maskDigits(v) : v;
       if (masked !== v) node.nodeValue = masked;
+      // 가린 값이 든 글자는 화면에서도 막대로 바꿔 어느 정도 수치인지 감도 오지 않게 한다 (React 가 다루지 않는 속성이라 다시 그려도 남는다)
+      // 차트(SVG) 글자와 문장 속 숫자는 *** 만 둔다 — 값만 있는 짧은 글자만 덮는다
+      if (masked.includes(MASK) && !(parent instanceof SVGElement) && isValueText(parent.textContent || '') && !parent.hasAttribute(MASK_ATTR)) parent.setAttribute(MASK_ATTR, '');
     };
     const maskTree = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) return maskText(node);
@@ -107,7 +122,12 @@ export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = fals
         <div className="preview-lock">
           <button type="button" className="preview-badge" data-btn="preview-login" onClick={() => setOpen(true)}>
             <FlaskConical size="0.875rem" aria-hidden="true" />
-            예시 데이터입니다 · 로그인하면 실제 수치를 볼 수 있습니다
+            <span className="preview-badge-long">로그인하면 실제 수치를 확인할 수 있습니다</span>
+            <span className="preview-badge-short">실제 수치는 로그인 후 확인</span>
+            <span className="preview-badge-cta">
+              로그인
+              <ArrowRight size="0.875rem" aria-hidden="true" />
+            </span>
           </button>
         </div>
       )}

@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { EXTERNAL_LINKS } from '../../utils/constants';
 import { fmt, parseCatParts, quoteKey, sourceColorVar } from '../../utils/format';
+import { downloadCsv, toCsv } from '../../utils/csv';
 import type { DayRange } from '../../utils/dayRange';
 import { CATEGORY_HIERARCHY, QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
 import { SkelBar, SkelRows } from '../common/SkeletonView';
-import { Dropdown, type DropdownOption } from '../common/Dropdown';
+import { Dropdown } from '../common/Dropdown';
 import { FilterReset } from '../common/FilterReset';
 import { Tooltip } from '../common/Tooltip';
 import { Download, ExternalLink, Save } from 'lucide-react';
@@ -15,8 +16,8 @@ import { Button, ButtonLink } from '../common/Button';
 import { TextInput } from '../common/TextInput';
 import { Pagination } from '../common/Pagination';
 import { Card } from '../common/Card';
-import { TabButton } from '../common/TabButton';
-import { Notice } from '../common/Notice';
+import { TabBar, TabButton } from '../common/TabButton';
+import { CategoryPicker, CategoryTrace, cat2CountHint } from './CategoryPicker';
 
 interface QuotesRawAdminTableProps {
   quotes: QuoteRawRow[];
@@ -44,8 +45,6 @@ interface QuotesRawAdminTableProps {
   onSave?: () => void;
   onReset?: () => void;
   saving?: boolean;
-  /** 저장 결과 — 목록 아래쪽에서 저장해도 보이도록 저장 바에 함께 보여 준다 */
-  saveMsg?: { text: string; ok: boolean } | null;
 }
 
 type SortKey = 'idx' | 'sno' | 'site' | 'date' | 'subject' | 'company' | 'name' | 'email' | 'phone' | 'rep' | 'category' | 'source';
@@ -54,83 +53,24 @@ export type QuoteChannel = 'live' | 'phone';
 /** 2차 필터의 '2차 없음' — 1차로만 분류된 행을 고른다 */
 const NO_CAT2 = '__NONE__';
 
-/** 1차 목록 항목 옆 '· 2' — 분류표에 있는 2차 개수, 2차가 없으면 표시하지 않는다 */
-const cat2CountHint = (count: number): string | undefined => (count ? `· ${count}` : undefined);
-
 /** 아이티켓 원장 행은 site 가 비어 있다 */
 const siteOf = (q: QuoteRawRow): string => q.site || 'itket';
 const siteLabelOf = (q: QuoteRawRow): string => QUOTE_SITES.find((s) => s.id === siteOf(q))?.label || siteOf(q);
 
-/** '2026-10-23 14:51:00' → '10.23 14:51' */
-const shortAt = (at: string) => {
-  const m = at.match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);
-  return m ? `${m[1]}.${m[2]} ${m[3]}` : at;
-};
-
-/**
- * 카테고리 칸 아래 흔적 한 줄 — 저장 전 변경이면 원래 값, 저장된 수동 지정이면 저장 시각.
- * 마우스를 올리면 자동 분류 결과와 저장한 관리자를 보여 준다.
- */
-const CategoryTrace: React.FC<{ quote: QuoteRawRow; original?: string }> = ({ quote, original }) => {
-  if (original !== undefined) {
-    return <span className="qr-cat-trace pending">저장 전 · 이전: {original || '없음'}</span>;
-  }
-  const m = quote.manual;
-  if (!m) return null;
-  const tip = [`자동 분류: ${quote.autoCategory || '–'}`, `수동 지정: ${m.category}`, m.by && `저장: ${m.by}`, m.at && `시각: ${m.at}`]
-    .filter(Boolean)
-    .join('\n');
-  return (
-    <span className="qr-cat-trace" title={tip}>
-      수동 지정{m.at ? ` · ${shortAt(m.at)}` : ''}
-    </span>
-  );
-};
-
-/**
- * 표준 카테고리 지정 — 1차·2차를 따로 고른다 (분류표 CATEGORY_HIERARCHY 기준).
- * 저장 값은 예전과 같은 문자열("1차" 또는 "1차 > 2차")이라 시트·집계는 그대로 쓴다.
- * 1차를 바꾸면 2차는 비워지고, 2차가 없는 1차는 2차 칸이 꺼진다. 분류표에 없는 예전 값은 "(기존)"으로 남겨 둔다.
- */
-const CategoryPicker: React.FC<{ value: string; changed: boolean; onChange: (category: string) => void }> = ({
-  value,
-  changed,
-  onChange,
-}) => {
-  const { cat1, cat2 } = parseCatParts(value || '기타');
-  const node = CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1);
-  const cat2List = node?.cat2 ?? [];
-  const cat1Options: DropdownOption<string>[] = [
-    ...CATEGORY_HIERARCHY.map((n) => ({ value: n.cat1, label: n.cat1, hint: cat2CountHint(n.cat2.length) })),
-    ...(node ? [] : [{ value: cat1, label: `${cat1} (기존)` }]),
-  ];
-  const cat2Options: DropdownOption<string>[] = [
-    { value: '', label: '2차 없음' },
-    ...cat2List.map((c) => ({ value: c, label: c })),
-    ...(cat2 && !cat2List.includes(cat2) ? [{ value: cat2, label: `${cat2} (기존)` }] : []),
-  ];
-  const cls = `dd-cat${changed ? ' is-changed' : ''}`;
-  return (
-    <div className="qr-cat-pair">
-      <Dropdown
-        className={cls}
-        fixedMenu
-        ariaLabel="1차 카테고리 선택"
-        value={cat1}
-        options={cat1Options}
-        onChange={(v) => onChange(v)}
-      />
-      <Dropdown
-        className={cls}
-        fixedMenu
-        ariaLabel="2차 카테고리 선택"
-        value={cat2}
-        disabled={!node || cat2List.length === 0}
-        options={cat2Options}
-        onChange={(v) => onChange(v ? `${cat1} > ${v}` : cat1)}
-      />
-    </div>
-  );
+/** 정렬 기준 값 — 숫자(원래 순서·SNO)는 크기로, 글자는 localeCompare 로 비교한다 */
+const SORT_VALUE: Record<SortKey, (it: { q: QuoteRawRow; originalIndex: number }) => string | number> = {
+  idx: (it) => it.originalIndex,
+  sno: ({ q }) => Number(q.sno || 0),
+  site: ({ q }) => siteLabelOf(q),
+  date: ({ q }) => q.date || '',
+  subject: ({ q }) => q.subject || '',
+  company: ({ q }) => q.company || '',
+  name: ({ q }) => q.name || '',
+  email: ({ q }) => q.email || '',
+  phone: ({ q }) => q.phone || '',
+  rep: ({ q }) => q.salesRep || '',
+  category: ({ q }) => q.category || '',
+  source: ({ q }) => q.source || '',
 };
 
 export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
@@ -149,7 +89,6 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   onSave,
   onReset,
   saving,
-  saveMsg,
 }) => {
   const isPhone = channel === 'phone';
   // 아래 필터·건수·정렬은 모두 고른 문의 종류의 행을 기준으로 한다
@@ -262,19 +201,21 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
         if (!inPeriod(q.date)) return false;
         if (search) {
           const s = search.toLowerCase();
-          const match =
-            String(q.sno || '').toLowerCase().includes(s) ||
-            String(q.subject || '').toLowerCase().includes(s) ||
-            String(q.company || '').toLowerCase().includes(s) ||
-            String(q.name || '').toLowerCase().includes(s) ||
-            String(q.email || '').toLowerCase().includes(s) ||
-            String(q.phone || '').toLowerCase().includes(s) ||
-            String(q.salesRep || '').toLowerCase().includes(s) ||
-            String(q.receiver || '').toLowerCase().includes(s) ||
-            String(q.date || '').toLowerCase().includes(s) ||
-            String(q.category || '').toLowerCase().includes(s) ||
-            String(q.source || '').toLowerCase().includes(s) ||
-            q.sourceDetail.toLowerCase().includes(s);
+          const fields = [
+            String(q.sno || ''),
+            String(q.subject || ''),
+            String(q.company || ''),
+            String(q.name || ''),
+            String(q.email || ''),
+            String(q.phone || ''),
+            String(q.salesRep || ''),
+            String(q.receiver || ''),
+            String(q.date || ''),
+            String(q.category || ''),
+            String(q.source || ''),
+            q.sourceDetail,
+          ];
+          const match = fields.some((f) => f.toLowerCase().includes(s));
           if (!match) return false;
         }
         return true;
@@ -295,35 +236,13 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
 
   // 사이트 탭까지 적용해 정렬
   const filteredQuotesWithIndex = useMemo(() => {
+    const value = SORT_VALUE[sortKey];
     return matchedQuotes
       .filter(({ q }) => selectedSite === 'ALL' || siteOf(q) === selectedSite)
       .sort((a, b) => {
-        let diff = 0;
-        if (sortKey === 'idx') {
-          diff = a.originalIndex - b.originalIndex;
-        } else if (sortKey === 'sno') {
-          diff = Number(a.q.sno || 0) - Number(b.q.sno || 0);
-        } else if (sortKey === 'site') {
-          diff = siteLabelOf(a.q).localeCompare(siteLabelOf(b.q));
-        } else if (sortKey === 'date') {
-          diff = (a.q.date || '').localeCompare(b.q.date || '');
-        } else if (sortKey === 'subject') {
-          diff = (a.q.subject || '').localeCompare(b.q.subject || '');
-        } else if (sortKey === 'company') {
-          diff = (a.q.company || '').localeCompare(b.q.company || '');
-        } else if (sortKey === 'name') {
-          diff = (a.q.name || '').localeCompare(b.q.name || '');
-        } else if (sortKey === 'email') {
-          diff = (a.q.email || '').localeCompare(b.q.email || '');
-        } else if (sortKey === 'phone') {
-          diff = (a.q.phone || '').localeCompare(b.q.phone || '');
-        } else if (sortKey === 'rep') {
-          diff = (a.q.salesRep || '').localeCompare(b.q.salesRep || '');
-        } else if (sortKey === 'category') {
-          diff = (a.q.category || '').localeCompare(b.q.category || '');
-        } else if (sortKey === 'source') {
-          diff = (a.q.source || '').localeCompare(b.q.source || '');
-        }
+        const va = value(a);
+        const vb = value(b);
+        const diff = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
         return sortOrder === 'asc' ? diff : -diff;
       });
   }, [matchedQuotes, selectedSite, sortKey, sortOrder]);
@@ -338,25 +257,16 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
 
   // CSV 내보내기 (구글 스프레드시트 전체 원본 열 기준 1:1 출력)
   const handleExportCsv = () => {
-    const cell = (v?: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const headers = isPhone
       ? ['번호', '접수일시', '메모', '고객사', '고객사담당', '전화번호', '카테고리', '경로', '연결영업대표', '전화수신자']
       : ['SNO', '제목', '작성자', '회사명', '이메일', '영업담당', '접수날짜', '유입경로', '유입 광고', '표준카테고리', '사이트'];
     const rows = filteredQuotesWithIndex.map(({ q }) => isPhone ? [
       q.sno, q.date, q.subject, q.company, q.name, q.phone, q.category, q.source, q.salesRep, q.receiver,
-    ].map(cell) : [
+    ] : [
       // 모든 칸을 같은 방식으로 감싼다 — 이메일·카테고리 등에 " 가 들어가도 열이 밀리지 않게
       q.sno || '', q.subject, q.name, q.company, q.email, q.salesRep, q.date, q.source, q.sourceDetail, q.category, siteLabelOf(q),
-    ].map(cell));
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${isPhone ? 'quotes_phone' : 'quotes_raw'}_export_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    ]);
+    downloadCsv(`${isPhone ? 'quotes_phone' : 'quotes_raw'}_export_${new Date().toISOString().slice(0, 10)}.csv`, toCsv(headers, rows));
   };
 
   return (
@@ -412,7 +322,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
       </div>
 
       {/* 사이트 탭 — 건수는 아래 필터를 적용한 값 */}
-      <div className="kw-tabs qr-site-tabs">
+      <TabBar className="qr-site-tabs">
         <TabButton
           className="btn-quote-site"
           data-btn="quote-site-all"
@@ -432,7 +342,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
             onClick={() => { setSelectedSite(site.id); setPage(1); }}
           />
         ))}
-      </div>
+      </TabBar>
 
       {/* 필터 바 */}
       <div className="qr-filter">
@@ -638,12 +548,11 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
         <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
       </div>
 
-      {/* 저장 바 — 목록을 아래로 내려도 화면 아래에 붙어 있다 */}
-      {(changedCount > 0 || saveMsg) && (
+      {/* 저장 바 — 목록을 아래로 내려도 화면 아래에 붙어 있다 (저장 결과는 토스트로 알린다) */}
+      {changedCount > 0 && (
         <div className="qr-savebar">
           <div className="qr-savebar-status">
             {changedCount > 0 && <span className="qr-unsaved">● 미저장 변경 {fmt(changedCount)}건</span>}
-            {saveMsg && <Notice tone={saveMsg.ok ? 'ok' : 'warn'}>{saveMsg.text}</Notice>}
           </div>
 
           {changedCount > 0 && (

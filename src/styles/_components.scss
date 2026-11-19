@@ -1541,6 +1541,97 @@ table.kv th {
   }
 }
 
+/* ── 토스트 (Toast) — 저장·승인 결과를 헤더 바로 아래 가운데에 잠깐 띄운다 ── */
+.toast-host {
+  position: fixed;
+  top: calc(var(--th) + 0.75rem);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 36rem;
+  padding: 0.625rem 0.5rem 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  animation: toast-in 0.2s ease-out;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &.ok {
+    background: var(--grp-naver-bg, #f2faf5);
+    color: var(--grp-naver-ink, #166534);
+    border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  }
+
+  &.warn {
+    background: var(--warnbg, #fbeccb);
+    color: var(--warn, #7a4a00);
+    border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  }
+
+  &.error {
+    background: color-mix(in srgb, var(--err) 10%, var(--card));
+    color: var(--err);
+    border-color: color-mix(in srgb, var(--err) 40%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+.toast-msg {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── 입력칸 (TextInput) ── */
 .input {
   padding: 0.5rem 0.75rem;

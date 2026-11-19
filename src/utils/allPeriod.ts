@@ -1,5 +1,5 @@
 import type { DashboardData, KeywordRow } from '../types/dashboard';
-import { ym } from './format';
+import { mLabel, prevM, ym } from './format';
 import { mediaKo } from './constants';
 
 /** 기간 선택의 '전체' 를 쓸 수 있는 화면 — 연도 '전체' 는 전 기간, 월 '전체' 는 선택 연도 합계 */
@@ -33,9 +33,22 @@ export const lastMonthOfYear = (month: string, max: string): string => {
 export const monthsUpTo = (month: string): string[] =>
   Array.from({ length: +month.slice(5, 7) }, (_, i) => ym(month.slice(0, 4), i + 1));
 
+/** 한 달의 1년 전 ('2026-03' → '2025-03') */
+export const lastYearMonth = (m: string): string => ym(+m.slice(0, 4) - 1, +m.slice(5, 7));
+
 /** 같은 달들의 1년 전 — 전년 동기 비교용 */
-export const sameMonthsLastYear = (months: string[]): string[] =>
-  months.map((m) => ym(+m.slice(0, 4) - 1, +m.slice(5, 7)));
+export const sameMonthsLastYear = (months: string[]): string[] => months.map(lastYearMonth);
+
+/** 비교할 달 목록 — 전체 기간은 없음, 연도 합계는 전년 같은 달들, 한 달은 전월 */
+export const compareMonthsOf = ({ allPeriod, yearTotal, months, curM }: { allPeriod?: boolean; yearTotal?: boolean; months: string[]; curM: string }): string[] =>
+  allPeriod ? [] : yearTotal ? sameMonthsLastYear(months) : [prevM(curM)];
+
+/** KPI 비교 문구 — 전체 기간은 비교 없음, 연도 합계는 '전년 동기', 일·기간 선택은 그 비교 문구, 한 달은 '전월' */
+export const cmpLabelOf = ({ allPeriod, yearTotal, period }: { allPeriod?: boolean; yearTotal?: boolean; period?: { cmpLabel: string } | null }): string | undefined =>
+  allPeriod ? undefined : yearTotal ? '전년 동기' : period ? period.cmpLabel : '전월';
+
+/** '2026-11' → '2026년 11월' */
+export const ymLabel = (m: string): string => `${m.slice(0, 4)}년 ${mLabel(m)}`;
 
 /** 월 목록에 드는 행만 고르는 조건 */
 export const inMonths = (months: string[]) => {

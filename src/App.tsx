@@ -29,6 +29,7 @@ import { MembersView } from './views/MembersView';
 import { applyTheme, applyThemeMode, getInitialDark, getThemeMode, type ThemeMode } from './utils/theme';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
+import { ToastHost } from './components/common/Toast';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
 import { openPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
@@ -239,7 +240,7 @@ export const App: React.FC = () => {
             : currentView === 'devices'
               ? `${until} (GA4 방문·전환과 구글 광고는 마감 후 반영)`
               : `${until}${dropped}`;
-    return `${head} · 오늘 값은 로그인 후 볼 수 있습니다`;
+    return `${head} · 오늘 값은 로그인 후 확인할 수 있습니다`;
   })();
 
   // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다
@@ -594,6 +595,8 @@ export const App: React.FC = () => {
       </div>
       <Tooltip />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+      {/* 저장·승인 결과 알림 (showToast) — 헤더 바로 아래 가운데 */}
+      <ToastHost />
       {searchOpen && (
         <SearchDialog
           data={data}
