@@ -23,6 +23,8 @@ interface MembersState {
   error: string;
   /** 승인·거절·해제·삭제를 보내는 중인 이메일 */
   busy: string;
+  /** 소유자 이메일 (데이터 시트 admins 탭 — 웹앱이 명단과 함께 보낸다, 옛 웹앱은 보내지 않는다) */
+  owners: string[];
   /** 명단을 다시 받는 중 (새로 고침 버튼이 돈다) */
   refreshing: boolean;
   /** 마지막으로 명단을 받은 시각 (HH:mm, 한국 시간) */
@@ -36,7 +38,7 @@ const ORDER: Record<MemberStatus, number> = { pending: 0, approved: 1, rejected:
  * 가입 요청 명단 — 계정 관리 화면과 사이드바 승인 대기 뱃지가 같은 명단을 쓴다.
  * 한 곳에서 승인·거절하면 다른 곳도 바로 바뀌도록 화면 밖(모듈)에 한 벌만 둔다
  */
-let state: MembersState = { rows: null, error: '', busy: '', refreshing: false, checkedAt: '' };
+let state: MembersState = { rows: null, owners: [], error: '', busy: '', refreshing: false, checkedAt: '' };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -61,10 +63,11 @@ export function loadMembers(): Promise<void> {
   if (loading) return loading;
   loading = (async () => {
     setState({ error: '', refreshing: true });
-    const res = await postAuthedAction<{ members?: MemberRow[] }>('listMembers');
+    const res = await postAuthedAction<{ members?: MemberRow[]; owners?: string[] }>('listMembers');
     if (res.error || !res.members) setState({ error: '가입 요청 목록을 불러오지 못했습니다.', rows: state.rows ?? [] });
     else
       setState({
+        owners: res.owners || [],
         rows: [...res.members].sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.requested_at.localeCompare(a.requested_at)),
         checkedAt: new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }),
       });
@@ -163,7 +166,7 @@ export function useMembers(enabled = true): MembersState & { pending: number } {
   useEffect(() => {
     if (enabled && !state.rows && !loading) void loadMembers();
     // 로그아웃하면 받아 둔 명단을 지운다
-    if (!enabled && state.rows) setState({ rows: null, error: '', checkedAt: '' });
+    if (!enabled && state.rows) setState({ rows: null, owners: [], error: '', checkedAt: '' });
   }, [enabled]);
   return { ...snap, pending: snap.rows?.filter((r) => r.status === 'pending').length || 0 };
 }

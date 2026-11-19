@@ -1667,7 +1667,9 @@ function updateProfile_(data) {
 /** 최고 관리자·관리자 — 가입 요청 목록 (role: member · manager) */
 function listMembers_(accessToken) {
   if (!isStaffRole_(accessOf_(accessToken).role)) return { error: 'forbidden' };
-  return { success: true, members: memberRows_(authSheet_()).map(({ row, ...m }) => ({ ...m, role: m.role === 'manager' ? 'manager' : 'member' })) };
+  const ss = authSheet_();
+  // owners — 소유자(admins 탭) 이메일. 계정 관리 화면 맨 위에 바꿀 수 없는 줄로 보여 준다
+  return { success: true, members: memberRows_(ss).map(({ row, ...m }) => ({ ...m, role: m.role === 'manager' ? 'manager' : 'member' })), owners: adminEmails_(ss) };
 }
 /**
  * 최고 관리자·관리자 — 승인(approved)·거절(rejected)·해제(revoked).
