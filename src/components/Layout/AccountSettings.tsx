@@ -12,7 +12,7 @@ import { TextInput } from '../common/TextInput';
 import { GateError } from './LoginForm';
 
 /** 설정 창 탭 — 기본 정보 · 비밀번호 */
-export type AccountTab = 'profile' | 'password';
+type AccountTab = 'profile' | 'password';
 
 /** 고르기 전에 거르는 사진 크기 (올릴 때는 256px 로 줄인다) */
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -187,19 +187,17 @@ const AccountHead: React.FC<{ roleLabel: string }> = ({ roleLabel }) => {
 interface AccountSettingsProps {
   open: boolean;
   onClose: () => void;
-  /** 열 때 보여 줄 탭 (메뉴의 '비밀번호 변경'은 password) */
-  initialTab?: AccountTab;
   /** 프로필 메뉴와 같은 권한 이름 (관리자·열람) */
   roleLabel: string;
 }
 
 /** 내 계정 설정 창 — 프로필 사진·이름·회사·팀, 비밀번호. 헤더 아래 쌓임에 갇히지 않게 body 에 띄운다 */
-export const AccountSettings: React.FC<AccountSettingsProps> = ({ open, onClose, initialTab = 'profile', roleLabel }) => {
-  const [tab, setTab] = useState<AccountTab>(initialTab);
-  // 열 때마다 메뉴에서 고른 탭부터
+export const AccountSettings: React.FC<AccountSettingsProps> = ({ open, onClose, roleLabel }) => {
+  const [tab, setTab] = useState<AccountTab>('profile');
+  // 다시 열면 첫 탭(기본 정보)부터
   useEffect(() => {
-    if (open) setTab(initialTab);
-  }, [open, initialTab]);
+    if (open) setTab('profile');
+  }, [open]);
 
   if (!open) return null;
   return createPortal(

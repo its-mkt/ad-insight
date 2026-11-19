@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 import { useAuth } from '../../context/AuthContext';
-import { KeyRound, LogOut, Palette, User, UserRound, Users, type LucideIcon } from 'lucide-react';
+import { LogOut, Palette, User, UserRound, Users, type LucideIcon } from 'lucide-react';
 import { SkelBar } from '../common/SkeletonView';
 import { Avatar } from '../common/Avatar';
 import { StatusBadge } from '../common/StatusBadge';
 import { SegmentedControl } from '../common/SegmentedControl';
-import { AccountSettings, type AccountTab } from './AccountSettings';
+import { AccountSettings } from './AccountSettings';
 import type { ThemeMode } from '../../utils/theme';
 import type { ViewId } from '../../types/dashboard';
 
@@ -40,7 +40,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
   // 승인된 일반 계정도 로그인한 상태라 프로필·로그아웃을 보여 준다 (관리자 표시만 다르다)
   const roleLabel = isLoggedIn ? '관리자' : '열람';
   const [open, setOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<AccountTab | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 바깥 클릭·Esc 로 닫기
@@ -103,8 +103,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
           </div>
 
           <div className="pm-group" role="group" aria-label="계정">
-            <MenuItem icon={UserRound} label="내 계정 설정" btn="account-settings" onClick={pick(() => setSettingsTab('profile'))} />
-            <MenuItem icon={KeyRound} label="비밀번호 변경" btn="account-password" onClick={pick(() => setSettingsTab('password'))} />
+            <MenuItem icon={UserRound} label="내 계정 설정" btn="account-settings" onClick={pick(() => setSettingsOpen(true))} />
           </div>
 
           {onThemeMode && (
@@ -129,7 +128,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
         </div>
       )}
 
-      <AccountSettings open={!!settingsTab && isSignedIn} initialTab={settingsTab || 'profile'} onClose={() => setSettingsTab(null)} roleLabel={roleLabel} />
+      <AccountSettings open={settingsOpen && isSignedIn} onClose={() => setSettingsOpen(false)} roleLabel={roleLabel} />
     </div>
   );
 };
