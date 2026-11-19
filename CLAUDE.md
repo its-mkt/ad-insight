@@ -75,4 +75,5 @@
 
 ### 확인
 - 변경 후 `npx tsc -p tsconfig.json --noEmit --noUnusedLocals` 와 `npx vite build` 통과
+- `apps-script/` 를 고쳤으면 `npm run check:gas` 통과 (편집기에 붙여 넣기 전에 따옴표 중첩·문자열 안 줄바꿈 같은 저장 불가 오류를 잡는다, `build` 도 먼저 돌린다)
 - 줄바꿈이 CRLF 인 파일이 있으므로 여러 줄 문자열 치환 스크립트는 `\r\n` 을 먼저 정리한다
