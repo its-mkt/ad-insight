@@ -36,9 +36,9 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; title: string }[] = [
 ];
 
 export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, themeMode = 'system', onThemeMode, onNavigate }) => {
-  const { user, isLoggedIn, isSignedIn, loading, logout } = useAuth();
+  const { user, isLoggedIn, isSuperAdmin, isSignedIn, loading, logout } = useAuth();
   // 승인된 일반 계정도 로그인한 상태라 프로필·로그아웃을 보여 준다 (관리자 표시만 다르다)
-  const roleLabel = isLoggedIn ? '관리자' : '열람';
+  const roleLabel = isSuperAdmin ? '최고 관리자' : isLoggedIn ? '관리자' : '열람';
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

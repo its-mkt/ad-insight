@@ -2,6 +2,8 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { currentAccessToken, postMemberAction } from '../lib/access';
 
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
+/** 승인된 계정의 등급 — member(일반) · manager(관리자). 최고 관리자는 명단(members 탭)이 아니라 admins 탭에 있다 */
+export type MemberRole = 'member' | 'manager';
 export interface MemberRow {
   email: string;
   name: string;
@@ -10,6 +12,8 @@ export interface MemberRow {
   requested_at: string;
   decided_at: string;
   decided_by: string;
+  /** 옛 웹앱 응답에는 없다 (일반으로 본다) */
+  role?: MemberRole;
 }
 
 interface MembersState {
@@ -64,8 +68,24 @@ export async function decideMember(email: string, status: Exclude<MemberStatus, 
   setState({ busy: email });
   const res = await postMemberAction({ action: 'decideMember', access_token: await currentAccessToken(), email, status }).catch(() => ({ error: 'network' }));
   setState({ busy: '' });
-  if (res.error) setState({ error: '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
+  if (res.error) setState({ error: res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. (관리자 계정은 최고 관리자만 바꿀 수 있습니다)' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
   else await loadMembers();
+}
+
+/** 등급 변경 (최고 관리자만) — 이용 현황의 계정별 조회 권한도 웹앱이 함께 맞춘다 */
+export async function setMemberRole(email: string, role: MemberRole): Promise<void> {
+  setState({ busy: email, notice: '' });
+  const res = await postMemberAction<{ usage?: string }>({ action: 'setMemberRole', access_token: await currentAccessToken(), email, role }).catch(
+    () => ({ error: 'network' }) as { error: string; usage?: string }
+  );
+  setState({ busy: '' });
+  if (res.error) {
+    setState({ error: res.error === 'not_approved' ? '승인된 계정만 등급을 바꿀 수 있습니다.' : '등급을 바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
+    return;
+  }
+  if (res.usage === 'failed' || res.usage === 'kept')
+    setState({ notice: `${email} 의 등급을 바꿨지만 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. (Supabase usage_admins 를 직접 확인해 주세요)` });
+  await loadMembers();
 }
 
 /**

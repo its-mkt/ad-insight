@@ -2752,6 +2752,9 @@ tr.kw-more-row td {
   .col-us-duration {
     width: var(--col-duration);
   }
+  .col-us-date {
+    width: var(--col-date);
+  }
 }
 
 /* 로그인해야 볼 수 있는 기간 안내 (LoginGate) */
