@@ -12,7 +12,8 @@ import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { useAuth } from '../../context/AuthContext';
 import { OwnerTransferModal } from './OwnerTransferModal';
-import { decideMember, deleteMember, loadMembers, sendPasswordGuide, setMemberRole, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
+import { RoleChangeModal, type RoleChange } from './RoleChangeModal';
+import { decideMember, deleteMember, loadMembers, sendPasswordGuide, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
 
 const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> = {
   pending: { label: '승인 대기', level: 'warn' },
@@ -48,6 +49,8 @@ export const MemberApprovals: React.FC = () => {
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
   // 소유자 권한을 넘길 운영자 (창이 열려 있을 때만)
   const [transferTo, setTransferTo] = useState<{ email: string; name: string } | null>(null);
+  // 등급 선택칸에서 고른 변경 — 확인 창에서 한 번 더 확인한 뒤 바꾼다
+  const [roleChange, setRoleChange] = useState<RoleChange | null>(null);
 
   return (
     <Card
@@ -126,7 +129,7 @@ export const MemberApprovals: React.FC = () => {
                     <Dropdown<MemberRole>
                       options={ROLE_OPTIONS}
                       value={role}
-                      onChange={(next) => next !== role && void setMemberRole(r.email, next)}
+                      onChange={(next) => next !== role && setRoleChange({ email: r.email, name: r.name, from: role, to: next })}
                       ariaLabel={`${r.name || r.email} 등급`}
                       disabled={busy === r.email}
                       fixedMenu
@@ -161,6 +164,7 @@ export const MemberApprovals: React.FC = () => {
       </table>
       {rows && rows.length === 0 && !error && <EmptyState message="가입 요청이 없습니다." />}
       <OwnerTransferModal target={transferTo} onClose={() => setTransferTo(null)} />
+      <RoleChangeModal change={roleChange} onClose={() => setRoleChange(null)} />
     </Card>
   );
 };

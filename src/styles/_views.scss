@@ -3265,3 +3265,40 @@ tr.kw-more-row td {
     }
   }
 }
+
+// 등급 변경 확인 창 — 뷰어 → 운영자 흐름, 달라지는 점 한 줄, 취소·바꾸기 버튼
+.card.login-modal.role-change-modal {
+  .role-change-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+
+    svg {
+      color: var(--sub);
+    }
+  }
+
+  .role-change-from {
+    color: var(--sub);
+  }
+
+  .role-change-to {
+    color: var(--acc);
+  }
+
+  .role-change-effect {
+    font-size: 0.8125rem;
+    color: var(--ink2);
+  }
+
+  .role-change-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+}
