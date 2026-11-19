@@ -1307,24 +1307,10 @@ tr.kw-more-row td {
 // 가입 요청·열람 권한 카드 — 견적 관리 위에 둔다
 // 계정 관리 화면 — 승인·거절·해제 버튼 칸
 .members-view {
+  // 승인·거절·해제·삭제는 설정 버튼 메뉴(ActionMenu)로 — 칸은 버튼 하나만큼 오른쪽에 붙인다
   .member-actions {
-    display: flex;
-    gap: 0.375rem;
-    justify-content: flex-end;
+    text-align: right;
     white-space: nowrap;
-
-    // 삭제 — 해제와 따로, 경고색. 한 번 누르면 "삭제 확인"(채운 버튼)으로 바뀐다
-    .btn-danger-ghost {
-      color: var(--warn);
-      border-color: color-mix(in srgb, var(--warn) 40%, transparent);
-    }
-
-    .btn-danger {
-      background: var(--warnbg);
-      color: var(--warn);
-      border-color: var(--warn);
-      font-weight: 700;
-    }
   }
 }
 

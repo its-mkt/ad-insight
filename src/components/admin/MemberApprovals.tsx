@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
+import { ActionMenu, type ActionMenuItem } from '../common/ActionMenu';
 import { StatusBadge, type StatusLevel } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
 import { SkelRows } from '../common/SkeletonView';
@@ -27,15 +29,13 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 가입 요청·열람 권한 관리 — 관리자만 보인다 (계정 관리 화면).
  * 명단은 데이터 시트 members 탭이고, 승인·거절·해제는 웹앱이 관리자 토큰을 확인한 뒤 바꾼다.
  * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers).
- * 삭제는 해제와 따로 둔다 — 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
+ * 승인·거절·해제·삭제는 줄 끝 설정 버튼의 메뉴에 모은다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
   const { rows, error, busy, pending } = useMembers();
   const { isSuperAdmin, user } = useAuth();
   const myEmail = (user?.email || '').toLowerCase();
-  // 삭제를 한 번 누른 줄 — 같은 줄에서 "삭제 확인"을 눌러야 지운다
-  const [confirmDel, setConfirmDel] = useState('');
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
 
   return (
@@ -102,44 +102,19 @@ export const MemberApprovals: React.FC = () => {
                 <td>{r.requested_at}</td>
                 <td>{r.decided_at ? `${r.decided_at}` : '–'}</td>
                 <td className="member-actions">
-                  {!canDecide && '–'}
-                  {canDecide && r.status !== 'approved' && (
-                    <Button size="sm" variant="primary" disabled={busy === r.email} onClick={() => void decide(r.email, 'approved')}>
-                      승인
-                    </Button>
-                  )}
-                  {canDecide && r.status === 'pending' && (
-                    <Button size="sm" disabled={busy === r.email} onClick={() => void decide(r.email, 'rejected')}>
-                      거절
-                    </Button>
-                  )}
-                  {canDecide && r.status === 'approved' && (
-                    <Button size="sm" disabled={busy === r.email} onClick={() => void decide(r.email, 'revoked')}>
-                      해제
-                    </Button>
-                  )}
-                  {!isSuperAdmin ? null : confirmDel === r.email ? (
-                    <>
-                      <Button
-                        size="sm"
-                        className="btn-danger"
-                        disabled={busy === r.email}
-                        onClick={() => {
-                          setConfirmDel('');
-                          void deleteMember(r.email);
-                        }}
-                      >
-                        삭제 확인
-                      </Button>
-                      <Button size="sm" disabled={busy === r.email} onClick={() => setConfirmDel('')}>
-                        취소
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="sm" className="btn-danger-ghost" disabled={busy === r.email} onClick={() => setConfirmDel(r.email)}>
-                      삭제
-                    </Button>
-                  )}
+                  {(() => {
+                    const items: ActionMenuItem[] = [];
+                    if (canDecide && r.status !== 'approved') items.push({ key: 'approve', label: '승인', icon: UserCheck, onSelect: () => decide(r.email, 'approved') });
+                    if (canDecide && r.status === 'pending') items.push({ key: 'reject', label: '거절', icon: UserX, onSelect: () => decide(r.email, 'rejected') });
+                    if (canDecide && r.status === 'approved') items.push({ key: 'revoke', label: '열람 권한 해제', icon: UserMinus, onSelect: () => decide(r.email, 'revoked') });
+                    if (isSuperAdmin)
+                      items.push({ key: 'delete', label: '삭제', icon: Trash2, danger: true, confirmLabel: '한 번 더 누르면 삭제', onSelect: () => void deleteMember(r.email) });
+                    return items.length ? (
+                      <ActionMenu items={items} ariaLabel={`${r.name || r.email} 관리`} disabled={busy === r.email} />
+                    ) : (
+                      '–'
+                    );
+                  })()}
                 </td>
               </tr>
               );
