@@ -93,6 +93,8 @@ interface GuestPreviewProps {
   app: React.ReactNode;
   /** 회원가입 도중이라 로그인·회원가입 창을 닫지 못하게 계속 띄울지 */
   keepOpen?: boolean;
+  /** 처음부터 로그인·회원가입 창을 열어 둘지 (비밀번호 재설정 안내 메일의 바로가기로 들어왔을 때) */
+  initialOpen?: boolean;
   /** 로그인·회원가입 창 내용 */
   children: React.ReactNode;
 }
@@ -103,11 +105,11 @@ interface GuestPreviewProps {
  * 실제 데이터는 한 건도 받지 않는다 (웹앱도 로그인 토큰이 없으면 데이터를 주지 않는다, 2026-11-18 사용자 결정).
  * 화면을 보고 가입하고 싶어지게 실제와 같은 모양으로 보여 준다 (2026-11-19 사용자 결정)
  */
-export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = false, children }) => {
+export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = false, initialOpen = false, children }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   useMaskedNumbers(rootRef);
   // 로그인·회원가입 창 — 처음에는 닫아 두어 메뉴·화면을 둘러보게 하고, 헤더 로그인 버튼이나 예시 데이터 표시를 누르면 연다
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   useEffect(() => {
     const onOpen = () => setOpen(true);
     window.addEventListener(OPEN_PREVIEW_LOGIN_EVENT, onOpen);

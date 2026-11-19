@@ -2089,3 +2089,92 @@ td.future {
   border: 1px solid var(--line2);
   background: var(--card);
 }
+
+// 줄 끝 설정 버튼 + 할 일 메뉴 (ActionMenu) — 메뉴는 화면 기준으로 띄운다
+.act-menu {
+  display: inline-flex;
+
+  .act-menu-btn.on {
+    color: var(--acc);
+    border-color: var(--acc);
+  }
+}
+
+.act-menu-pop {
+  z-index: 40;
+  min-width: 6rem; // 글자 길이만큼만 — 짧은 메뉴(승인·삭제)는 좁게
+  padding: 0.25rem;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.act-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+
+  svg {
+    flex: none;
+    color: var(--sub);
+  }
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  // 삭제 — 붉은색(--err)으로만 구분한다 (나누는 줄 없음). 한 번 누르면 채운 배경으로 바뀌어 한 번 더 누르게 한다
+  &.danger {
+    color: var(--err);
+
+    svg {
+      color: currentColor;
+    }
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--err) 10%, var(--card));
+      color: var(--err);
+    }
+  }
+
+  &.armed {
+    background: color-mix(in srgb, var(--err) 10%, var(--card));
+    font-weight: 700;
+  }
+}
+
+// 새로 고침처럼 받는 동안 아이콘을 돌리는 버튼 (Button icon + className="is-spinning")
+.btn.is-spinning svg {
+  animation: btn-spin 0.9s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-spinning svg {
+    animation: none;
+  }
+}

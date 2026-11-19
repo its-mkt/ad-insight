@@ -99,9 +99,20 @@
     background: none;
   }
 
+  // 아이콘은 바탕 없이 강조색으로만 — 마우스를 올리면 옆 선택 칸처럼 연한 바탕
   .brand-home {
     display: flex;
     cursor: pointer;
+
+    i {
+      background: none;
+      color: var(--acc);
+      transition: background 0.15s ease;
+    }
+
+    &:hover i {
+      background: var(--accbg);
+    }
   }
 
   .brand-dd {
@@ -112,19 +123,19 @@
       width: 100%;
       height: 2rem;
       padding: 0 0.5rem 0 0.5rem;
-      border-color: transparent;
+      border-color: var(--line);
       background: none;
       font-size: 0.875rem;
       letter-spacing: -0.01em;
 
       &:hover {
-        border-color: transparent;
+        border-color: var(--line2);
         background: var(--accbg);
       }
     }
 
     &.open .dd-trigger {
-      border-color: transparent;
+      border-color: var(--acc);
       background: var(--accbg);
     }
 

@@ -15,7 +15,7 @@ import {
   passwordErrorText,
   passwordLengthError,
 } from '../lib/authErrors';
-import { DEV_ADMIN_KEY, readDevSession, writeRoleCache } from '../lib/roleCache';
+import { DEV_ADMIN_KEY, readDevSession } from '../lib/roleCache';
 import { useAccessRole } from '../hooks/useAccessRole';
 import { clearCachedPayloads } from '../utils/payloadCache';
 import { squareJpeg } from '../utils/image';
@@ -176,10 +176,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const userKey = user ? `${user.id}|${user.isDevAdmin ? 'dev' : ''}` : '';
   const { role, roleLoading } = useAccessRole(sessionLoading, userKey, roleTick);
 
-  // 볼 권한이 없으면 이 브라우저에 남은 지난 응답도 지운다
+  // 로그인한 계정이 볼 권한이 없다고 확인되면(승인 대기·거절·해제 등) 이 브라우저에 남은 지난 응답도 지운다.
+  // 로그아웃(guest)은 지우지 않는다 — 같은 계정이 다시 로그인하면 그 응답으로 바로 그린다 (계정별 저장, utils/payloadCache)
   const canView = canViewRole(role);
   useEffect(() => {
-    if (!roleLoading && role && !canView) void clearCachedPayloads();
+    if (!roleLoading && role && role !== 'guest' && !canView) void clearCachedPayloads();
   }, [roleLoading, role, canView]);
 
   const sendEmailCode = async (email: string, signup = false): Promise<{ error?: string; registered?: boolean }> => {
@@ -234,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeSignup = async ({ name, company, team, password }: SignUpInfo): Promise<{ error?: string }> => {
-    const missing = missingProfileText(name, company, team);
+    const missing = missingProfileText(name, company, team, '담당자');
     if (missing) return { error: missing };
     if (!password) return { error: '비밀번호를 입력해 주세요.' };
     const shortPw = passwordLengthError(password);
@@ -276,7 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const requestAccess = async (name: string, company: string, team: string): Promise<{ error?: string }> => {
-    const missing = missingProfileText(name, company, team);
+    const missing = missingProfileText(name, company, team, '담당자');
     if (!user?.email || missing) return { error: missing || '로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.' };
     const req = await postAuthedAction('requestAccess', { email: user.email, name: name.trim(), team: affiliationText(company, team) });
     if (req.error) return { error: '승인 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
@@ -288,7 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { error: '로그인이 필요합니다.' };
     if (user.isDevAdmin) return { error: DEV_ACCOUNT_ERROR };
     const next = { name: name.trim().slice(0, 40), company: company.trim().slice(0, 40), team: team.trim().slice(0, 40) };
-    const missing = missingProfileText(next.name, next.company, next.team);
+    const missing = missingProfileText(next.name, next.company, next.team, '담당자');
     if (missing) return { error: missing };
     const res = await supabase.auth.updateUser({ data: next });
     if (res.error) {
@@ -369,8 +370,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setSignupInProgress(false);
     removeKey(DEV_ADMIN_KEY);
-    writeRoleCache('', null);
-    await clearCachedPayloads();
+    // 기억한 권한(12시간)과 저장한 응답은 남긴다 — 같은 계정이 다시 로그인하면 권한 확인·데이터를 기다리지 않고 바로 연다 (2026-11-19 사용자 결정: 공용 PC 없음).
+    // 둘 다 계정별이라 다른 계정이 로그인하면 쓰지 않고, 웹앱이 뒤에서 다시 확인해 권한이 없으면 잠그고 지운다
     await supabase.auth.signOut();
     setUser(null);
   };

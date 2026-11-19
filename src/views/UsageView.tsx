@@ -50,7 +50,8 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   const [loaded, setLoaded] = useState<Loaded>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<UsageTab>('views');
+  // 처음에는 계정별 — 누가 쓰는지가 가장 먼저 궁금하다 (2026-11-19 사용자 결정). 계정별 기록이 없으면 첫 탭(화면별)
+  const [tab, setTab] = useState<UsageTab>('accounts');
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -139,16 +140,16 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
         ].concat(kinds.unknown > 0 ? [['미수집', `${fmt(kinds.unknown)}대`]] : [])
       : [];
 
-    // 표는 탭으로 나눠 하나씩 보여 준다 — 계정별은 기록 함수가 있을 때만
+    // 표는 탭으로 나눠 하나씩 보여 준다 — 계정별(맨 앞)은 기록 함수가 있을 때만
     const tabs: { id: UsageTab; label: string; count?: number; sort: string }[] = [
-      { id: 'views', label: '화면별', count: cur.views.length, sort: '페이지뷰 많은 순' },
       ...(cur.accounts !== null
         ? [{ id: 'accounts' as const, label: '계정별', count: Array.isArray(cur.accounts) ? cur.accounts.length : undefined, sort: '페이지뷰 많은 순' }]
         : []),
+      { id: 'views', label: '화면별', count: cur.views.length, sort: '페이지뷰 많은 순' },
       { id: 'categories', label: '카테고리별', count: cur.categoryGroups.length, sort: '많이 고른 순' },
       { id: 'daily', label: monthly ? '월별' : '일별', sort: '최근부터' },
     ];
-    const activeTab: UsageTab = tabs.some((t) => t.id === tab) ? tab : 'views';
+    const activeTab: UsageTab = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
     const tabInfo = tabs.find((t) => t.id === activeTab)!;
 
     body = (
@@ -254,8 +255,11 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                   계정별 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
                 </Notice>
               ) : cur.accounts.length ? (
-                <table className="stk usage-table">
+                <table className="stk usage-table usage-accounts">
                   <colgroup>
+                    <col className="col-us-name" />
+                    <col className="col-us-company" />
+                    <col className="col-us-team" />
                     <col />
                     <col className="col-us-count" />
                     <col className="col-us-count" />
@@ -264,7 +268,10 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                   </colgroup>
                   <thead>
                     <tr>
-                      <Th>계정</Th>
+                      <Th>담당자</Th>
+                      <Th>회사</Th>
+                      <Th>팀</Th>
+                      <Th>이메일</Th>
                       <Th className="n" tip="이용한 날|그 계정으로 로그인해 화면을 연 날 수 (펼친 줄은 그 화면을 연 날 수)">이용한 날</Th>
                       <Th className="n">페이지뷰</Th>
                       <Th className="n">총 체류시간</Th>
@@ -278,12 +285,14 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                         <React.Fragment key={a.userId}>
                           <TreeParentRow
                             label={a.name || a.email.split('@')[0] || '(알 수 없음)'}
-                            sub={[[a.company, a.team].filter(Boolean).join(' '), a.email].filter(Boolean).join(' · ')}
                             childCount={a.views.length}
                             showCount={false}
                             open={isOpen}
                             onToggle={() => setOpenAccounts((prev) => toggledSet(prev, a.userId))}
                           >
+                            <td title={a.company || undefined}>{a.company || '–'}</td>
+                            <td title={a.team || undefined}>{a.team || '–'}</td>
+                            <td title={a.email || undefined}>{a.email || '–'}</td>
                             <NumTd value={a.days} unit="일" />
                             <NumTd value={a.pageviews} unit="회" bold />
                             <NumTd>{durationText(a.seconds)}</NumTd>
@@ -291,7 +300,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                           </TreeParentRow>
                           {isOpen &&
                             a.views.map((v) => (
-                              <TreeChildRow key={v.view} label={viewTitle(v.view)}>
+                              <TreeChildRow key={v.view} label={viewTitle(v.view)} labelColSpan={4}>
                                 <NumTd value={v.days} unit="일" />
                                 <NumTd value={v.pageviews} unit="회" />
                                 <NumTd>{durationText(v.seconds)}</NumTd>

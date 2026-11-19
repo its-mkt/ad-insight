@@ -22,9 +22,35 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 /** 명단(members 탭)·알림의 소속 칸 — 회사와 팀을 '회사 · 팀' 한 칸으로 적는다 (회사가 없으면 팀만) */
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
-/** 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열 */
-export const missingProfileText = (name: string, company: string, team: string): string =>
-  !name.trim() || !company.trim() || !team.trim() ? '이름·회사·팀을 모두 입력해 주세요.' : '';
+/** affiliationText 로 합친 소속을 회사·팀으로 다시 나눈다 — 구분점이 없는 옛 값은 팀으로만 본다 */
+export const splitAffiliation = (text: string): { company: string; team: string } => {
+  const i = text.indexOf(' · ');
+  return i < 0 ? { company: '', team: text.trim() } : { company: text.slice(0, i).trim(), team: text.slice(i + 3).trim() };
+};
+
+/**
+ * 이름·회사·팀 중 빈 칸이 있거나 '.'·'-' 처럼 뜻 없는 값이면 안내 문구, 아니면 빈 문자열.
+ * 흔히 쓰는 기호는 받되 실제 글자가 있어야 한다 (2026-11-19 사용자 결정 — 가입 때 귀찮아서 기호만 적는 것을 막는 목적).
+ * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청·내 계정 설정 모두 '담당자' (2026-11-19 사용자 결정)
+ */
+export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
+  !name.trim() || !company.trim() || !team.trim()
+    ? `${nameLabel}·회사·팀을 모두 입력해 주세요.`
+    : !isPersonName(name)
+      ? `${nameLabel} 칸은 한글이나 영문 이름으로 2자 이상 입력해 주세요.`
+      : !isOrgName(company) || !isOrgName(team)
+        ? '회사·팀은 실제 이름으로 입력해 주세요. 한글·영문이 들어간 2자 이상이어야 하고, 기호만 적을 수는 없습니다.'
+        : '';
+
+/** 한글(완성형)·영문 글자 수 — 자음·모음만 쓴 'ㅎㅎ' 는 세지 않는다 */
+const letterCount = (v: string): number => (v.match(/[가-힣a-zA-Z]/g) || []).length;
+
+/** 담당자명 — 한글·영문 2자 이상, 띄어쓰기와 이름에 쓰는 . - ' 만 (숫자 없음) */
+export const isPersonName = (v: string): boolean => /^[가-힣a-zA-Z .'-]+$/.test(v.trim()) && letterCount(v) >= 2;
+
+/** 회사·팀 — 한글·영문·숫자와 흔히 쓰는 기호(㈜ ( ) & . , - _ ' / · +), 한글·영문 1자 이상 포함 글자·숫자 2자 이상 ('3M'·'영업1팀' 통과, '.'·'-'·'12' 막음) */
+export const isOrgName = (v: string): boolean =>
+  /^[가-힣a-zA-Z0-9 ㈜()&.,\-_'/·+]+$/.test(v.trim()) && letterCount(v) >= 1 && (v.match(/[가-힣a-zA-Z0-9]/g) || []).length >= 2;
 
 /** 입력한 인증번호에서 숫자만 남긴다 */
 export const otpDigits = (code: string): string => code.replace(/\D/g, '');

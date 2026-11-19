@@ -17,6 +17,7 @@ import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../li
 import { takePrefetched } from '../lib/prefetch';
 import { getCfg, webAppUrl } from '../lib/webApp';
 import { usePreviewMode } from '../context/PreviewModeContext';
+import { useAuth } from '../context/AuthContext';
 import { isPreviewDeviceShares, previewPayload, setPreviewRealDevices } from '../data/previewPayload';
 
 // 웹앱 설정(getCfg·siteConnected 등)은 lib/webApp.ts — App 등 기존 import 를 위해 siteConnected 만 다시 내보낸다
@@ -36,6 +37,8 @@ export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): 
 export function useDashboardData(site: SiteId = 'itket') {
   // 로그인 전 미리보기는 웹앱에 묻지 않고 예시 데이터로 그린다 (캐시에도 남기지 않는다)
   const preview = usePreviewMode();
+  // 저장해 둔 응답은 계정마다 따로 — 같은 계정이 다시 로그인하면 그 응답으로 먼저 그린다
+  const uid = useAuth().user?.id || '';
   const [data, setData] = useState<DashboardData>(() => (preview ? fromSiteApi(previewPayload(), site) : emptyData()));
   const [status, setStatus] = useState<SyncStatus>(preview ? 'live' : 'init');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -60,14 +63,14 @@ export function useDashboardData(site: SiteId = 'itket') {
       if (liveLoaded.current || siteRef.current !== site) return;
       setData((prevData) => {
         if (prevData.spend.length > 0 && prevData.quotesRaw.length > 0) return prevData;
-        writeCachedPayload(localJ, site);
+        writeCachedPayload(localJ, site, uid);
         return fromSiteApi(localJ, site);
       });
       setStatus('live');
     } catch {
       // ignore fallback failure
     }
-  }, [site]);
+  }, [site, uid]);
 
   const load = useCallback(async () => {
     if (preview) return;
@@ -99,7 +102,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       liveLoaded.current = true;
       setData(fromSiteApi(j, site));
       setStatus('live');
-      writeCachedPayload(j, site);
+      writeCachedPayload(j, site, uid);
     } catch (e) {
       if (isStale()) return;
       console.error('[ad-insight] 실데이터 동기화 오류 (화면 데이터 유지):', e);
@@ -109,7 +112,7 @@ export function useDashboardData(site: SiteId = 'itket') {
       // 뒤에 보낸 요청이 아직 받는 중이면 동기화 표시를 끄지 않는다
       if (id === reqId.current) setIsSyncing(false);
     }
-  }, [site, preview, tryLoadStaticFallback]);
+  }, [site, uid, preview, tryLoadStaticFallback]);
 
   useEffect(() => {
     if (preview) {
@@ -142,7 +145,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     // 실데이터 요청(수 초~수십 초)을 가장 먼저 띄워 두고, 그동안 지난번 받은 데이터(없으면 배포에 묶인 스냅숏)로 먼저 그린다.
     // 예전에는 캐시·스냅숏을 다 받은 뒤에야 요청을 시작해 그만큼 늦게 도착했다
     load();
-    readCachedPayload(site).then(async (cached) => {
+    readCachedPayload(site, uid).then(async (cached) => {
       if (liveLoaded.current || siteRef.current !== site) return; // 실데이터가 먼저 왔으면 옛 캐시로 덮지 않는다
       if (isUsableCache(cached, site)) {
         setData(fromSiteApi(cached, site));
@@ -154,7 +157,7 @@ export function useDashboardData(site: SiteId = 'itket') {
 
     const timer = setInterval(load, 15 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [site, preview, load, tryLoadStaticFallback]);
+  }, [site, uid, preview, load, tryLoadStaticFallback]);
 
   // 로그인·로그아웃하면 그 권한에 맞는 데이터로 다시 받는다 (토큰 갱신처럼 계정이 그대로면 받지 않는다)
   useEffect(() => {

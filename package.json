@@ -5,7 +5,8 @@
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-gas.mjs && tsc -b && vite build",
+    "check:gas": "node scripts/check-gas.mjs",
     "preview": "vite preview",
     "verify": "node scripts/verify-sync.mjs",
     "verify:sync": "node scripts/verify-sync.mjs --write",

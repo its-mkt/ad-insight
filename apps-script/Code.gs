@@ -1667,7 +1667,9 @@ function updateProfile_(data) {
 /** 최고 관리자·관리자 — 가입 요청 목록 (role: member · manager) */
 function listMembers_(accessToken) {
   if (!isStaffRole_(accessOf_(accessToken).role)) return { error: 'forbidden' };
-  return { success: true, members: memberRows_(authSheet_()).map(({ row, ...m }) => ({ ...m, role: m.role === 'manager' ? 'manager' : 'member' })) };
+  const ss = authSheet_();
+  // owners — 소유자(admins 탭) 이메일. 계정 관리 화면 맨 위에 바꿀 수 없는 줄로 보여 준다
+  return { success: true, members: memberRows_(ss).map(({ row, ...m }) => ({ ...m, role: m.role === 'manager' ? 'manager' : 'member' })), owners: adminEmails_(ss) };
 }
 /**
  * 최고 관리자·관리자 — 승인(approved)·거절(rejected)·해제(revoked).
@@ -1709,6 +1711,119 @@ function setMemberRole_(accessToken, email, role) {
     CacheService.getScriptCache().remove('acc:' + email);
     return { success: true, email, role, usage: syncUsageAdmin_(email, role === 'manager') };
   } finally { lock.releaseLock(); }
+}
+/**
+ * 소유자 — 소유자 권한 넘기기. 받는 사람은 승인된 운영자(manager)만, 넘긴 사람은 운영자가 된다 (되돌리기는 새 소유자만 할 수 있다).
+ * 실수 방지: 화면이 받는 사람 이메일을 다시 입력받아 confirm 으로 보내고, 10분 안에 비밀번호로 다시 로그인한 토큰만 받는다.
+ * admins 탭의 내 줄을 받는 사람 이메일로 바꾸고, members 탭은 받는 사람 줄을 지우고(소유자는 목록에 나오지 않는다) 내 줄을 승인된 운영자로 둔다.
+ * owner_log 탭에 기록하고 Teams·메일로 알린다. 앱 안의 권한만 넘어가며 시트·Apps Script·Supabase 소유권은 그대로다
+ */
+function transferOwner_(data) {
+  const acc = accessOf_(data.access_token);
+  if (acc.role !== 'admin') return { error: 'forbidden' };
+  if (!recentPasswordLogin_(data.access_token, 10 * 60)) return { error: 'reauth_required' };
+  const from = acc.email;
+  const to = String(data.email || '').trim().toLowerCase();
+  if (!to || String(data.confirm || '').trim().toLowerCase() !== to) return { error: 'confirm_mismatch' };
+  if (to === from) return { error: 'self' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const ss = authSheet_();
+    if (adminEmails_(ss).includes(to)) return { error: 'already_owner' };
+    const target = memberRows_(ss).find((r) => r.email === to);
+    if (!target) return { error: 'not_found' };
+    if (target.status !== 'approved' || target.role !== 'manager') return { error: 'not_manager' };
+    const adminSh = ss.getSheetByName('admins');
+    const adminVals = adminSh ? adminSh.getRange(1, 1, adminSh.getLastRow(), 1).getValues() : [];
+    const adminRow = adminVals.findIndex((r) => String(r[0]).trim().toLowerCase() === from);
+    if (adminRow < 0) return { error: 'forbidden' };
+    const now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
+    const name = String(data.name || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40) || from.split('@')[0];
+    const team = String(data.team || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 90) || '-';
+    // 1) 넘긴 사람을 승인된 운영자로 (명단 줄이 있으면 고치고, 없으면 만든다)
+    const sh = membersSheet_(ss);
+    const mine = memberRows_(ss).find((r) => r.email === from);
+    const myRow = [from, mine ? mine.name || name : name, mine ? mine.team || team : team, 'approved', mine ? mine.requested_at : now, now, 'owner-transfer', 'manager'];
+    if (mine) sh.getRange(mine.row, 1, 1, MEMBER_HEAD_.length).setValues([myRow]);
+    else sh.appendRow(myRow);
+    // 2) 받는 사람을 소유자로 — admins 탭 내 줄을 바꾸고, 명단 줄은 지운다
+    adminSh.getRange(adminRow + 1, 1).setValue(to);
+    const t = memberRows_(ss).find((r) => r.email === to);
+    if (t) sh.deleteRow(t.row);
+    const cache = CacheService.getScriptCache();
+    cache.removeAll(['acc:' + from, 'acc:' + to]);
+    // 3) 이용 현황 계정별 조회 권한은 둘 다 그대로 (운영자·소유자 모두 볼 수 있다)
+    const usage = syncUsageAdmin_(from, true);
+    let log = ss.getSheetByName('owner_log');
+    if (!log) { log = ss.insertSheet('owner_log'); log.appendRow(['at', 'from', 'to']); log.setFrozenRows(1); }
+    log.appendRow([now, from, to]);
+    sendAccessNotice_({
+      title: '광고 인사이트 소유자 변경',
+      facts: [{ title: '이전 소유자', value: from + ' → 운영자' }, { title: '새 소유자', value: target.name + ' (' + to + ')' }, { title: '시각', value: now }],
+      note: '계정 관리 화면에서 소유자 권한을 넘겼습니다. 본인이 한 일이 아니면 새 소유자에게 되돌려 달라고 하거나 권한 시트 admins 탭을 직접 고쳐 주세요.',
+      action: '계정 관리 열기',
+      subject: '[광고 인사이트] 소유자 변경 — ' + from + ' → ' + to,
+      text: '광고 인사이트 소유자 변경 (' + now + ')\n이전 소유자: ' + from + ' → 운영자\n새 소유자: ' + target.name + ' (' + to + ')\n\n본인이 한 일이 아니면 권한 시트 admins 탭을 직접 고쳐 주세요.',
+    });
+    return { success: true, from, to, usage };
+  } finally { lock.releaseLock(); }
+}
+/**
+ * 로그인 토큰이 sec 초 안에 비밀번호로 로그인해 받은 것인지 — Supabase 토큰 안 amr(로그인 방식·시각)을 본다.
+ * 토큰 자체가 진짜인지는 accessOf_ → tokenEmail_ 가 Supabase 에 물어 이미 확인했다
+ */
+function recentPasswordLogin_(accessToken, sec) {
+  try {
+    const part = String(accessToken).split('.')[1];
+    const payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(part + '==='.slice((part.length + 3) % 4))).getDataAsString());
+    const now = Date.now() / 1000;
+    return (payload.amr || []).some((a) => a && a.method === 'password' && now - Number(a.timestamp) <= sec);
+  } catch (err) {
+    return false;
+  }
+}
+/** 비밀번호 재설정 안내 메일의 바로가기 — 접속하면 로그인 창이 '비밀번호 찾기'로 열린다 */
+const PASSWORD_GUIDE_URL_ = 'https://its.itket.com/ad-insight/itket/summary?reset=1';
+/**
+ * 최고 관리자·관리자 — 승인된 계정에 비밀번호 재설정 안내 메일을 보낸다 (계정 관리 설정 메뉴).
+ * 비밀번호는 보거나 바꾸지 않는다 — 본인이 '비밀번호 찾기'에서 메일 인증번호로 새로 정한다.
+ * 관리자는 일반 계정만 (다른 관리자·자기 자신은 최고 관리자만). 한 계정에 한 시간 3번까지
+ */
+function sendPasswordGuide_(accessToken, email) {
+  const acc = accessOf_(accessToken);
+  if (!isStaffRole_(acc.role)) return { error: 'forbidden' };
+  email = String(email || '').trim().toLowerCase();
+  const m = memberRows_(authSheet_()).find((r) => r.email === email);
+  if (!m) return { error: 'not_found' };
+  if (acc.role !== 'admin' && (m.role === 'manager' || email === acc.email)) return { error: 'forbidden' };
+  if (m.status !== 'approved') return { error: 'not_approved' };
+  const cache = CacheService.getScriptCache(), hk = 'pwg:' + email + ':' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMddHH');
+  const n = Number(cache.get(hk) || 0);
+  if (n >= 3) return { error: 'too_many' };
+  cache.put(hk, String(n + 1), 3600);
+  const who = m.name ? m.name + ' 님' : email;
+  const body = [
+    who + ', 안녕하세요.',
+    '',
+    '광고 인사이트 관리자가 비밀번호 재설정 방법을 보내 드립니다.',
+    '아래 주소로 접속하면 로그인 창이 "비밀번호 찾기"로 열립니다.',
+    '',
+    PASSWORD_GUIDE_URL_,
+    '',
+    '1. 가입한 이메일(' + email + ')을 넣고 인증번호를 받습니다.',
+    '2. 메일로 온 6자리 인증번호와 새 비밀번호를 넣으면 바로 로그인됩니다.',
+    '',
+    '이미 로그인돼 있다면 오른쪽 위 프로필 → 내 계정 설정에서 바꿀 수 있습니다.',
+    '관리자는 비밀번호를 알 수 없으며, 요청하지 않으셨다면 이 메일은 무시하셔도 됩니다.',
+  ].join('\n');
+  try {
+    GmailApp.sendEmail(email, '[광고 인사이트] 비밀번호 재설정 안내', body);
+  } catch (err) {
+    console.warn('비밀번호 안내 메일 실패: ' + err.message);
+    return { error: 'mail_failed' };
+  }
+  return { success: true, email };
 }
 /** Supabase 관리자 키(SUPABASE_SERVICE_KEY) 요청 머리글 — 새 형식 비밀 키(sb_secret_…)는 apikey 만 (게이트웨이가 토큰을 만든다), 예전 service_role(JWT)는 Bearer 도 함께 */
 function supabaseServiceHeaders_(key) {
@@ -1867,6 +1982,8 @@ function memberPost_(e) {
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
   if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));
   if (data.action === 'setMemberRole') return json_(setMemberRole_(data.access_token, data.email, data.role));
+  if (data.action === 'transferOwner') return json_(transferOwner_(data));
+  if (data.action === 'sendPasswordGuide') return json_(sendPasswordGuide_(data.access_token, data.email));
   return null;
 }
 function doPostBody_(e) {

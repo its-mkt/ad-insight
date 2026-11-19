@@ -18,6 +18,8 @@ interface DropdownProps<T extends string | number> {
   className?: string;
   id?: string;
   disabled?: boolean;
+  /** 트리거에 선택된 라벨 대신 보일 내용 (예: 상태 뱃지) — 없으면 선택된 항목의 label */
+  valueLabel?: React.ReactNode;
   /** 스크롤 영역(표 등) 안에서 목록이 잘리지 않게 화면 기준으로 띄운다. 공간이 모자라면 위로 펼치고, 바깥을 스크롤하면 닫는다 */
   fixedMenu?: boolean;
 }
@@ -32,6 +34,7 @@ export function Dropdown<T extends string | number>({
   id,
   disabled,
   fixedMenu,
+  valueLabel,
 }: DropdownProps<T>): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -160,7 +163,7 @@ export function Dropdown<T extends string | number>({
           }
         }}
       >
-        <span className="dd-value">{selected?.label}</span>
+        <span className="dd-value">{valueLabel ?? selected?.label}</span>
         <ChevronDown className="dd-chev" strokeWidth={2.25} aria-hidden="true" />
       </button>
 
