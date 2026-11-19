@@ -40,13 +40,13 @@ const goDashboard = (id: DashboardId) => {
 };
 
 /** 사이트 선택 — 막아 둔 사이트(route.ts SITE_ENABLED)와, 로그인 전의 온코어는 고를 수 없게 둔다 */
-const siteOptions = (isLoggedIn: boolean): SegmentOption<SiteId>[] => [
+const siteOptions = (canView: boolean): SegmentOption<SiteId>[] => [
   { value: 'itket', label: '아이티켓' },
   {
     value: 'oncore',
     label: '온코어',
-    title: !SITE_ENABLED.oncore ? '온코어 데이터 연결 준비 중' : isLoggedIn ? undefined : '로그인하면 온코어 데이터를 볼 수 있습니다',
-    disabled: !SITE_ENABLED.oncore || !isLoggedIn,
+    title: !SITE_ENABLED.oncore ? '온코어 데이터 연결 준비 중' : canView ? undefined : '로그인하면 온코어 데이터를 볼 수 있습니다',
+    disabled: !SITE_ENABLED.oncore || !canView, // 승인된 계정이면 등급과 상관없이 연다 (2026-11-19)
   },
 ];
 
@@ -131,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSiteChange,
   preview,
 }) => {
-  const { isLoggedIn, isSuperAdmin } = useAuth();
+  const { isLoggedIn, isSuperAdmin, canView } = useAuth();
   // 계정 관리 메뉴 옆 승인 대기 건수 — 관리자로 로그인했을 때만 명단을 받는다
   const { pending } = useMembers(isLoggedIn);
   const live = status === 'live';
@@ -194,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Dropdown<DashboardId> className="brand-dd" id="dd-dashboard" ariaLabel="대시보드 선택" options={DASHBOARD_OPTIONS} value="ad-insight" onChange={goDashboard} />
         </div>
         <div className="site-switch">
-          <SegmentedControl<SiteId> id="seg-site" options={siteOptions(isLoggedIn)} value={site} onChange={onSiteChange} />
+          <SegmentedControl<SiteId> id="seg-site" options={siteOptions(canView)} value={site} onChange={onSiteChange} />
         </div>
         <div className="sm">
           <div className="lbl">대시보드</div>

@@ -55,7 +55,7 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState(() => parseRoute().query);
   const [searchTab, setSearchTab] = useState<SearchTab | undefined>();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { isLoggedIn, isSuperAdmin, loading: authLoading } = useAuth();
+  const { isLoggedIn, isSuperAdmin, canView, loading: authLoading } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
   // 로그인 전 미리보기(예시 데이터) — 로그인·검색 버튼은 접속 화면의 로그인·회원가입 창을 연다 (검색 창은 예시 숫자를 가리지 못해 열지 않는다)
   const preview = usePreviewMode();
@@ -322,8 +322,8 @@ export const App: React.FC = () => {
     }
     // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
     else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
-    // 온코어는 로그인한 관리자만 — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
-    if (site === 'oncore' && !isLoggedIn) {
+    // 온코어는 승인된 계정만(등급 무관) — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
+    if (site === 'oncore' && !canView) {
       setSite('itket');
       window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
       if (!wasLoggedIn.current && !preview) setLoginOpen(true);
@@ -331,7 +331,7 @@ export const App: React.FC = () => {
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
     if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
     wasLoggedIn.current = isLoggedIn;
-  }, [authLoading, isLoggedIn, isSuperAdmin, currentView, site, preview]);
+  }, [authLoading, isLoggedIn, isSuperAdmin, canView, currentView, site, preview]);
 
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
