@@ -27,7 +27,7 @@ const MASK = '***';
 const maskDigits = (v: string): string =>
   v.replace(TOKEN, (m: string, at: number) => (/[-/]/.test(m) || /^\s*[년월일]/.test(v.slice(at + m.length)) ? m : MASK));
 
-/** 값 글자를 덮는 표시 — 이 속성이 붙은 요소에 _views.scss 가 반투명 회색 막대를 덮는다 */
+/** 값 글자를 덮는 표시 — 이 속성이 붙은 요소에 _views.scss 가 2px 픽셀 모자이크 필터(#pv-mosaic)를 건다 */
 const MASK_ATTR = 'data-pv-mask';
 
 /**
@@ -38,8 +38,8 @@ const isValueText = (text: string): boolean => text.replace(/\*+|[\s원건회개
 const MASK_ATTRS = ['title', 'aria-label', 'data-tip', 'data-tip-desc'];
 
 /**
- * 숫자 자리의 글자를 *** 로 바꾸고(개발자 도구에서도 숫자가 보이지 않게) 그 글자를 반투명 막대로 덮는다(어느 정도 수치인지 감도 오지 않게).
- * 미리보기 숫자는 예시라 실제 값은 아니지만 실제 실적으로 오해하지 않게 한다 (2026-11-19 사용자 결정 — * 는 개발자 도구용, 덮개는 크기 짐작 방지용. 픽셀 모자이크는 보기 싫다고 해 반투명 막대로).
+ * 숫자 자리의 글자를 *** 로 바꾸고(개발자 도구에서도 숫자가 보이지 않게) 그 글자를 2px 픽셀 모자이크로 덮는다(어느 정도 수치인지 감도 오지 않게).
+ * 미리보기 숫자는 예시라 실제 값은 아니지만 실제 실적으로 오해하지 않게 한다 (2026-11-19 사용자 결정 — * 는 개발자 도구용, 모자이크는 크기 짐작 방지용. 6px 는 징그럽고 반투명 막대는 다 보여 2px 로).
  * React 가 값을 다시 그려도 바로 다시 가린다.
  */
 function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
@@ -62,7 +62,7 @@ function useMaskedNumbers(rootRef: React.RefObject<HTMLDivElement | null>) {
       if (!v || !parent?.closest(MASKED)) return;
       const masked = /\d/.test(v) ? maskDigits(v) : v;
       if (masked !== v) node.nodeValue = masked;
-      // 가린 값이 든 글자는 화면에서도 반투명 막대로 덮어 어느 정도 수치인지 감도 오지 않게 한다 (React 가 다루지 않는 속성이라 다시 그려도 남는다)
+      // 가린 값이 든 글자는 화면에서도 모자이크로 덮어 어느 정도 수치인지 감도 오지 않게 한다 (React 가 다루지 않는 속성이라 다시 그려도 남는다)
       // 차트(SVG) 글자와 문장 속 숫자는 *** 만 둔다 — 값만 있는 짧은 글자만 덮는다
       if (masked.includes(MASK) && !(parent instanceof SVGElement) && isValueText(parent.textContent || '') && !parent.hasAttribute(MASK_ATTR)) parent.setAttribute(MASK_ATTR, '');
     };
@@ -118,6 +118,20 @@ export const GuestPreview: React.FC<GuestPreviewProps> = ({ app, keepOpen = fals
       <div className="preview-mode" ref={rootRef}>
         {app}
       </div>
+      {/* 값 글자용 픽셀 모자이크 필터 — 2px 칸마다 한 점의 색으로 채운다. 살짝 번지게 한 뒤 진하게 해 가는 획이 빠지지 않게 */}
+      <svg className="pv-mask-defs" aria-hidden="true" focusable="false">
+        <filter id="pv-mosaic" x="-5%" y="-15%" width="110%" height="130%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="soft" />
+          <feComponentTransfer in="soft" result="solid">
+            <feFuncA type="linear" slope="2" />
+          </feComponentTransfer>
+          <feFlood x="1" y="1" width="1" height="1" />
+          <feComposite width="2" height="2" />
+          <feTile result="grid" />
+          <feComposite in="solid" in2="grid" operator="in" />
+          <feMorphology operator="dilate" radius="1" />
+        </filter>
+      </svg>
       {!(open || keepOpen) && (
         <div className="preview-lock">
           <button type="button" className="preview-badge" data-btn="preview-login" onClick={() => setOpen(true)}>
