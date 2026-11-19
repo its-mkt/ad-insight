@@ -35,7 +35,6 @@
 | 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
 | 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` — 자체 필터를 쓰는 표도 이용 현황 기록은 `useTrackCategoryFilter(cat1, cat2)` |
-| 비로그인에 가리는 화면 안내 | `LoginGate` |
 | 마우스를 올리면 뜨는 설명 (요소 감싸기) | `Tooltip` (`common/Tooltip`, 표 머리글은 `Th` 의 `tip`) |
 | 더보기·접기 | `MoreButton`, `ShowMoreButton` |
 | 펼침 줄 Set 상태 토글 / 비중 % 표기 | `setX((prev) => toggledSet(prev, key))` (`utils/toggleSet`), `pctLabel` (`utils/format`) |

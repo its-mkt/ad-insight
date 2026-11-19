@@ -406,12 +406,3 @@ export interface RawApiPayload {
   g_ad_stats?: RawAdStatApiRow[];
   n_ad_stats?: RawAdStatApiRow[];
 }
-
-declare global {
-  interface Window {
-    ADI?: {
-      url?: string;
-      key?: string;
-    };
-  }
-}

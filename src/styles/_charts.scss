@@ -12,10 +12,6 @@
   .g {
     stroke: var(--line);
   }
-
-  rect.hit:hover {
-    opacity: 0.8;
-  }
 }
 
 .ch {
@@ -542,13 +538,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  // 순위 번호 + 이름 (월별 견적 순위 막대)
-  &.has-rank {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
   }
 }
 

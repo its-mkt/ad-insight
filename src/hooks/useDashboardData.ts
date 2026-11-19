@@ -62,7 +62,6 @@ const webAppUrl = (c: { url: string; key: string }, params: Record<string, strin
 
 export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
   if (site !== 'itket') return SITE_SOURCES[site];
-  const c = window.ADI || {};
   const envUrl = import.meta.env?.VITE_ADI_URL;
   const envKey = import.meta.env?.VITE_ADI_KEY;
   let s: { url?: string; key?: string } = {};
@@ -78,8 +77,8 @@ export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
     return '';
   };
   return {
-    url: pick(s.url, envUrl, c.url) || DEFAULT_URL,
-    key: pick(s.key, envKey, c.key) || DEFAULT_KEY,
+    url: pick(s.url, envUrl) || DEFAULT_URL,
+    key: pick(s.key, envKey) || DEFAULT_KEY,
   };
 }
 

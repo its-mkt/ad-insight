@@ -68,7 +68,7 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
           {hasQ && <span className="qn">견적</span>}
         </div>
       </div>
-      {list.map((c, idx) => {
+      {list.map((c) => {
         const curShare = hasShare ? shareOf(c.cur, totalCur) : null;
         const prevShare = hasShare && !hidePrev ? shareOf(c.prev, totalPrev) : null;
         const d = c.prev ? Math.round(((c.cur - c.prev) / c.prev) * 1000) / 10 : null;
