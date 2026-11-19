@@ -15,7 +15,7 @@ import { Button, ButtonLink } from '../common/Button';
 import { TextInput } from '../common/TextInput';
 import { Pagination } from '../common/Pagination';
 import { Card } from '../common/Card';
-import { TabButton } from '../common/TabButton';
+import { TabBar, TabButton } from '../common/TabButton';
 import { Notice } from '../common/Notice';
 
 interface QuotesRawAdminTableProps {
@@ -412,7 +412,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
       </div>
 
       {/* 사이트 탭 — 건수는 아래 필터를 적용한 값 */}
-      <div className="kw-tabs qr-site-tabs">
+      <TabBar className="qr-site-tabs">
         <TabButton
           className="btn-quote-site"
           data-btn="quote-site-all"
@@ -432,7 +432,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
             onClick={() => { setSelectedSite(site.id); setPage(1); }}
           />
         ))}
-      </div>
+      </TabBar>
 
       {/* 필터 바 */}
       <div className="qr-filter">

@@ -21,3 +21,16 @@ export const TabButton: React.FC<TabButtonProps> = ({ active, label, count, clas
     {children}
   </button>
 );
+
+export interface TabBarProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** 탭 바에 덧붙일 클래스 (kw-tabs 뒤에 붙는다) */
+  className?: string;
+}
+
+/** 밑줄 탭 바 틀(.kw-tabs) — 안에 TabButton 을 넣는다. 가로 스크롤 위치 계산 등에 쓰도록 ref 를 넘길 수 있다 */
+export const TabBar = React.forwardRef<HTMLDivElement, TabBarProps>(({ className, children, ...rest }, ref) => (
+  <div {...rest} ref={ref} className={className ? `kw-tabs ${className}` : 'kw-tabs'}>
+    {children}
+  </div>
+));
+TabBar.displayName = 'TabBar';

@@ -31,7 +31,7 @@
 | 버튼 / 링크 모양 버튼 | `Button`, `ButtonLink` |
 | 새 탭 외부 링크 | `ExtLink` (직접 `target="_blank"` 쓰지 않는다) |
 | 광고 API 출처 각주 | `AdApiSource` + `TableFootnote` |
-| 탭 / 구간 선택 | `TabButton`, `SegmentedControl` |
+| 탭 / 구간 선택 | `TabButton`, `SegmentedControl` — 밑줄 탭 바 틀(`.kw-tabs`)은 `TabBar` (`common/TabButton`, `className`·`id`·`ref`) |
 | 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
 | 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` — 자체 필터를 쓰는 표도 이용 현황 기록은 `useTrackCategoryFilter(cat1, cat2)` |
@@ -51,7 +51,7 @@
 | 아이콘 + 굵은 이름 + 흐린 보조 글자 한 줄 (매체 이름 칸 등) | `IconLabel` (`icon`, `title`, `sub`, `lead`) — 펼침 줄이면 `GroupAccordionRow` |
 | 표 펼침 줄 앞 화살표(›) | `AccordionChevron` (`open`, `variant`, `placeholder`) — `ChevronRight` 를 직접 쓰지 않는다 |
 | 월별 표 한 줄 / 월 머리글 | `MonthRow`, `MonthHeadCells` |
-| 빈 상태 | `EmptyState` (`message`, `subMessage`) |
+| 빈 상태 | `EmptyState` (`message`, `subMessage`) — 표 안 한 줄이면 `EmptyRow` (`colSpan`, `common/TableRows`) |
 | 로딩 자리표시 | `SkelBar`, `SkelRows`, `SkelTable`, `SkeletonView` — 화면 안에서 값을 받는 동안은 KPI 칸 `SkelKpi` · 차트 카드 `SkelChartCard` · 막대 목록 `SkelList` (글자 "…"·"불러오는 중"·"수집 전"으로 대신하지 않는다) |
 | 알림 박스 | `Notice` |
 | 화면 위에 띄우는 창 (흐린 바탕·닫기·Esc) | `Modal` (`open`, `onClose`, `labelledBy`, `className`) — 로그인 창·내 계정 설정 |

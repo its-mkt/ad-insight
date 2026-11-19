@@ -8,8 +8,8 @@ import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
 import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
-import { NumTd, TreeChildRow, TreeParentRow, childLabelOf } from '../components/common/TableRows';
-import { TabButton } from '../components/common/TabButton';
+import { NumTd, TreeChildRow, TreeParentRow, childLabelOf, EmptyRow } from '../components/common/TableRows';
+import { TabBar, TabButton } from '../components/common/TabButton';
 import { Th } from '../components/common/Th';
 import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
@@ -290,11 +290,11 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
         />
 
         <Card name="usage-detail" id="usage-detail" tableWrap title="상세 이용" subtitle={`(${label} · ${tabInfo.sort})`}>
-          <div className="kw-tabs">
+          <TabBar>
             {tabs.map((t) => (
               <TabButton key={t.id} className="btn-usage-tab" data-btn={`usage-tab-${t.id}`} active={activeTab === t.id} label={t.label} count={t.count} onClick={() => setTab(t.id)} />
             ))}
-          </div>
+          </TabBar>
           {activeTab === 'views' && (
             <>
               {cur.views.length ? (
@@ -483,11 +483,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                 </thead>
                 <tbody>
                   {buckets.length === 0 && (
-                    <tr>
-                      <td colSpan={5}>
-                        <EmptyState message="이 기간에 기록된 방문이 없습니다." />
-                      </td>
-                    </tr>
+                    <EmptyRow colSpan={5} message="이 기간에 기록된 방문이 없습니다." />
                   )}
                   {[...buckets].reverse().map((d) => (
                     <tr key={d.date}>

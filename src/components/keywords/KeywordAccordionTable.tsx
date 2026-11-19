@@ -11,11 +11,10 @@ import { ChevronDown } from 'lucide-react';
 import { useSort } from '../../hooks/useSort';
 import { SortableTh } from '../common/SortableTh';
 import { Th } from '../common/Th';
-import { TabButton } from '../common/TabButton';
+import { TabBar, TabButton } from '../common/TabButton';
 import { Card } from '../common/Card';
-import { EmptyState } from '../common/EmptyState';
 import { AdApiSource } from '../common/ExtLink';
-import { NumTd, TotalRow } from '../common/TableRows';
+import { NumTd, TotalRow, EmptyRow } from '../common/TableRows';
 import { Muted } from '../common/Muted';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
@@ -237,7 +236,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
     >
 
       {type === 'SA' && campaigns.length > 0 && (
-        <div id="kwTabBar" className="kw-tabs" ref={tabBarRef}>
+        <TabBar id="kwTabBar" ref={tabBarRef}>
           {['전체', ...campaigns.slice(0, VISIBLE_TABS).map(campLabel)].map((lbl, i) => (
             <TabButton
               key={i}
@@ -299,7 +298,7 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
               })}
             </div>
           )}
-        </div>
+        </TabBar>
       )}
 
       <div className="tw">
@@ -315,14 +314,11 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
           </colgroup>
           {type === 'DA' ? (
             <tbody>
-              <tr>
-                <td colSpan={7}>
-                  <EmptyState
-                    message="디스플레이 광고(DA)는 키워드 입찰을 진행하지 않습니다."
-                    subMessage="타겟팅 배너로 운영되어 키워드 목록이 없습니다."
-                  />
-                </td>
-              </tr>
+              <EmptyRow
+                colSpan={7}
+                message="디스플레이 광고(DA)는 키워드 입찰을 진행하지 않습니다."
+                subMessage="타겟팅 배너로 운영되어 키워드 목록이 없습니다."
+              />
             </tbody>
           ) : !topGroups.length ? (
             <>
@@ -338,20 +334,17 @@ export const KeywordAccordionTable: React.FC<KeywordAccordionTableProps> = ({
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={7}>
-                    <EmptyState
-                      message={
-                        media === 'Google'
-                          ? '수집된 Google 검색광고 키워드가 없습니다.'
-                          : firstMonth && month < firstMonth
-                            ? '키워드 재구성 이전 기간이라 키워드별 실적이 없습니다.'
-                            : '조회 조건에 해당하는 키워드가 없습니다.'
-                      }
-                      subMessage={media === 'Google' ? 'Google Ads 스크립트 실행 후 자동 수집됩니다.' : undefined}
-                    />
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={7}
+                  message={
+                    media === 'Google'
+                      ? '수집된 Google 검색광고 키워드가 없습니다.'
+                      : firstMonth && month < firstMonth
+                        ? '키워드 재구성 이전 기간이라 키워드별 실적이 없습니다.'
+                        : '조회 조건에 해당하는 키워드가 없습니다.'
+                  }
+                  subMessage={media === 'Google' ? 'Google Ads 스크립트 실행 후 자동 수집됩니다.' : undefined}
+                />
               </tbody>
             </>
           ) : (

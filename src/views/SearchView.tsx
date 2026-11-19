@@ -17,7 +17,7 @@ import { MultiChart } from '../components/charts/MultiChart';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
-import { TabButton } from '../components/common/TabButton';
+import { TabBar, TabButton } from '../components/common/TabButton';
 import { LIST_LIMIT, MoreButton, ShowMoreButton } from '../components/common/MoreButton';
 import { MediaPill } from '../components/common/MediaPill';
 import { useSort } from '../hooks/useSort';
@@ -480,7 +480,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       <Card name="search-list" id="search-list">
         <h3>일치 항목</h3>
-        <div className="kw-tabs">
+        <TabBar>
           {TABS.map((t) => (
             <TabButton
               key={t.id}
@@ -494,7 +494,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               onClick={() => changeTab(t.id)}
             />
           ))}
-        </div>
+        </TabBar>
 
         {activeTab === 'groups' && (
           <KeywordAccordionTable

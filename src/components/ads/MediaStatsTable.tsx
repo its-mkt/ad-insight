@@ -6,14 +6,13 @@ import { EXTERNAL_LINKS, MEDIA_KO } from '../../utils/constants';
 import { useSort } from '../../hooks/useSort';
 import { Card } from '../common/Card';
 import { SortableTh } from '../common/SortableTh';
-import { NumTd, TotalRow, TreeChildRow, TreeParentRow } from '../common/TableRows';
+import { NumTd, TotalRow, TreeChildRow, TreeParentRow, EmptyRow } from '../common/TableRows';
 import { MediaPill } from '../common/MediaPill';
-import { EmptyState } from '../common/EmptyState';
 import { TableFootnote } from '../common/TableFootnote';
 import { AdApiSource, ExtLink } from '../common/ExtLink';
 import { Th } from '../common/Th';
 import { DeltaSpan } from '../charts/KpiCard';
-import { TabButton } from '../common/TabButton';
+import { TabBar, TabButton } from '../common/TabButton';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
@@ -217,7 +216,7 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
       subtitle={<>{periodLabel} · 디스플레이(DA) 제외</>}
     >
       {hasShop && (
-        <div className="kw-tabs">
+        <TabBar>
           <TabButton
             className="btn-media-compare-tab"
             data-btn="media-compare-search"
@@ -234,7 +233,7 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
           >
             <MediaPill media="Naver" iconOnly size="0.75rem" />
           </TabButton>
-        </div>
+        </TabBar>
       )}
       <table className="stk media-stats-table">
         <StatCols />
@@ -406,19 +405,16 @@ export const MediaStatsTable: React.FC<MediaStatsTableProps> = ({
         </thead>
         <tbody>
           {!camps.length ? (
-            <tr>
-              <td colSpan={colCount}>
-                <EmptyState
-                  message={`${periodLabel}에 수집된 ${label} 실적이 없습니다.`}
-                  subMessage={
-                    // 네이버 DA(GFA)는 API 가 없어 정기 보고서 메일로만 들어온다 — 지금은 집행하지 않지만 다시 할 수 있다
-                    segment === 'display' && media === 'Naver'
-                      ? '네이버 DA(GFA)는 GFA 정기 보고서 메일로 수집합니다. 집행 중인데 비어 있다면 보고서 발송 설정을 확인해 주세요.'
-                      : undefined
-                  }
-                />
-              </td>
-            </tr>
+            <EmptyRow
+              colSpan={colCount}
+              message={`${periodLabel}에 수집된 ${label} 실적이 없습니다.`}
+              subMessage={
+                // 네이버 DA(GFA)는 API 가 없어 정기 보고서 메일로만 들어온다 — 지금은 집행하지 않지만 다시 할 수 있다
+                segment === 'display' && media === 'Naver'
+                  ? '네이버 DA(GFA)는 GFA 정기 보고서 메일로 수집합니다. 집행 중인데 비어 있다면 보고서 발송 설정을 확인해 주세요.'
+                  : undefined
+              }
+            />
           ) : (
             <>
               {sortList(camps).map((c) => {
@@ -517,7 +513,7 @@ export const MediaStatsTabs: React.FC<MediaStatsTabsProps> = (props) => {
       segment={tab.segment}
       cardId="media-stats"
       tabs={
-        <div className="kw-tabs">
+        <TabBar>
           {list.map((t) => (
             <TabButton
               key={t.id}
@@ -532,7 +528,7 @@ export const MediaStatsTabs: React.FC<MediaStatsTabsProps> = (props) => {
               <MediaPill media={t.media} iconOnly size="0.75rem" />
             </TabButton>
           ))}
-        </div>
+        </TabBar>
       }
       tools={
         <SegmentedControl<'SA' | 'DA'>

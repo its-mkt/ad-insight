@@ -14,7 +14,7 @@ import { DeltaSpan } from '../charts/KpiCard';
 import { SourceBarChart } from '../charts/SourceBarChart';
 import { SourceShareTable } from './SourceShareTable';
 import { TableFootnote } from '../common/TableFootnote';
-import { TabButton } from '../common/TabButton';
+import { TabBar, TabButton } from '../common/TabButton';
 import { LIST_LIMIT, ShowMoreButton } from '../common/MoreButton';
 import { Card } from '../common/Card';
 import { EmptyState } from '../common/EmptyState';
@@ -226,7 +226,7 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
       {viewMode === 'chart' ? (
         <div className="quote-chart-view">
           {!single && (
-            <div className="kw-tabs seg-src-platform">
+            <TabBar className="seg-src-platform">
               {!allPeriod && (
                 <>
                   <TabButton
@@ -253,7 +253,7 @@ export const MonthlyQuotesTable: React.FC<MonthlyQuotesTableProps> = ({
                   if (!allPeriod) setTimeScope('all');
                 }}
               />
-            </div>
+            </TabBar>
           )}
 
           {chartData.items.length ? (
