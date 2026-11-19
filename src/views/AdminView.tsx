@@ -10,6 +10,15 @@ import { currentAccessToken, postMemberAction } from '../lib/access';
 import { quoteKey } from '../utils/format';
 import { setUnsavedEdits } from '../utils/monthRollover';
 import type { DayRange } from '../utils/dayRange';
+import { showToast } from '../components/common/Toast';
+
+/** 카테고리 저장 실패 → 알림 문구 */
+const saveErrorText = (error?: string): string =>
+  error === 'forbidden'
+    ? '카테고리를 저장할 권한이 없습니다. 최고 관리자만 저장할 수 있습니다.'
+    : error === 'network'
+      ? '네트워크 문제로 저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.'
+      : '카테고리를 저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
 
 const CHANNEL_OPTIONS: { value: QuoteChannel; label: string }[] = [
   { value: 'live', label: '견적문의' },
@@ -72,14 +81,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
   }, [isDirty]);
 
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  // 저장 성공 안내는 표를 가리지 않도록 잠시 뒤 닫는다 (실패 안내는 다시 시도할 때까지 둔다)
-  React.useEffect(() => {
-    if (!saveMsg?.ok) return;
-    const timer = window.setTimeout(() => setSaveMsg(null), 6000);
-    return () => window.clearTimeout(timer);
-  }, [saveMsg]);
 
   // 개별 행 카테고리 수동 지정 변경 — 변경된 행을 pendingOverrides에 기록
   const handleUpdateQuoteCategory = (idOrIndex: string | number, newCategory: string) => {
@@ -100,7 +101,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
     });
     setLocalQuotes(updated);
     setIsDirty(true);
-    setSaveMsg(null);
     if (changedSno) {
       const sno = changedSno;
       const original = originals.has(sno) ? originals.get(sno)! : prevCategory;
@@ -132,11 +132,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
   // Apps Script manual_categories 시트에 오버라이드 저장 → 서버가 바로 quotes_monthly 재산출 (실패하면 다음 정기 수집 때)
   const handleSaveOverrides = async () => {
     if (pendingOverrides.size === 0) {
-      setSaveMsg({ text: '저장할 변경사항이 없습니다.', ok: false });
+      showToast('저장할 변경 사항이 없습니다.', 'warn');
       return;
     }
     setSaving(true);
-    setSaveMsg(null);
 
     const { key } = getCfg();
     const overrides = Array.from(pendingOverrides.entries()).map(([sno, category]) => ({ sno, category }));
@@ -152,11 +151,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
       if (json.success) {
         // recalculated 가 없으면 아직 이전 버전 웹앱이다 — 정기 수집 때 반영된다
         if (json.recalculated === true) {
-          setSaveMsg({ text: `${overrides.length}건 저장하고 통계에 반영했습니다.`, ok: true });
+          showToast(`카테고리 ${overrides.length}건을 저장하고 통계에 반영했습니다.`);
         } else if (json.recalculated === false) {
-          setSaveMsg({ text: `${overrides.length}건 저장했지만 통계 반영에 실패했습니다. 다음 동기화(최대 1시간) 때 반영됩니다.`, ok: false });
+          showToast(`카테고리 ${overrides.length}건을 저장했지만 통계 반영은 실패했습니다. 다음 동기화(최대 1시간) 때 반영됩니다.`, 'warn');
         } else {
-          setSaveMsg({ text: `${overrides.length}건 저장됨. 다음 동기화(최대 1시간) 후 반영됩니다.`, ok: true });
+          showToast(`카테고리 ${overrides.length}건을 저장했습니다. 다음 동기화(최대 1시간) 때 통계에 반영됩니다.`);
         }
         // 저장한 행은 '수동 지정' 흔적으로 바로 바꿔 보여 준다 (다음 동기화 전에도)
         const at = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 19);
@@ -175,10 +174,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
         setIsDirty(false);
         if (json.recalculated === true) onReload?.();
       } else {
-        setSaveMsg({ text: json.error || '저장 실패', ok: false });
+        showToast(saveErrorText(json.error), 'error');
       }
-    } catch (err) {
-      setSaveMsg({ text: (err instanceof Error ? err.message : '') || '네트워크 오류', ok: false });
+    } catch {
+      showToast(saveErrorText('network'), 'error');
     }
     setSaving(false);
   };
@@ -187,13 +186,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
   const handleResetChanges = () => {
     if (confirm('저장하지 않은 모든 카테고리 수동 변경사항을 되돌리시겠습니까?')) {
       const original = baseQuotes.current;
+      const count = pendingOverrides.size;
       setLocalQuotes(toAdminRows(original, baseSites.current));
       setIsDirty(false);
       setPendingOverrides(new Map());
       setOriginals(new Map());
-      setSaveMsg(null);
       if (onUpdateQuotesRaw) onUpdateQuotesRaw(original);
       if (onUpdateQuotesSites) onUpdateQuotesSites(baseSites.current);
+      showToast(count ? `저장하지 않은 변경 ${count}건을 되돌렸습니다.` : '변경 사항을 되돌렸습니다.');
     }
   };
 
@@ -229,7 +229,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
           onSave={handleSaveOverrides}
           onReset={handleResetChanges}
           saving={saving}
-          saveMsg={saveMsg}
         />
       </div>
     </div>

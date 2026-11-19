@@ -17,7 +17,6 @@ import { TextInput } from '../common/TextInput';
 import { Pagination } from '../common/Pagination';
 import { Card } from '../common/Card';
 import { TabBar, TabButton } from '../common/TabButton';
-import { Notice } from '../common/Notice';
 import { CategoryPicker, CategoryTrace, cat2CountHint } from './CategoryPicker';
 
 interface QuotesRawAdminTableProps {
@@ -46,8 +45,6 @@ interface QuotesRawAdminTableProps {
   onSave?: () => void;
   onReset?: () => void;
   saving?: boolean;
-  /** 저장 결과 — 목록 아래쪽에서 저장해도 보이도록 저장 바에 함께 보여 준다 */
-  saveMsg?: { text: string; ok: boolean } | null;
 }
 
 type SortKey = 'idx' | 'sno' | 'site' | 'date' | 'subject' | 'company' | 'name' | 'email' | 'phone' | 'rep' | 'category' | 'source';
@@ -92,7 +89,6 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   onSave,
   onReset,
   saving,
-  saveMsg,
 }) => {
   const isPhone = channel === 'phone';
   // 아래 필터·건수·정렬은 모두 고른 문의 종류의 행을 기준으로 한다
@@ -552,12 +548,11 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
         <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
       </div>
 
-      {/* 저장 바 — 목록을 아래로 내려도 화면 아래에 붙어 있다 */}
-      {(changedCount > 0 || saveMsg) && (
+      {/* 저장 바 — 목록을 아래로 내려도 화면 아래에 붙어 있다 (저장 결과는 토스트로 알린다) */}
+      {changedCount > 0 && (
         <div className="qr-savebar">
           <div className="qr-savebar-status">
             {changedCount > 0 && <span className="qr-unsaved">● 미저장 변경 {fmt(changedCount)}건</span>}
-            {saveMsg && <Notice tone={saveMsg.ok ? 'ok' : 'warn'}>{saveMsg.text}</Notice>}
           </div>
 
           {changedCount > 0 && (

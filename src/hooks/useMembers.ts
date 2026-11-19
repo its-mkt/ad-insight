@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { postAuthedAction } from '../lib/access';
+import { showToast } from '../components/common/Toast';
 
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'revoked';
 /** 승인된 계정의 등급 — member(일반) · manager(관리자). 최고 관리자는 명단(members 탭)이 아니라 admins 탭에 있다 */
@@ -22,8 +23,6 @@ interface MembersState {
   error: string;
   /** 승인·거절·해제·삭제를 보내는 중인 이메일 */
   busy: string;
-  /** 삭제 결과 안내 (명단만 지웠을 때 등) */
-  notice: string;
 }
 
 // 승인 대기를 맨 위로, 그다음 최근 요청 순
@@ -33,7 +32,7 @@ const ORDER: Record<MemberStatus, number> = { pending: 0, approved: 1, rejected:
  * 가입 요청 명단 — 계정 관리 화면과 사이드바 승인 대기 뱃지가 같은 명단을 쓴다.
  * 한 곳에서 승인·거절하면 다른 곳도 바로 바뀌도록 화면 밖(모듈)에 한 벌만 둔다
  */
-let state: MembersState = { rows: null, error: '', busy: '', notice: '' };
+let state: MembersState = { rows: null, error: '', busy: '' };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -46,6 +45,12 @@ const subscribe = (fn: () => void) => {
   return () => listeners.delete(fn);
 };
 const getSnapshot = () => state;
+
+/** 토스트 문구의 대상 — 이름이 있으면 '홍길동 님', 없으면 '메일 계정' (뒤에 '을'·'의'를 붙여 쓴다) */
+const whoOf = (email: string): string => {
+  const name = state.rows?.find((r) => r.email === email)?.name?.trim();
+  return name ? `${name} 님` : `${email} 계정`;
+};
 
 /** 명단을 다시 받는다 (받는 중이면 그 요청을 같이 기다린다) */
 export function loadMembers(): Promise<void> {
@@ -63,24 +68,38 @@ export function loadMembers(): Promise<void> {
 
 /** 승인(approved)·거절(rejected)·해제(revoked) 후 명단을 다시 받는다 */
 export async function decideMember(email: string, status: Exclude<MemberStatus, 'pending'>): Promise<void> {
+  const who = whoOf(email);
   setState({ busy: email });
   const res = await postAuthedAction('decideMember', { email, status });
   setState({ busy: '' });
-  if (res.error) setState({ error: res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. (관리자 계정은 최고 관리자만 바꿀 수 있습니다)' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
-  else await loadMembers();
+  if (res.error) {
+    showToast(res.error === 'forbidden' ? '이 계정을 바꿀 권한이 없습니다. 관리자 계정은 최고 관리자만 바꿀 수 있습니다.' : '바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
+    return;
+  }
+  const done: Record<typeof status, string> = {
+    approved: `${who}을 승인했습니다.`,
+    rejected: `${who}의 가입 요청을 거절했습니다.`,
+    revoked: `${who}의 열람 권한을 해제했습니다.`,
+  };
+  showToast(done[status]);
+  await loadMembers();
 }
 
 /** 등급 변경 (최고 관리자만) — 이용 현황의 계정별 조회 권한도 웹앱이 함께 맞춘다 */
 export async function setMemberRole(email: string, role: MemberRole): Promise<void> {
-  setState({ busy: email, notice: '' });
+  const who = whoOf(email);
+  setState({ busy: email });
   const res = await postAuthedAction<{ usage?: string }>('setMemberRole', { email, role });
   setState({ busy: '' });
   if (res.error) {
-    setState({ error: res.error === 'not_approved' ? '승인된 계정만 등급을 바꿀 수 있습니다.' : '등급을 바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
+    showToast(res.error === 'not_approved' ? '승인된 계정만 등급을 바꿀 수 있습니다.' : '등급을 바꾸지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
     return;
   }
+  const roleText = role === 'manager' ? '관리자로' : '일반으로';
+  // 이용 현황 권한을 못 맞췄으면 직접 확인해야 하므로 닫을 때까지 남는 주의 알림으로
   if (res.usage === 'failed' || res.usage === 'kept')
-    setState({ notice: `${email} 의 등급을 바꿨지만 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. (Supabase usage_admins 를 직접 확인해 주세요)` });
+    showToast(`${who}의 등급을 ${roleText} 바꿨지만, 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. Supabase usage_admins 를 확인해 주세요.`, 'warn');
+  else showToast(`${who}의 등급을 ${roleText} 바꿨습니다.`);
   await loadMembers();
 }
 
@@ -89,20 +108,23 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
  * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
  */
 export async function deleteMember(email: string): Promise<void> {
-  setState({ busy: email, notice: '' });
+  const who = whoOf(email);
+  setState({ busy: email });
   const res = await postAuthedAction<{ account?: string }>('deleteMember', { email });
   setState({ busy: '' });
   if (res.error) {
-    setState({ error: res.error === 'admin_protected' ? '관리자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' });
+    showToast(res.error === 'admin_protected' ? '최고 관리자 계정은 삭제할 수 없습니다.' : '삭제하지 못했습니다. 잠시 뒤 다시 시도해 주세요.', 'error');
     return;
   }
-  const notice: Record<string, string> = {
-    deleted: `${email} 을(를) 명단과 로그인 계정에서 삭제했습니다.`,
-    missing: `${email} 을(를) 명단에서 삭제했습니다. (로그인 계정은 없었습니다)`,
-    kept: `${email} 을(를) 명단에서 삭제했습니다. 로그인 계정은 남아 있어, 로그인하면 승인 요청 화면만 보입니다.`,
-    failed: `${email} 을(를) 명단에서 삭제했지만 로그인 계정은 지우지 못했습니다.`,
+  // 로그인 계정이 남았거나 못 지웠으면 닫을 때까지 남는 주의 알림으로
+  const result: Record<string, [string, 'ok' | 'warn']> = {
+    deleted: [`${who}을 명단과 로그인 계정에서 삭제했습니다.`, 'ok'],
+    missing: [`${who}을 명단에서 삭제했습니다. (로그인 계정은 없었습니다)`, 'ok'],
+    kept: [`${who}을 명단에서 삭제했습니다. 로그인 계정은 남아 있어, 로그인하면 승인 요청 화면만 보입니다.`, 'warn'],
+    failed: [`${who}을 명단에서 삭제했지만, 로그인 계정은 지우지 못했습니다.`, 'warn'],
   };
-  setState({ notice: notice[res.account || 'kept'] || notice.kept });
+  const [text, tone] = result[res.account || 'kept'] || result.kept;
+  showToast(text, tone);
   await loadMembers();
 }
 
@@ -114,7 +136,7 @@ export function useMembers(enabled = true): MembersState & { pending: number } {
   useEffect(() => {
     if (enabled && !state.rows && !loading) void loadMembers();
     // 로그아웃하면 받아 둔 명단을 지운다
-    if (!enabled && state.rows) setState({ rows: null, error: '', notice: '' });
+    if (!enabled && state.rows) setState({ rows: null, error: '' });
   }, [enabled]);
   return { ...snap, pending: snap.rows?.filter((r) => r.status === 'pending').length || 0 };
 }
