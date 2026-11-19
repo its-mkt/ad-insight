@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { MultiChart } from '../components/charts/MultiChart';
+import { TrendTable } from '../components/quotes/TrendTable';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
-import { SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl, type ChartTableMode, type SegmentOption } from '../components/common/SegmentedControl';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf, EmptyRow } from '../components/common/TableRows';
 import { TabBar, TabButton } from '../components/common/TabButton';
@@ -52,6 +53,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
   // 처음에는 계정별 — 누가 쓰는지가 가장 먼저 궁금하다 (2026-11-19 사용자 결정). 계정별 기록이 없으면 첫 탭(화면별)
   const [tab, setTab] = useState<UsageTab>('accounts');
+  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);
@@ -122,6 +124,15 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     const visits = sumBy(cur.daily, (d) => d.visits);
     const pageviews = sumBy(cur.daily, (d) => d.pageviews);
     const seconds = sumBy(cur.daily, (d) => d.seconds);
+    // 추이 그래프·표가 함께 쓰는 가로축·계열
+    const trendLabels = buckets.map((d) => (monthly ? monthText(d.date) : daySlashLabel(d.date)));
+    const trendSeries =
+      visits || pageviews
+        ? [
+            { k: '방문', c: '--c-it', v: buckets.map((d) => d.visits) },
+            { k: '페이지뷰', c: '--c-g', v: buckets.map((d) => d.pageviews) },
+          ]
+        : [];
     const prevVisits = prev ? sumBy(prev.daily, (d) => d.visits) : 0;
     const prevPageviews = prev ? sumBy(prev.daily, (d) => d.pageviews) : 0;
     const prevSeconds = prev ? sumBy(prev.daily, (d) => d.seconds) : 0;
@@ -189,21 +200,29 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           />
         </KpiSection>
 
+        <ChartTableToggle value={trendMode} onChange={setTrendMode} />
+        {trendMode === 'chart' ? (
         <MultiChart
           id="chUsage"
           title={`${monthly ? '월별' : '일별'} 방문 · 페이지뷰`}
-          labels={buckets.map((d) => (monthly ? monthText(d.date) : daySlashLabel(d.date)))}
-          series={
-            visits || pageviews
-              ? [
-                  { k: '방문', c: '--c-it', v: buckets.map((d) => d.visits) },
-                  { k: '페이지뷰', c: '--c-g', v: buckets.map((d) => d.pageviews) },
-                ]
-              : []
-          }
+          labels={trendLabels}
+          series={trendSeries}
           unit="회"
           emptyMessage="이 기간에 기록된 방문이 없습니다"
         />
+        ) : (
+          // 방문과 페이지뷰는 더해도 뜻이 없어 열 합계 줄은 뺀다 (줄 끝 합계는 각자의 기간 합)
+          <TrendTable
+            id="tbUsage"
+            title={`${monthly ? '월별' : '일별'} 방문 · 페이지뷰`}
+            subtitle="(단위: 회)"
+            nameLabel="구분"
+            totalRow={false}
+            labels={trendLabels}
+            series={trendSeries}
+            emptyMessage="이 기간에 기록된 방문이 없습니다"
+          />
+        )}
 
         <Card name="usage-detail" id="usage-detail" tableWrap title="상세 이용" subtitle={`(${label} · ${tabInfo.sort})`}>
           <TabBar>

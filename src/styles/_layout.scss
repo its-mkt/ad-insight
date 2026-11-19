@@ -611,7 +611,7 @@ main {
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
-    width: 18rem;
+    width: 16.75rem; // 테마 두 개 + 이메일(itsmkt1307@gmail.com)·등급 뱃지가 잘리지 않는 폭
     padding: 0.5rem;
     background: var(--card);
     border: 1px solid var(--line2);
@@ -694,7 +694,7 @@ main {
     }
   }
 
-  // 테마 — 이름 왼쪽, 라이트·다크·시스템 고르기 오른쪽
+  // 테마 — 이름 왼쪽, 라이트·다크 고르기 오른쪽
   .pm-theme {
     flex-direction: row;
     align-items: center;

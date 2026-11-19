@@ -15,6 +15,8 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
 import { MultiChart } from '../components/charts/MultiChart';
+import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { TrendTable } from '../components/quotes/TrendTable';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
@@ -95,6 +97,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
+  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
   // 견적 구성(카테고리·유입 매체·문의 유형·담당자)은 표의 더보기와 따로 펼친다
   const [breakdownAll, setBreakdownAll] = useState(false);
 
@@ -371,6 +374,41 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </KpiSection>
       )}
 
+      <ChartTableToggle value={trendMode} onChange={setTrendMode} />
+      {trendMode === 'table' ? (
+        <>
+          {sourceScope ? (
+            <TrendTable
+              id="tbSearchSourceTotal"
+              title={allPeriod ? '연도별 견적 접수' : '월별 견적 접수'}
+              subtitle="(단위: 건)"
+              nameLabel="유입 매체"
+              labels={axisLabels}
+              series={[{ k: sourceScope, c: sourceColorVar(sourceScope), v: monthlyTotal }].filter((s) => s.v.some((x) => x))}
+              emptyMessage="일치하는 견적이 없습니다."
+            />
+          ) : (
+            <TrendTable
+              id="tbSearchSpend"
+              title={allPeriod ? '연도별 광고비' : '월별 광고비'}
+              subtitle="(단위: 원)"
+              nameLabel="매체"
+              labels={axisLabels}
+              series={spendSeries.map((s) => ({ k: s.k, c: s.c, v: s.raw }))}
+              emptyMessage="일치하는 광고비가 없습니다."
+            />
+          )}
+          <TrendTable
+            id="tbSearchQuotes"
+            title={sourceScope ? (allPeriod ? '연도별 카테고리별 견적 접수' : '카테고리별 월별 견적 접수') : allPeriod ? '연도별 견적 접수' : '월별 견적 접수'}
+            subtitle="(단위: 건)"
+            nameLabel="카테고리"
+            labels={axisLabels}
+            series={quoteSeries}
+            emptyMessage="일치하는 견적이 없습니다."
+          />
+        </>
+      ) : (
       <div className="grid">
         {sourceScope ? (
           // 광고비는 유입 매체와 이어지지 않으므로, 이 매체의 견적 접수 추이를 왼쪽에 둔다
@@ -401,6 +439,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           emptyMessage="일치하는 견적이 없습니다."
         />
       </div>
+      )}
 
       <Card name="search-list" id="search-list">
         <h3>일치 항목</h3>

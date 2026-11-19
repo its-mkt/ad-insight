@@ -29,11 +29,15 @@ const MenuItem: React.FC<{ icon: LucideIcon; label: string; btn: string; onClick
   </button>
 );
 
+/** 테마 고르기 — 라이트·다크 둘만 (2026-11-19 사용자 결정: 시스템을 빼 메뉴 폭을 줄임) */
 const THEME_OPTIONS: { value: ThemeMode; label: string; title: string }[] = [
   { value: 'light', label: '라이트', title: '밝은 화면' },
   { value: 'dark', label: '다크', title: '어두운 화면' },
-  { value: 'system', label: '시스템', title: '컴퓨터·휴대폰 설정을 따른다' },
 ];
+
+/** 아직 고르지 않아 시스템 설정을 따르는 중이면, 지금 보이는 쪽(라이트·다크)을 선택된 것으로 보여 준다 */
+const shownThemeMode = (mode: ThemeMode): ThemeMode =>
+  mode !== 'system' ? mode : window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
 
 export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, themeMode = 'system', onThemeMode, onNavigate }) => {
   const { user, isLoggedIn, isSuperAdmin, isSignedIn, loading, logout } = useAuth();
@@ -112,7 +116,7 @@ export const HeaderProfileMenu: React.FC<HeaderProfileMenuProps> = ({ onLogin, t
               <Palette size="1rem" aria-hidden="true" />
               테마
             </span>
-            <SegmentedControl<ThemeMode> mini options={THEME_OPTIONS} value={themeMode} onChange={onThemeMode} dataKey="theme-mode" />
+            <SegmentedControl<ThemeMode> mini options={THEME_OPTIONS} value={shownThemeMode(themeMode)} onChange={onThemeMode} dataKey="theme-mode" />
           </div>
           )}
 

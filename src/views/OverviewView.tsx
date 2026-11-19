@@ -27,6 +27,8 @@ import { originGroupCounts } from '../utils/quoteOrigin';
 import { colTip } from '../utils/columnTips';
 import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
+import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { TrendTable } from '../components/quotes/TrendTable';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
 import { formatCategoryScope, formatSourceScope } from '../utils/search';
@@ -78,6 +80,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const hasSpend = data.spend.length > 0;
   const hasQuotes = data.quotes.length > 0;
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
+  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
   const prevMonthRef = useRef('');
 
   if (!hasSpend && !hasQuotes) {
@@ -394,6 +397,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         )}
       </KpiSection>
 
+      <ChartTableToggle value={trendMode} onChange={setTrendMode} />
+      {trendMode === 'chart' ? (
       <div className="grid">
         <MultiChart
           id="chOverviewSpend"
@@ -412,6 +417,29 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           emptyMessage="취합된 견적 데이터가 없습니다."
         />
       </div>
+      ) : (
+        <>
+          {/* 표는 열이 많아 반 칸 대신 한 줄씩. 광고비는 그래프의 만원 대신 원 단위 그대로 */}
+          <TrendTable
+            id="tbOverviewSpend"
+            title={allPeriod ? '연도별 광고비' : '월별 광고비'}
+            subtitle="(단위: 원)"
+            nameLabel="매체"
+            labels={allPeriod ? spendYears.map((y) => `${y}년`) : months.map(mLabel)}
+            series={spendSeries.map((s) => ({ k: s.k, c: s.c, v: s.raw }))}
+            emptyMessage="취합된 광고비 데이터가 없습니다."
+          />
+          <TrendTable
+            id="tbOverviewQuotes"
+            title={allPeriod ? '연도별 견적 접수' : '월별 견적 접수'}
+            subtitle="(단위: 건)"
+            nameLabel="카테고리"
+            labels={allPeriod ? quoteYears.map((y) => `${y}년`) : months.map(mLabel)}
+            series={quoteSeries}
+            emptyMessage="취합된 견적 데이터가 없습니다."
+          />
+        </>
+      )}
 
       <div className="grid">
         <Card

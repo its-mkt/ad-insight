@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { SiteId, SyncStatus } from '../types/dashboard';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
+import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { TrendTable } from '../components/quotes/TrendTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { MediaPill } from '../components/common/MediaPill';
@@ -94,6 +96,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const chartMonths = useMemo(() => (allPeriod ? allMonths : monthsUpTo(selectedMonth)), [allPeriod, allMonths, selectedMonth]);
 
   const [ga4, setGa4] = useState<Record<string, Ga4DeviceMonth> | null>(null);
+  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
   useEffect(() => {
     let alive = true;
     const months = [...new Set([...scope, ...prevScope, ...chartMonths])];
@@ -256,6 +259,29 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
       </KpiSection>
 
+      <ChartTableToggle value={trendMode} onChange={setTrendMode} />
+      {!loading && trendMode === 'table' ? (
+        <>
+          <TrendTable
+            id="tbDeviceVisits"
+            title={allPeriod ? '연도별 기기별 방문' : '월별 기기별 방문'}
+            subtitle="(단위: 회)"
+            nameLabel="기기"
+            labels={visitTrend.labels}
+            series={visitTrend.series}
+            emptyMessage="GA4 방문 값이 없습니다."
+          />
+          <TrendTable
+            id="tbDeviceEstimates"
+            title={`${allPeriod ? '연도별' : '월별'} 기기별 ${convName}`}
+            subtitle="(단위: 회)"
+            nameLabel="기기"
+            labels={convTrend.labels}
+            series={convTrend.series}
+            emptyMessage={estimateUntracked ? `이 기간에 기기별 ${convName}가 없습니다.` : `기기별 ${convName}는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
+          />
+        </>
+      ) : (
       <div className="grid">
         {loading ? (
           <>
@@ -283,6 +309,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
           </>
         )}
       </div>
+      )}
 
       <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${liveHidden && !chVisits.measured ? CLOSED : coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
         {loading ? (
