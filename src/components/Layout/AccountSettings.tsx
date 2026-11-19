@@ -10,6 +10,7 @@ import { Notice } from '../common/Notice';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { TextInput } from '../common/TextInput';
 import { GateError } from './LoginForm';
+import { isLetterText } from '../../lib/authErrors';
 
 /** 설정 창 탭 — 기본 정보 · 비밀번호 */
 type AccountTab = 'profile' | 'password';
@@ -42,8 +43,8 @@ const ProfilePanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<AccountResult | null>(null);
   const dirty = name.trim() !== (user?.name || '') || company.trim() !== (user?.company || '') || team.trim() !== (user?.team || '');
-  // 저장에 실패했을 때 비어 있는 칸만 붉게
-  const err = (v: string) => (result?.error && !v.trim() ? ' err' : '');
+  // 저장에 실패했을 때 비어 있거나 한글·영문이 아닌 칸만 붉게
+  const err = (v: string) => (result?.error && (!v.trim() || !isLetterText(v)) ? ' err' : '');
 
   const save = async () => {
     setSaving(true);

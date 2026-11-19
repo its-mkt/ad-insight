@@ -23,11 +23,18 @@ export const isRateLimited = (message: string): boolean => /rate|too many/i.test
 export const affiliationText = (company: string, team: string): string => (company.trim() ? `${company.trim()} · ${team.trim()}` : team.trim());
 
 /**
- * 이름·회사·팀 중 빈 칸이 있으면 안내 문구, 셋 다 있으면 빈 문자열.
+ * 이름·회사·팀 중 빈 칸이 있거나 한글·영문 말고 다른 글자가 있으면 안내 문구, 아니면 빈 문자열.
  * nameLabel: 이름 칸의 표기 — 회원가입·승인 요청은 '담당자', 내 계정 설정은 '이름' (2026-11-19 사용자 결정)
  */
 export const missingProfileText = (name: string, company: string, team: string, nameLabel = '이름'): string =>
-  !name.trim() || !company.trim() || !team.trim() ? `${nameLabel}·회사·팀을 모두 입력해 주세요.` : '';
+  !name.trim() || !company.trim() || !team.trim()
+    ? `${nameLabel}·회사·팀을 모두 입력해 주세요.`
+    : [name, company, team].some((v) => !isLetterText(v))
+      ? `${nameLabel}·회사·팀은 한글이나 영문으로만 입력해 주세요. 숫자·기호는 쓸 수 없습니다.`
+      : '';
+
+/** 한글(완성형)·영문과 단어 사이 띄어쓰기만 있는지 — 담당자명·회사·팀 칸 (2026-11-19 사용자 결정) */
+export const isLetterText = (v: string): boolean => /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/.test(v.trim().replace(/\s+/g, ' '));
 
 /** 입력한 인증번호에서 숫자만 남긴다 */
 export const otpDigits = (code: string): string => code.replace(/\D/g, '');
