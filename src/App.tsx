@@ -240,7 +240,8 @@ export const App: React.FC = () => {
             : currentView === 'devices'
               ? `${until} (GA4 방문·전환과 구글 광고는 마감 후 반영)`
               : `${until}${dropped}`;
-    return `${head} · 오늘 값은 로그인 후 확인할 수 있습니다`;
+    // 데이터는 승인된 계정만 보므로 '로그인 후 확인' 안내는 붙이지 않는다 — 뷰어도 이미 로그인한 상태다 (2026-11-19 사용자 결정)
+    return head;
   })();
 
   // 기간 선택 바를 이용 현황에서 건드리면 '최근 N일' 을 풀고 고른 기간을 모든 메뉴에 쓴다
@@ -565,7 +566,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                   dayRange={searchDay}
                   dayCovered={dayCovered}
-                  isLoggedIn={isLoggedIn}
+                  // 승인된 계정(뷰어 포함)은 견적 목록을 본다 — 뷰어는 웹앱이 고객 정보를 *** 로 가려 준다. 로그인 전 미리보기만 로그인 안내
+                  isLoggedIn={canView}
                   onLogin={openLogin}
                   onSelectAllPeriod={selectAllPeriod}
                 />

@@ -44,6 +44,7 @@ interface SearchViewProps {
   dayRange?: DayRange | null;
   /** 일·기간의 광고비가 일별 자료로 정확히 모인 상태 (아니면 걸친 달 전체) */
   dayCovered?: boolean;
+  /** 견적 목록을 볼 수 있는 계정인지 (승인된 계정 — 아니면 로그인 안내) */
   isLoggedIn: boolean;
   onLogin: () => void;
   onSelectAllPeriod: () => void;
