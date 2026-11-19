@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkeletonView } from '../common/SkeletonView';
-import { GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
+import { DevLoginButton, GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
 
@@ -187,7 +187,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
           title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
           desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
         >
-          {tab === 'login' && !signingUp ? <LoginForm /> : <SignupForm />}
+          {tab === 'login' && !signingUp ? <LoginForm showDevLogin={false} /> : <SignupForm />}
           {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
           {!signingUp && (
           <p className="gate-switch">
@@ -197,6 +197,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
             </Button>
           </p>
           )}
+          {tab === 'login' && !signingUp && <DevLoginButton />}
         </GateCardBody>
       </GuestPreview>
     );

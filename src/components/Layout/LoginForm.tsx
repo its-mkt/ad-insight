@@ -351,6 +351,8 @@ const PasswordLoginForm: React.FC<{ initialEmail?: string; onDone?: (email: stri
 interface LoginFormProps {
   /** 로그인에 성공하면 부른다 */
   onDone?: () => void;
+  /** 폼 바로 밑에 테스트 관리자 버튼을 그릴지 (접속 화면은 맨 아래에 따로 그려 false) */
+  showDevLogin?: boolean;
 }
 
 /**
@@ -358,8 +360,7 @@ interface LoginFormProps {
  * 이메일·비밀번호로만 로그인하고(2026-11-18 사용자 결정), 비밀번호를 잊으면 '비밀번호 찾기'에서 메일 인증번호로 새로 정한다.
  * 이 브라우저에서 지난번 로그인한 이메일을 기억해 채워 둔다. 개발 서버에서는 테스트 관리자 버튼도 보인다.
  */
-export const LoginForm: React.FC<LoginFormProps> = ({ onDone }) => {
-  const { loginAsDevAdmin } = useAuth();
+export const LoginForm: React.FC<LoginFormProps> = ({ onDone, showDevLogin = true }) => {
   const [lastEmail] = useState(readLastEmail);
   const [resetting, setResetting] = useState(false);
   const done = (email: string) => {
@@ -374,21 +375,27 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onDone }) => {
           {resetting ? '로그인으로 돌아가기' : '비밀번호를 잊으셨나요?'}
         </Button>
       </p>
-      {/* 개발 환경 전용 즉시 로그인 */}
-      {import.meta.env.DEV && (
-        <button
-          type="button"
-          className="btn btn-dev-login"
-          data-btn="dev-login"
-          onClick={() => {
-            loginAsDevAdmin();
-            onDone?.();
-          }}
-        >
-          <Zap size="0.75rem" aria-hidden="true" />
-          <span>테스트용 관리자로 바로 시작</span>
-        </button>
-      )}
+      {showDevLogin && <DevLoginButton onDone={onDone} />}
     </>
+  );
+};
+
+/** 개발 서버 전용 '테스트용 관리자로 바로 시작' 버튼 — 운영 빌드에서는 아무것도 그리지 않는다 */
+export const DevLoginButton: React.FC<{ /** 로그인한 뒤 부른다 */ onDone?: () => void }> = ({ onDone }) => {
+  const { loginAsDevAdmin } = useAuth();
+  if (!import.meta.env.DEV) return null;
+  return (
+    <button
+      type="button"
+      className="btn btn-dev-login"
+      data-btn="dev-login"
+      onClick={() => {
+        loginAsDevAdmin();
+        onDone?.();
+      }}
+    >
+      <Zap size="0.75rem" aria-hidden="true" />
+      <span>테스트용 관리자로 바로 시작</span>
+    </button>
   );
 };
