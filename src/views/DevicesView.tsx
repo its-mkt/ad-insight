@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { SiteId, SyncStatus } from '../types/dashboard';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { CardChartTableTabs, ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { RowBarsChart, type RowBarsRow, type RowBarsSeries } from '../components/charts/RowBarsChart';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
@@ -206,6 +207,46 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const loading = ga4 === null;
   const kpiValue = (n: number | undefined) => (visits.measured ? `${fmt(n ?? 0)}회` : gaWait);
 
+  // 표만 있던 세 카드의 그래프 보기 — 줄마다 기기 비중을 100% 누적 막대로 (사용자 요청 2026-11-19, 표/그래프 탭)
+  const deviceSeries = (keys: DeviceKey[]): RowBarsSeries[] => keys.map((d) => ({ key: d, label: DEVICE_LABELS[d], color: DEVICE_COLORS[d] }));
+  const channelChartRows: RowBarsRow[] = channelNames.map((ch) => {
+    const total = sumBy(tableDevices, (d) => chVisits.acc.get(`${d}|${ch}`) ?? 0);
+    return { key: ch, label: channelLabelOf(ch), sub: `방문 ${fmt(total)}회`, values: Object.fromEntries(tableDevices.map((d) => [d, chVisits.acc.get(`${d}|${ch}`) ?? 0])) };
+  });
+  const adDevices = DEVICE_KEYS.filter((d) => adRows.some((r) => r.device === d));
+  const AD_METRICS = [
+    { k: 'cost', label: '광고비', fmt: (v: number) => `${fmt(v)}원` },
+    { k: 'clk', label: '클릭', fmt: (v: number) => `${fmt(v)}회` },
+    { k: 'imp', label: '노출', fmt: (v: number) => `${fmt(v)}회` },
+    { k: 'conv', label: '광고전환', fmt: (v: number) => `${fmt(v)}회` },
+  ] as const;
+  // 매체마다 기기 구분이 달라(네이버는 태블릿을 모바일에 포함) 합치지 않고 매체·지표별 줄로 둔다
+  const adChartRows: RowBarsRow[] = (['Google', 'Naver'] as const).flatMap((media) =>
+    adRows.some((r) => r.media === media)
+      ? AD_METRICS.map((m) => ({
+          key: `${media}|${m.k}`,
+          label: (
+            <>
+              <MediaPill media={media} iconOnly size="0.875rem" />
+              {m.label}
+            </>
+          ),
+          format: m.fmt,
+          values: Object.fromEntries(adRows.filter((r) => r.media === media).map((r) => [r.device, r[m.k]])),
+        }))
+      : []
+  );
+  // 판매 — 주문 형태(PC·모바일·수기 주문)별 비중, 미수집은 빼고 그린다
+  const SALE_COLORS: Record<string, string> = { [DEVICE_LABELS.desktop]: DEVICE_COLORS.desktop, [DEVICE_LABELS.mobile]: DEVICE_COLORS.mobile, '수기 주문': DEVICE_COLORS.tablet };
+  const saleSeries: RowBarsSeries[] = saleKnown.map((r) => ({ key: r.label, label: r.label, color: SALE_COLORS[r.label] || DEVICE_COLORS.other }));
+  const saleChartRows: RowBarsRow[] = [
+    { key: 'orders', label: '판매 건수', format: (v) => `${fmt(v)}건`, values: Object.fromEntries(saleKnown.map((r) => [r.label, r.orders])) },
+    { key: 'amount', label: '판매 금액', format: (v) => `${fmt(v)}원`, values: Object.fromEntries(saleKnown.map((r) => [r.label, r.amount])) },
+  ];
+  const [channelMode, setChannelMode] = useState<ChartTableMode>('chart');
+  const [adMode, setAdMode] = useState<ChartTableMode>('chart');
+  const [saleMode, setSaleMode] = useState<ChartTableMode>('chart');
+
   return (
     <View name="devices" title={TITLE}>
       <ViewHeader title={TITLE} description="PC·모바일·태블릿별 방문, 견적·주문 전환, 광고 성과와 판매를 한 화면에 봅니다" status={status} />
@@ -311,9 +352,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
       </div>
       )}
 
-      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${liveHidden && !chVisits.measured ? CLOSED : coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap>
+      <Card name="device-channels" id="device-channels" title="기기 × 유입 채널" subtitle={`(${periodLabel}${!loading && coverText(chVisits.measured, scope.length) ? ` · ${liveHidden && !chVisits.measured ? CLOSED : coverText(chVisits.measured, scope.length)}` : ''})`} tableWrap tools={<CardChartTableTabs id="seg-device-channels" value={channelMode} onChange={setChannelMode} />}>
         {loading ? (
           <SkelTable rows={5} />
+        ) : chVisits.measured && channelMode === 'chart' ? (
+          <RowBarsChart id="chDeviceChannels" mode="share" series={deviceSeries(tableDevices)} rows={channelChartRows} unit="%" />
         ) : chVisits.measured ? (
           <table className="stk" id="tbDeviceChannels">
             <colgroup>
@@ -383,8 +426,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         <TableFootnote unit="회" basis={`산출 근거: GA4 세션 · ${convName} = ${CONV_BASIS[mainConv]} · 전환율 = ${convName} ÷ 방문`} sources={['출처: GA4 (itket-analytics 수집)']} />
       </Card>
 
-      <Card key={reveal ? 'ads-real' : 'ads'} name="device-ads" id="device-ads" className={reveal ? 'preview-real' : undefined} title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap>
-        {adRows.length ? (
+      <Card key={reveal ? 'ads-real' : 'ads'} name="device-ads" id="device-ads" className={reveal ? 'preview-real' : undefined} title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap tools={<CardChartTableTabs id="seg-device-ads" value={adMode} onChange={setAdMode} />}>
+        {adRows.length && adMode === 'chart' ? (
+          <RowBarsChart id="chDeviceAds" mode="share" series={deviceSeries(adDevices)} rows={adChartRows} unit="%" valuesHidden={reveal} />
+        ) : adRows.length ? (
           <table className="stk" id="tbDeviceAds">
             <colgroup>
               <col />
@@ -456,8 +501,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
       </Card>
 
-      <Card key={reveal ? 'sales-real' : 'sales'} name="device-sales" id="device-sales" className={reveal ? 'preview-real' : undefined} title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected || noSales ? '' : ` · 기기 ${PENDING}`})`} tableWrap>
-        {saleCollected ? (
+      <Card key={reveal ? 'sales-real' : 'sales'} name="device-sales" id="device-sales" className={reveal ? 'preview-real' : undefined} title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected || noSales ? '' : ` · 기기 ${PENDING}`})`} tableWrap tools={<CardChartTableTabs id="seg-device-sales" value={saleMode} onChange={setSaleMode} />}>
+        {saleCollected && saleMode === 'chart' ? (
+          <RowBarsChart id="chDeviceSales" mode="share" series={saleSeries} rows={saleChartRows} unit="%" valuesHidden={reveal} />
+        ) : saleCollected ? (
           <table className="stk" id="tbDeviceSales">
             <colgroup>
               <col />

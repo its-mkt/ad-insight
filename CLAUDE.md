@@ -33,6 +33,8 @@
 | 광고 API 출처 각주 | `AdApiSource` + `TableFootnote` |
 | 탭 / 구간 선택 | `TabButton`, `SegmentedControl` — 밑줄 탭 바 틀(`.kw-tabs`)은 `TabBar` (`common/TabButton`, `className`·`id`·`ref`) |
 | 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
+| 카드 제목 줄의 그래프/표 탭 (표만 있던 카드에 그래프 보기 더하기) | `CardChartTableTabs` (`common/SegmentedControl`, Card 의 `tools`) |
+| 줄마다 계열 비교 막대 — 비중(100% 누적)·지표 비교(나란히) | `RowBarsChart` (`charts/RowBarsChart`, `mode` share·compare, 미리보기 실제 비중은 `valuesHidden`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
 | 1차·2차 카테고리 필터 | `CategoryFilter` + `useCategoryFilterState`·`buildCategoryFilter`·`matchesCategory` — 자체 필터를 쓰는 표도 이용 현황 기록은 `useTrackCategoryFilter(cat1, cat2)` |
 | 마우스를 올리면 뜨는 설명 (요소 감싸기) | `Tooltip` (`common/Tooltip`, 표 머리글은 `Th` 의 `tip`) |

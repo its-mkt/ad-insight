@@ -642,3 +642,115 @@
 .card-quotes-monthly .src-bar-head .src-bar-bars {
   display: none;
 }
+
+/* ── 줄별 막대 (charts/RowBarsChart) — 표만 있던 카드의 그래프 보기. 줄 이름 | 막대 ──
+ * share: 100% 누적 막대(계열 비중) · compare: 계열별 막대를 그 줄의 가장 큰 값에 맞춰 나란히 + 끝에 값 */
+.row-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  .leg {
+    margin-top: 0;
+  }
+
+  .row-bars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .row-bars-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .row-bars-name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      min-width: 0;
+    }
+
+    small {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--sub);
+    }
+  }
+
+  // share — 한 줄짜리 누적 막대, 칸이 넓으면 안에 비중 글자
+  .row-bars-track {
+    display: flex;
+    height: 1.5rem;
+    overflow: hidden;
+    background: var(--line);
+  }
+
+  .row-bars-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2px;
+    height: 100%;
+
+    em {
+      font-size: 0.6875rem;
+      font-style: normal;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+    }
+  }
+
+  // compare — 계열마다 얇은 막대 한 줄 + 값
+  .row-bars-pairs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .row-bars-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .row-bars-bar {
+    height: 0.625rem;
+    background: var(--bg);
+
+    span {
+      display: block;
+      height: 100%;
+    }
+  }
+
+  .row-bars-val {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink2);
+  }
+}
+
+@media (max-width: 768px) {
+  .row-bars .row-bars-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+  }
+}

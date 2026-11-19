@@ -13,7 +13,8 @@ import { AdApiSource, ExtLink } from '../common/ExtLink';
 import { Th } from '../common/Th';
 import { DeltaSpan } from '../charts/KpiCard';
 import { TabBar, TabButton } from '../common/TabButton';
-import { SegmentedControl } from '../common/SegmentedControl';
+import { CardChartTableTabs, SegmentedControl, type ChartTableMode } from '../common/SegmentedControl';
+import { RowBarsChart, type RowBarsRow } from '../charts/RowBarsChart';
 import { GroupAccordionRow, GroupChildRow } from '../common/GroupAccordionRow';
 
 /** 광고 구분 — 키워드 검색광고(SA, 쇼핑검색 제외) · 네이버 쇼핑검색(SA) · 디스플레이(DA) */
@@ -173,6 +174,21 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
   // 키워드 검색광고(네이버·구글 비교)와 네이버 쇼핑검색을 탭으로 나눠 본다
   const [tab, setTab] = useState<SaSegment>('search');
   const showShop = hasShop && tab === 'shopping';
+  // 그래프 보기 — 지표마다 네이버·구글 막대를 그 지표의 큰 값에 맞춰 나란히 (사용자 요청 2026-11-19). 쇼핑검색 탭은 매체가 하나라 표만
+  const [mode, setMode] = useState<ChartTableMode>('chart');
+  const showChart = mode === 'chart' && !showShop;
+  const won = (v: number) => `${fmt(v)}원`;
+  const cnt = (v: number) => `${fmt(v)}회`;
+  const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
+  const compareRows: RowBarsRow[] = [
+    { key: 'cost', label: 'SA 광고비', format: won, values: Object.fromEntries(lines.map(({ media, s }) => [media, s.cost])) },
+    { key: 'imp', label: '노출', format: cnt, values: Object.fromEntries(lines.map(({ media, s }) => [media, s.imp])) },
+    { key: 'clk', label: '클릭', format: cnt, values: Object.fromEntries(lines.map(({ media, s }) => [media, s.clk])) },
+    { key: 'ctr', label: 'CTR', format: (v) => `${(v * 100).toFixed(2)}%`, values: Object.fromEntries(lines.map(({ media, s }) => [media, ratio(s.clk, s.imp)])) },
+    { key: 'conv', label: '광고전환', format: cnt, values: Object.fromEntries(lines.map(({ media, s }) => [media, s.conv])) },
+    { key: 'cpc', label: '평균 CPC', format: won, values: Object.fromEntries(lines.map(({ media, s }) => [media, ratio(s.cost, s.clk)])) },
+    { key: 'cpa', label: '전환당 비용', format: won, values: Object.fromEntries(lines.map(({ media, s }) => [media, ratio(s.cost, s.conv)])) },
+  ];
   // 줄을 누르면 그 아래에 비교 기간 대비 증감 줄이 펼쳐진다 (처음에는 모두 접힘)
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
   const toggleRow = (key: string) =>
@@ -214,6 +230,7 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
       tableWrap
       title="매체별 검색광고(SA) 비교"
       subtitle={<>{periodLabel} · 디스플레이(DA) 제외</>}
+      tools={!showShop && <CardChartTableTabs id="seg-media-compare" value={mode} onChange={setMode} />}
     >
       {hasShop && (
         <TabBar>
@@ -235,6 +252,15 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
           </TabButton>
         </TabBar>
       )}
+      {showChart ? (
+        <RowBarsChart
+          id="chMediaCompare"
+          mode="compare"
+          series={lines.map(({ media }) => ({ key: media, label: MEDIA_KO[media], color: media === 'Naver' ? '--c-n' : '--c-g' }))}
+          rows={compareRows}
+          emptyMessage="선택한 기간의 검색광고 실적이 없습니다."
+        />
+      ) : (
       <table className="stk media-stats-table">
         <StatCols />
         <thead>
@@ -271,6 +297,7 @@ export const MediaCompareTable: React.FC<CompareProps> = ({ rows, prevRows, cmpL
           )}
         </tbody>
       </table>
+      )}
       <TableFootnote
         unit="원·회"
         // CTR·CPC·전환당 비용 식은 머리글 설명(ⓘ)에 있어 각주에는 집계 기준만 둔다
