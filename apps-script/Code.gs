@@ -1736,7 +1736,7 @@ function sendPasswordGuide_(accessToken, email) {
     who + ', 안녕하세요.',
     '',
     '광고 인사이트 관리자가 비밀번호 재설정 방법을 보내 드립니다.',
-    '아래 주소로 접속하면 로그인 창이 '비밀번호 찾기'로 열립니다.',
+    '아래 주소로 접속하면 로그인 창이 "비밀번호 찾기"로 열립니다.',
     '',
     PASSWORD_GUIDE_URL_,
     '',
@@ -1745,8 +1745,7 @@ function sendPasswordGuide_(accessToken, email) {
     '',
     '이미 로그인돼 있다면 오른쪽 위 프로필 → 내 계정 설정에서 바꿀 수 있습니다.',
     '관리자는 비밀번호를 알 수 없으며, 요청하지 않으셨다면 이 메일은 무시하셔도 됩니다.',
-  ].join('
-');
+  ].join('\n');
   try {
     GmailApp.sendEmail(email, '[광고 인사이트] 비밀번호 재설정 안내', body);
   } catch (err) {
