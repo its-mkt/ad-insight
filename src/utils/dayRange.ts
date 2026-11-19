@@ -26,6 +26,26 @@ export const lastDayOf = (month: string): string => `${month}-${pad(daysOfMonth(
 /** 'YYYY-MM-DD' → 'YYYY-MM' */
 export const monthOfDay = (day: string): string => day.slice(0, 7);
 
+/** 'YYYY-MM-DD' 에서 n 일 뒤 (음수면 앞) */
+export const addDays = (key: string, n: number): string => {
+  const d = fromDayKey(key);
+  d.setDate(d.getDate() + n);
+  return toDayKey(d);
+};
+
+/** from~to 의 날짜 목록 */
+export const daysBetween = (from: string, to: string): string[] => {
+  const out: string[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) out.push(d);
+  return out;
+};
+
+/** 1년 전 같은 날 (2월 29일은 28일) */
+export const lastYearDay = (key: string): string => {
+  const md = key.slice(5) === '02-29' ? '02-28' : key.slice(5);
+  return `${+key.slice(0, 4) - 1}-${md}`;
+};
+
 /** 시작·끝이 뒤바뀌어도 앞뒤를 바로잡는다 */
 export const orderedRange = (a: string, b: string): DayRange => (a <= b ? { from: a, to: b } : { from: b, to: a });
 
