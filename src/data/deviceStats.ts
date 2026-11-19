@@ -6,7 +6,7 @@
  */
 import type { SiteId } from '../types/dashboard';
 import { THIS_M } from '../utils/format';
-import { loadOncoreGa4Months } from './oncoreGa4';
+import { loadGa4Months } from './oncoreGa4';
 
 export type DeviceKey = 'desktop' | 'mobile' | 'tablet' | 'other';
 
@@ -167,7 +167,8 @@ function parseGa4(file: Ga4MonthFile): Ga4DeviceMonth {
   };
 }
 
-const ga4Cache = new Map<string, Promise<Ga4DeviceMonth | null>>();
+/** 받은 달 값 → 화면 형식 (같은 응답을 여러 번 바꾸지 않게) */
+const parsed = new WeakMap<Ga4MonthFile, Ga4DeviceMonth>();
 
 /** GA4 수집이 시작된 달 (itket-analytics config startMonth) */
 export const GA4_FIRST_MONTH = '2025-01';
@@ -175,24 +176,13 @@ export const GA4_FIRST_MONTH = '2025-01';
 /** 고른 달들의 GA4 기기 자료를 받는다. 받지 못했거나 측정이 없는 달은 결과에 없다 (0 이 아니다). 온코어는 온코어 GA4 속성 값 */
 export async function loadGa4Devices(months: string[], site: SiteId = 'itket'): Promise<Record<string, Ga4DeviceMonth>> {
   const wanted = months.filter((m) => m >= GA4_FIRST_MONTH && m <= THIS_M);
-  if (site === 'oncore') {
-    const all = await loadOncoreGa4Months<Ga4MonthFile>();
-    return Object.fromEntries(wanted.filter((m) => all[m]?.total?.sessions).map((m) => [m, parseGa4(all[m])]));
-  }
-  const got = await Promise.all(
-    wanted.map((m) => {
-      let p = ga4Cache.get(m);
-      if (!p) {
-        p = fetch(`https://raw.githubusercontent.com/its-mkt/analytics/main/data/ga4/${m}.json`)
-          .then((res) => (res.ok ? (res.json() as Promise<Ga4MonthFile>) : null))
-          .then((file) => (file?.total?.sessions ? parseGa4(file) : null))
-          .catch(() => null);
-        ga4Cache.set(m, p);
-      }
-      return p.then((v) => [m, v] as const);
+  const all = await loadGa4Months<Ga4MonthFile>(site);
+  return Object.fromEntries(
+    wanted.filter((m) => all[m]?.total?.sessions).map((m) => {
+      if (!parsed.has(all[m])) parsed.set(all[m], parseGa4(all[m]));
+      return [m, parsed.get(all[m])!];
     })
   );
-  return Object.fromEntries(got.filter(([, v]) => v)) as Record<string, Ga4DeviceMonth>;
 }
 
 /* ── 고도몰 판매 ── */
