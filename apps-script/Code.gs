@@ -1294,18 +1294,70 @@ function quoteSource_(raw) {
 /* ── 대시보드용 웹앱 ── */
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  // 열람 권한 — 승인된 계정(member)·관리자(admin)만 데이터를 받는다. whoami 는 화면이 로그인 직후 권한만 묻는 가벼운 요청
+  // 열람 권한 — 승인된 계정(member)·관리자(manager)·최고 관리자(admin)만 데이터를 받는다. whoami 는 화면이 로그인 직후 권한만 묻는 가벼운 요청
   const acc = accessOf_(p.access_token);
   if (p.whoami) return json_(acc);
-  const token = PROPS.getProperty('API_TOKEN');
-  if (!token || p.key !== token) return json_({ error: 'unauthorized' });
-  if (acc.role !== 'admin' && acc.role !== 'member') return json_({ error: 'login_required', role: acc.role });
+  // 웹앱 비밀키(API_TOKEN)는 보지 않는다 — 화면 코드에 들어 있어 누구나 볼 수 있으므로 관문이 되지 못한다.
+  // 데이터의 관문은 로그인 토큰 + 명단이다. 키는 서버끼리 쓰는 doPost 쓰기 동작에만 쓴다 (2026-11-19 보안 점검)
+  // 로그인 전 미리보기 — 기기별 비중만 준다 (절대값 없음, 2026-11-19 사용자 결정: 기기별 통계는 비중만 공개). 로그인 없이 통과
+  if (p.preview === 'devices') return json_(previewDeviceShares_());
+  if (!isStaffRole_(acc.role) && acc.role !== 'member') return json_({ error: 'login_required', role: acc.role });
   const ss = SpreadsheetApp.openById(CFG.SHEET_ID), out = { served: Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') };
   if (p.daily) return json_(dailyHistResponse_(ss, p.daily, out));
-  const isAdmin = acc.role === 'admin';
+  const isAdmin = isStaffRole_(acc.role); // 관리자도 원문(가리지 않은 값)을 받는다 (2026-11-19 사용자 결정)
   // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다)
   return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 로그인 전 미리보기용 기기 비중 — 광고(달·매체마다 기기별 광고비·노출·클릭·전환의 비중)와 고도몰 주문 형태(달마다 주문 수 비중).
+ * 비중(0~1, 소수 넷째 자리)만 내보내 광고비·판매 건수 같은 절대값은 알 수 없다. 데이터가 바뀌면(API_CACHE_V) 다시 만든다.
+ */
+function previewDeviceShares_() {
+  const cache = CacheService.getScriptCache(), key = 'preview:devices:' + (PROPS.getProperty('API_CACHE_V') || '0');
+  const hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
+  const r4 = (n) => Math.round(n * 10000) / 10000;
+  const devOf = (v) => { const s = String(v || '').trim().toLowerCase(); return s === 'desktop' || s === 'mobile' || s === 'tablet' ? s : 'other'; };
+  const sum = {}; // 달 → 매체 → 기기 → 합계
+  const addAds = (media, rows, monthOf) => rows.forEach((r) => {
+    const m = monthOf(r);
+    if (!/^\d{4}-\d{2}$/.test(m)) return;
+    const byDev = ((sum[m] = sum[m] || {})[media] = sum[m][media] || {});
+    const x = (byDev[devOf(r.device)] = byDev[devOf(r.device)] || { cost: 0, imp: 0, clk: 0, conv: 0 });
+    x.cost += Number(r.cost) || 0; x.imp += Number(r.impressions) || 0; x.clk += Number(r.clicks) || 0; x.conv += Number(r.conversions) || 0;
+  });
+  addAds('Google', read_(ss, 'g_device_monthly'), (r) => String(r.month).slice(0, 7));
+  addAds('Naver', read_(ss, 'n_device_daily'), (r) => String(r.date).slice(0, 7));
+  const ads = {};
+  Object.keys(sum).forEach((m) => Object.keys(sum[m]).forEach((media) => {
+    const byDev = sum[m][media], devs = Object.keys(byDev), out = {};
+    const tot = (k) => devs.reduce((s, d) => s + byDev[d][k], 0);
+    const t = { cost: tot('cost'), imp: tot('imp'), clk: tot('clk'), conv: tot('conv') };
+    devs.forEach((d) => { out[d] = {}; ['cost', 'imp', 'clk', 'conv'].forEach((k) => { out[d][k] = t[k] > 0 ? r4(byDev[d][k] / t[k]) : 0; }); });
+    (ads[m] = ads[m] || {})[media] = out;
+  }));
+  // 주문 형태(pc·mobile·write, 비면 미수집) — 주문 번호로 한 번만 센다
+  const seen = {}, cnt = {};
+  read_(ss, 'godo_order_lines').forEach((r) => {
+    const m = String(r.month).slice(0, 7), k = String(r.key);
+    if (!/^\d{4}-\d{2}$/.test(m) || seen[k]) return;
+    seen[k] = 1;
+    const c = ((cnt[m] = cnt[m] || {}));
+    const d = String(r.device || '').trim();
+    c[d] = (c[d] || 0) + 1;
+  });
+  const orders = {};
+  Object.keys(cnt).forEach((m) => {
+    const t = Object.keys(cnt[m]).reduce((s, d) => s + cnt[m][d], 0);
+    orders[m] = {};
+    Object.keys(cnt[m]).forEach((d) => { orders[m][d] = r4(cnt[m][d] / t); });
+  });
+  const out = { ads: ads, orders: orders };
+  try { cache.put(key, JSON.stringify(out), API_SNAPSHOT_TTL_SEC); } catch (e) { /* 캐시 한도를 넘으면 다음에 다시 만든다 */ }
+  return out;
 }
 
 /* ── 대시보드 응답 스냅숏 ──
@@ -1423,11 +1475,13 @@ function maskFreeText_(v) {
 
 /* ── 열람 권한: 가입 요청 → 관리자 승인 ──
  * 명단은 아이티켓 데이터 시트 한 곳에 둔다 (온코어 프로젝트도 같은 명단을 읽는다).
- *  - admins  탭: A열 이메일 — 관리자 (원문 데이터·승인 권한)
- *  - members 탭: email · name · team · status(pending·approved·rejected·revoked) · requested_at · decided_at · decided_by
+ *  - admins  탭: A열 이메일 — 최고 관리자 (원문 데이터·승인·등급 변경·삭제·견적 원본 관리)
+ *  - members 탭: email · name · team · status(pending·approved·rejected·revoked) · requested_at · decided_at · decided_by · role
+ *    role: '' (일반) · manager (관리자 — 원문 데이터·계정 관리(일반 계정 승인·거절·해제)·이용 현황·데이터 연결). 승인된 줄에서만 쓴다
  * Supabase 로그인 토큰으로 이메일을 확인하고, 명단에서 권한을 찾는다. 확인 결과는 5분 캐시해 요청마다 느려지지 않게 한다. */
 const AUTH_SHEET_ID = '1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg';
-const MEMBER_HEAD_ = ['email', 'name', 'team', 'status', 'requested_at', 'decided_at', 'decided_by'];
+const MEMBER_HEAD_ = ['email', 'name', 'team', 'status', 'requested_at', 'decided_at', 'decided_by', 'role'];
+const MEMBER_ROLES_ = ['member', 'manager']; // members 탭 role 칸에 둘 수 있는 등급 (member 는 빈 칸으로 적는다)
 const MEMBER_STATUSES_ = ['pending', 'approved', 'rejected', 'revoked'];
 const ACCESS_NOTIFY_TO_ = 'itsmkt1307@gmail.com'; // 가입 요청 메일 알림 받는 곳 (Teams 는 스크립트 속성 TEAMS_WEBHOOK_URL — 마케팅팀 채널)
 // 가입 시 이메일 인증을 하지 않으므로(Supabase Confirm email 끔) 승인 전 본인 확인이 유일한 관문이다
@@ -1474,6 +1528,8 @@ function membersSheet_(ss) {
 function memberRows_(ss) {
   const sh = ss.getSheetByName('members');
   if (!sh || sh.getLastRow() < 2) return [];
+  // role 칸이 생기기 전 시트에는 머리글을 채운다 (값은 빈 칸 = 일반)
+  if (sh.getLastColumn() < MEMBER_HEAD_.length) sh.getRange(1, MEMBER_HEAD_.length).setValue(MEMBER_HEAD_[MEMBER_HEAD_.length - 1]);
   return sh.getRange(2, 1, sh.getLastRow() - 1, MEMBER_HEAD_.length).getDisplayValues().map((r, i) => {
     const o = { row: i + 2 };
     MEMBER_HEAD_.forEach((h, j) => { o[h] = String(r[j] || '').trim(); });
@@ -1482,7 +1538,7 @@ function memberRows_(ss) {
   }).filter((m) => m.email);
 }
 /**
- * 로그인 토큰의 열람 권한 — role: admin(관리자) · member(승인됨) · pending(승인 대기) · rejected(거절) · revoked(해제)
+ * 로그인 토큰의 열람 권한 — role: admin(최고 관리자) · manager(관리자) · member(승인됨) · pending(승인 대기) · rejected(거절) · revoked(해제)
  * · none(가입 요청 없음) · invalid(토큰이 틀리거나 만료) · guest(토큰 없음)
  */
 function accessOf_(accessToken) {
@@ -1497,13 +1553,15 @@ function accessOf_(accessToken) {
   if (adminEmails_(ss).includes(email)) acc = { email, role: 'admin' };
   else {
     const m = memberRows_(ss).find((r) => r.email === email);
-    acc = !m ? { email, role: 'none' } : { email, name: m.name, role: m.status === 'approved' ? 'member' : (MEMBER_STATUSES_.includes(m.status) ? m.status : 'pending') };
+    acc = !m ? { email, role: 'none' } : { email, name: m.name, role: m.status === 'approved' ? (m.role === 'manager' ? 'manager' : 'member') : (MEMBER_STATUSES_.includes(m.status) ? m.status : 'pending') };
   }
   cache.put(ck, JSON.stringify(acc), ACCESS_CACHE_SEC_);
   return acc;
 }
-/** 예전 이름 — 관리자인지만 볼 때 */
+/** 예전 이름 — 최고 관리자인지만 볼 때 */
 function isAdminToken_(ss, accessToken) { return accessOf_(accessToken).role === 'admin'; }
+/** 원문 데이터·계정 관리를 받는 등급 (최고 관리자·관리자) */
+function isStaffRole_(role) { return role === 'admin' || role === 'manager'; }
 
 /** 열람 요청 — 화면이 인증번호 확인 직후 로그인 토큰과 함께 보낸다. 이미 요청·승인된 이메일이면 그대로 둔다 */
 function requestAccess_(data) {
@@ -1526,8 +1584,8 @@ function requestAccess_(data) {
     const sh = membersSheet_(ss), now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
     const m = memberRows_(ss).find((r) => r.email === email);
     if (m && (m.status === 'approved' || m.status === 'pending')) return { success: true, status: m.status };
-    if (m) sh.getRange(m.row, 1, 1, MEMBER_HEAD_.length).setValues([[email, name, team, 'pending', now, '', '']]); // 거절·해제된 사람이 다시 요청
-    else sh.appendRow([email, name, team, 'pending', now, '', '']);
+    if (m) sh.getRange(m.row, 1, 1, MEMBER_HEAD_.length).setValues([[email, name, team, 'pending', now, '', '', '']]); // 거절·해제된 사람이 다시 요청 (등급도 일반으로)
+    else sh.appendRow([email, name, team, 'pending', now, '', '', '']);
     cache.remove('acc:' + email);
     notifyAccessRequest_(email, name, team);
     return { success: true, status: 'pending' };
@@ -1535,8 +1593,18 @@ function requestAccess_(data) {
 }
 /** 가입 요청 알림 — Teams 마케팅팀 채널(웹훅) + 관리자 메일. 알림이 실패해도 요청은 저장돼 있다 */
 function notifyAccessRequest_(email, name, team) {
-  const url = 'https://its.itket.com/ad-insight/itket/admin';
-  const text = '광고 인사이트 가입 요청: ' + name + ' (' + team + ') · ' + email;
+  sendAccessNotice_({
+    title: '광고 인사이트 가입 요청',
+    facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }],
+    note: ACCESS_VERIFY_NOTE_,
+    action: '승인하러 가기',
+    subject: '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
+    text: '광고 인사이트 가입 요청: ' + name + ' (' + team + ') · ' + email + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n계정 관리 화면에서 승인하거나 거절해 주세요.',
+  });
+}
+/** 관리자 알림 공통 — Teams 카드(제목·항목·안내·버튼) + 관리자 메일(제목·본문 + 계정 관리 화면 주소). 실패해도 저장 결과는 그대로 */
+function sendAccessNotice_(n) {
+  const url = 'https://its.itket.com/ad-insight/itket/members'; // 계정 관리 (관리자 등급도 열 수 있는 화면)
   const hook = PROPS.getProperty('TEAMS_WEBHOOK_URL');
   if (hook) {
     try {
@@ -1545,39 +1613,132 @@ function notifyAccessRequest_(email, name, team) {
         // Teams 워크플로 웹훅 형식 (온코어 견적 알림과 같은 Adaptive Card)
         payload: JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: {
           $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4',
-          body: [{ type: 'TextBlock', text: '광고 인사이트 가입 요청', weight: 'Bolder', size: 'Medium' },
-            { type: 'FactSet', facts: [{ title: '이름', value: name }, { title: '소속', value: team }, { title: '이메일', value: email }] },
-            { type: 'TextBlock', text: ACCESS_VERIFY_NOTE_, wrap: true, isSubtle: true, size: 'Small' }],
-          actions: [{ type: 'Action.OpenUrl', title: '승인하러 가기', url }],
+          body: [{ type: 'TextBlock', text: n.title, weight: 'Bolder', size: 'Medium' },
+            { type: 'FactSet', facts: n.facts },
+            { type: 'TextBlock', text: n.note, wrap: true, isSubtle: true, size: 'Small' }],
+          actions: [{ type: 'Action.OpenUrl', title: n.action, url }],
         } }] }),
       });
     } catch (err) { console.warn('Teams 알림 실패: ' + err.message); }
   }
   try {
-    GmailApp.sendEmail(ACCESS_NOTIFY_TO_, '[광고 인사이트] 가입 요청 — ' + name + ' (' + team + ')',
-      text + '\n\n' + ACCESS_VERIFY_NOTE_ + '\n관리자 화면에서 승인하거나 거절해 주세요.\n' + url);
-  } catch (err) { console.warn('가입 요청 메일 실패: ' + err.message); }
+    GmailApp.sendEmail(ACCESS_NOTIFY_TO_, n.subject, n.text + '\n' + url);
+  } catch (err) { console.warn('관리자 알림 메일 실패: ' + err.message); }
 }
-/** 관리자 — 가입 요청 목록 */
+/**
+ * 내 계정 설정 — 로그인 토큰의 이메일 줄만 이름·소속을 고친다 (남의 줄은 못 고친다).
+ * 승인 상태는 그대로 두고, 승인·대기 중인 사람이 바꾸면 관리자에게 알린다 (승인 때 확인한 사람과 같은지 볼 수 있게).
+ * 관리자(admins 탭)는 명단 줄이 없으면 고칠 것이 없다.
+ */
+function updateProfile_(data) {
+  const email = tokenEmail_(data.access_token);
+  if (!email) return { error: 'login_required' };
+  const name = String(data.name || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40);
+  const team = String(data.team || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 90);
+  if (!name || !team) return { error: 'bad_request' };
+  // 한 사람이 한 시간에 20번까지만 (알림 폭주 막기)
+  const cache = CacheService.getScriptCache(), hk = 'prof:' + email + ':' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMddHH');
+  const n = Number(cache.get(hk) || 0);
+  if (n >= 20) return { error: 'too_many' };
+  cache.put(hk, String(n + 1), 3600);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const ss = authSheet_();
+    const m = memberRows_(ss).find((r) => r.email === email);
+    if (!m) return adminEmails_(ss).includes(email) ? { success: true, listed: false } : { error: 'not_member' };
+    if (m.name === name && m.team === team) return { success: true, listed: true, changed: false };
+    membersSheet_(ss).getRange(m.row, 2, 1, 2).setValues([[name, team]]);
+    cache.remove('acc:' + email);
+    if (m.status === 'approved' || m.status === 'pending') {
+      sendAccessNotice_({
+        title: '광고 인사이트 계정 정보 변경',
+        facts: [{ title: '이메일', value: email }, { title: '이름', value: m.name + ' → ' + name }, { title: '소속', value: m.team + ' → ' + team }],
+        note: '이용자가 내 계정 설정에서 바꿨습니다. 승인 상태는 그대로입니다. 본인이 아닌 것 같으면 계정 관리 화면에서 해제해 주세요.',
+        action: '계정 관리 열기',
+        subject: '[광고 인사이트] 계정 정보 변경 — ' + name + ' (' + team + ')',
+        text: '광고 인사이트 계정 정보 변경: ' + email + '\n이름 ' + m.name + ' → ' + name + '\n소속 ' + m.team + ' → ' + team + '\n\n승인 상태는 그대로입니다. 본인이 아닌 것 같으면 계정 관리 화면에서 해제해 주세요.',
+      });
+    }
+    return { success: true, listed: true, changed: true };
+  } finally { lock.releaseLock(); }
+}
+/** 최고 관리자·관리자 — 가입 요청 목록 (role: member · manager) */
 function listMembers_(accessToken) {
-  if (accessOf_(accessToken).role !== 'admin') return { error: 'forbidden' };
-  return { success: true, members: memberRows_(authSheet_()).map(({ row, ...m }) => m) };
+  if (!isStaffRole_(accessOf_(accessToken).role)) return { error: 'forbidden' };
+  return { success: true, members: memberRows_(authSheet_()).map(({ row, ...m }) => ({ ...m, role: m.role === 'manager' ? 'manager' : 'member' })) };
 }
-/** 관리자 — 승인(approved)·거절(rejected)·해제(revoked) */
+/**
+ * 최고 관리자·관리자 — 승인(approved)·거절(rejected)·해제(revoked).
+ * 관리자는 일반 계정만 바꿀 수 있다 (다른 관리자·자기 자신은 최고 관리자만). 거절·해제하면 등급도 일반으로 되돌린다
+ */
 function decideMember_(accessToken, email, status) {
   const acc = accessOf_(accessToken);
-  if (acc.role !== 'admin') return { error: 'forbidden' };
+  if (!isStaffRole_(acc.role)) return { error: 'forbidden' };
   email = String(email || '').trim().toLowerCase();
   if (!['approved', 'rejected', 'revoked'].includes(status)) return { error: 'bad_status' };
   const ss = authSheet_(), m = memberRows_(ss).find((r) => r.email === email);
   if (!m) return { error: 'not_found' };
+  if (acc.role !== 'admin' && (m.role === 'manager' || email === acc.email)) return { error: 'forbidden' };
   const sh = membersSheet_(ss), now = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
-  sh.getRange(m.row, 4, 1, 4).setValues([[status, m.requested_at, now, acc.email]]);
+  const role = status === 'approved' ? m.role : '';
+  sh.getRange(m.row, 4, 1, 5).setValues([[status, m.requested_at, now, acc.email, role]]);
   CacheService.getScriptCache().remove('acc:' + email); // 바로 반영 (다른 사이트 프로젝트는 캐시가 따로라 최대 5분 뒤)
-  return { success: true, email, status };
+  const usage = m.role === 'manager' && !role ? syncUsageAdmin_(email, false) : undefined;
+  return { success: true, email, status, usage };
 }
 /**
- * 관리자 — 이용자 삭제 (해제와 별도). 명단(members 탭) 줄을 지우고, 스크립트 속성 SUPABASE_SERVICE_KEY 가 있으면
+ * 최고 관리자 — 승인된 계정의 등급 변경 (member 일반 · manager 관리자).
+ * 이용 현황의 계정별 조회 권한(Supabase usage_admins)도 함께 맞춘다. usage: synced · kept(키 없음) · failed
+ */
+function setMemberRole_(accessToken, email, role) {
+  const acc = accessOf_(accessToken);
+  if (acc.role !== 'admin') return { error: 'forbidden' };
+  email = String(email || '').trim().toLowerCase();
+  if (!MEMBER_ROLES_.includes(role)) return { error: 'bad_role' };
+  const ss = authSheet_();
+  if (adminEmails_(ss).includes(email)) return { error: 'admin_protected' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const m = memberRows_(ss).find((r) => r.email === email);
+    if (!m) return { error: 'not_found' };
+    if (m.status !== 'approved') return { error: 'not_approved' };
+    membersSheet_(ss).getRange(m.row, MEMBER_HEAD_.indexOf('role') + 1).setValue(role === 'manager' ? 'manager' : '');
+    CacheService.getScriptCache().remove('acc:' + email);
+    return { success: true, email, role, usage: syncUsageAdmin_(email, role === 'manager') };
+  } finally { lock.releaseLock(); }
+}
+/** Supabase 관리자 키(SUPABASE_SERVICE_KEY) 요청 머리글 — 새 형식 비밀 키(sb_secret_…)는 apikey 만 (게이트웨이가 토큰을 만든다), 예전 service_role(JWT)는 Bearer 도 함께 */
+function supabaseServiceHeaders_(key) {
+  return /^sb_/.test(key) ? { apikey: key } : { apikey: key, Authorization: 'Bearer ' + key };
+}
+/** 이용 현황 계정별 조회 권한(Supabase usage_admins) 추가·삭제 — synced · kept(키 없음) · failed */
+function syncUsageAdmin_(email, on) {
+  const key = PROPS.getProperty('SUPABASE_SERVICE_KEY');
+  if (!key) return 'kept';
+  try {
+    const headers = supabaseServiceHeaders_(key);
+    const res = on
+      ? UrlFetchApp.fetch(CFG.SUPABASE_URL + '/rest/v1/usage_admins?on_conflict=email', {
+          method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+          headers: Object.assign({ Prefer: 'resolution=ignore-duplicates,return=minimal' }, headers),
+          payload: JSON.stringify([{ email }]),
+        })
+      : UrlFetchApp.fetch(CFG.SUPABASE_URL + '/rest/v1/usage_admins?email=eq.' + encodeURIComponent(email), {
+          method: 'delete', muteHttpExceptions: true, headers: Object.assign({ Prefer: 'return=minimal' }, headers),
+        });
+    const code = res.getResponseCode();
+    if (code >= 200 && code < 300) return 'synced';
+    console.warn('usage_admins 동기화 실패 ' + code + ': ' + res.getContentText().slice(0, 200));
+    return 'failed';
+  } catch (err) {
+    console.warn('usage_admins 동기화 실패: ' + err.message);
+    return 'failed';
+  }
+}
+/**
+ * 최고 관리자 — 이용자 삭제 (해제와 별도). 명단(members 탭) 줄을 지우고, 스크립트 속성 SUPABASE_SERVICE_KEY 가 있으면
  * 로그인 계정(Supabase)도 지운다. 관리자(admins 탭) 계정은 지우지 않는다.
  * account: deleted(계정까지 삭제) · kept(키가 없어 명단만 삭제) · missing(계정 없음) · failed(계정 삭제 실패)
  */
@@ -1593,6 +1754,7 @@ function deleteMember_(accessToken, email) {
     const m = memberRows_(ss).find((r) => r.email === email);
     if (m) membersSheet_(ss).deleteRow(m.row);
     CacheService.getScriptCache().remove('acc:' + email);
+    if (m && m.role === 'manager') syncUsageAdmin_(email, false);
     return { success: true, email, listed: !!m, account: deleteAuthUser_(email) };
   } finally { lock.releaseLock(); }
 }
@@ -1600,8 +1762,7 @@ function deleteMember_(accessToken, email) {
 function deleteAuthUser_(email) {
   const key = PROPS.getProperty('SUPABASE_SERVICE_KEY');
   if (!key) return 'kept';
-  // 새 형식 비밀 키(sb_secret_…)는 apikey 머리글만 보낸다 (게이트웨이가 토큰을 만든다). 예전 service_role(JWT)는 Bearer 도 함께
-  const headers = /^sb_/.test(key) ? { apikey: key } : { apikey: key, Authorization: 'Bearer ' + key };
+  const headers = supabaseServiceHeaders_(key);
   try {
     for (let page = 1; page <= 20; page++) {
       const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users?per_page=200&page=' + page, { headers, muteHttpExceptions: true });
@@ -1658,14 +1819,23 @@ function doPost(e) {
   if (member) return member;
   try { return doPostBody_(e); } finally { bumpApiCache_(); } // 견적 수신·카테고리 저장 뒤 응답 스냅숏을 새로 만들게
 }
+/** 수집을 다시 돌리는 요청은 sec 초에 한 번만 받는다 — 키가 새어도 반복 호출로 UrlFetch 하루 한도를 바닥내지 못하게. 막혔으면 true */
+function throttled_(name, sec) {
+  const cache = CacheService.getScriptCache(), k = 'throttle:' + name;
+  if (cache.get(k)) return true;
+  cache.put(k, '1', sec);
+  return false;
+}
 /** 가입 요청·회원 관리 — 데이터 시트를 바꾸지 않으므로 응답 스냅숏을 그대로 둔다. 해당 요청이 아니면 null */
 function memberPost_(e) {
   let data;
   try { data = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { return null; }
   if (data.action === 'requestAccess') return json_(requestAccess_(data));
+  if (data.action === 'updateProfile') return json_(updateProfile_(data));
   if (data.action === 'listMembers') return json_(listMembers_(data.access_token));
   if (data.action === 'decideMember') return json_(decideMember_(data.access_token, data.email, data.status));
   if (data.action === 'deleteMember') return json_(deleteMember_(data.access_token, data.email));
+  if (data.action === 'setMemberRole') return json_(setMemberRole_(data.access_token, data.email, data.role));
   return null;
 }
 function doPostBody_(e) {
@@ -1675,8 +1845,9 @@ function doPostBody_(e) {
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     // 쇼핑몰 주문 완료 화면이 보내는 유입 경로 — 공개 화면이라 키가 없다. 주문번호·경로만 받는다
     if (data.action === 'orderInflow') return json_(saveOrderInflow_(data));
+    // 카테고리 수동 지정은 화면(관리자)이 보낸다 — 키 대신 관리자 로그인 토큰으로만 확인한다 ([F] 참고)
     const token = PROPS.getProperty('API_TOKEN');
-    if (!token || data.key !== token) return json_({ error: 'unauthorized' });
+    if (data.action !== 'saveManualCategories' && (!token || data.key !== token)) return json_({ error: 'unauthorized' });
 
     const ss = SpreadsheetApp.openById(CFG.SHEET_ID);
 
@@ -1750,12 +1921,14 @@ function doPostBody_(e) {
 
     // [D] 네이버 커머스(스마트스토어) API 즉시 동기화 호출
     if (data.action === 'syncCommerce') {
+      if (throttled_('syncCommerce', 600)) return json_({ error: 'too_soon' });
       const res = collectCommerce();
       return json_({ success: true, result: res });
     }
 
     // [E] 전체 매체(네이버·구글·견적·GFA·커머스) 즉시 동기화 호출
     if (data.action === 'syncAll') {
+      if (throttled_('syncAll', 600)) return json_({ error: 'too_soon' });
       syncAll();
       return json_({ success: true, message: 'All channels synced simultaneously' });
     }

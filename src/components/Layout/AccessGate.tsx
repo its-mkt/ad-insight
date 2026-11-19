@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { ChartNoAxesCombined, Clock, Layers, Lock, MailCheck, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkeletonView } from '../common/SkeletonView';
-import { DevLoginButton, GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
+import { Modal } from '../common/Modal';
+import { DevLoginButton, GateError, LoginForm, ProfileFields, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
+
+/** 권한 확인이 이보다 오래 걸리면 새로 고침 안내를 띄운다 */
+const ACCESS_SLOW_MS = 10 * 1000;
 
 /** 승인 대기 화면이 승인 여부를 다시 묻는 간격 */
 const PENDING_POLL_MS = 30 * 1000;
@@ -68,18 +71,11 @@ const GateCard: React.FC<GateCardProps> = (props) => (
   </div>
 );
 
-/** 이름·소속 입력칸 — 가입 요청과 다시 요청에 함께 쓴다 */
-const NameTeamFields: React.FC<{ name: string; team: string; onName: (v: string) => void; onTeam: (v: string) => void; err: boolean }> = ({ name, team, onName, onTeam, err }) => (
-  <>
-    <TextInput className={`gate-input${err ? ' err' : ''}`} name="name" autoComplete="name" placeholder="이름" value={name} onChange={(e) => onName(e.target.value)} />
-    <TextInput className={`gate-input${err ? ' err' : ''}`} name="team" autoComplete="organization" placeholder="소속 (회사·팀)" value={team} onChange={(e) => onTeam(e.target.value)} />
-  </>
-);
-
 /** 로그인한 계정으로 승인을 (다시) 요청 — 요청 기록이 없거나 거절·해제된 경우 */
 const RequestAgainForm: React.FC = () => {
   const { user, requestAccess } = useAuth();
   const [name, setName] = useState(user?.name || '');
+  const [company, setCompany] = useState(user?.company || '');
   const [team, setTeam] = useState(user?.team || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -88,14 +84,14 @@ const RequestAgainForm: React.FC = () => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
-    const res = await requestAccess(name, team);
+    const res = await requestAccess(name, company, team);
     setSubmitting(false);
     if (res.error) setError(res.error);
   };
 
   return (
     <form className="gate-form" onSubmit={handleSubmit}>
-      <NameTeamFields name={name} team={team} onName={setName} onTeam={setTeam} err={!!error} />
+      <ProfileFields name={name} company={company} team={team} onName={setName} onCompany={setCompany} onTeam={setTeam} err={!!error} autoFocus />
       {error && <GateError message={error} />}
       <button type="submit" className="btn acc btn-login" data-btn="request-access" disabled={submitting}>
         {submitting ? '보내는 중...' : '승인 요청 보내기'}
@@ -154,9 +150,55 @@ const PendingWatch: React.FC = () => {
  * 접속 관문 — 관리자 또는 승인된 계정만 대시보드(children)를 연다.
  * 그 밖에는 대시보드를 아예 그리지 않아 데이터 요청도 나가지 않는다 (경쟁사·봇이 데이터를 보지 못하게, 2026-11-18 사용자 결정).
  */
+/**
+ * 접속 권한 확인 중 — 대시보드 뼈대 위 화면 가운데에 확인 중 카드를 띄운다 (닫을 수 없음).
+ * 금방 끝나면 깜빡이지 않게 카드는 잠깐 늦게 나타나고(CSS), 오래 걸리면 새로 고침을 안내한다.
+ */
+const AccessChecking: React.FC = () => {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), ACCESS_SLOW_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div className="access-loading">
+      <div className="access-loading-bar" aria-hidden="true" />
+      <SkeletonView title="아이티스 광고 인사이트" />
+      <Modal open onClose={() => undefined} dismissible={false} labelledBy="access-checking-title" className="access-checking" backdropClassName="access-checking-backdrop">
+        <div className="gate-icon gate-icon-spin">
+          <Lock size="1.25rem" aria-hidden="true" />
+        </div>
+        <h2 id="access-checking-title">접속 권한을 확인하고 있습니다</h2>
+        <p role="status">
+          {slow ? (
+            <>
+              평소보다 오래 걸리고 있습니다.
+              <br />
+              잠시 뒤에도 그대로면 새로 고침해 주세요.
+            </>
+          ) : (
+            <>
+              승인된 계정인지 확인하는 중입니다.
+              <br />
+              잠시만 기다려 주세요.
+            </>
+          )}
+        </p>
+        {slow && (
+          <Button variant="primary" className="btn-login" data-btn="access-reload" onClick={() => window.location.reload()}>
+            새로 고침
+          </Button>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
 export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loading, isSignedIn, role, canView, refreshRole, signupInProgress } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
+  // 회원가입에서 이미 가입된 이메일로 넘어왔을 때 로그인 폼에 미리 채울 값 (바뀔 때마다 폼을 새로 그린다)
+  const [loginPreset, setLoginPreset] = useState<{ email: string; reset: boolean; seq: number } | null>(null);
 
   // 권한을 다시 확인하는 동안에도 이미 보고 있던 화면은 그대로 둔다
   if (canView) return <>{children}</>;
@@ -166,28 +208,28 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // 권한 확인 중 — 대부분 승인된 사람이므로 잠금 카드 대신 대시보드 모양 로딩을 보여 준다 (화면이 열릴 때 들썩이지 않게)
   if (loading && !signingUp) {
-    return (
-      <div className="access-loading">
-        <div className="access-loading-bar" aria-hidden="true" />
-        <p className="access-loading-status" role="status">
-          <Lock size="0.875rem" aria-hidden="true" />
-          접속 권한을 확인하고 있습니다
-        </p>
-        <SkeletonView title="아이티스 광고 인사이트" />
-      </div>
-    );
+    return <AccessChecking />;
   }
 
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview>
+      <GuestPreview app={children}>
         <GateCardBody
           icon={<Lock size="1.25rem" aria-hidden="true" />}
           title={tab === 'login' && !signingUp ? '로그인하면 볼 수 있습니다' : '회원가입 및 열람 요청'}
           desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
         >
-          {tab === 'login' && !signingUp ? <LoginForm showDevLogin={false} /> : <SignupForm />}
+          {tab === 'login' && !signingUp ? (
+            <LoginForm key={loginPreset?.seq ?? 0} showDevLogin={false} initialEmail={loginPreset?.email} initialResetting={loginPreset?.reset} />
+          ) : (
+            <SignupForm
+              onExistingAccount={(email, next) => {
+                setLoginPreset((prev) => ({ email, reset: next === 'reset', seq: (prev?.seq ?? 0) + 1 }));
+                setTab('login');
+              }}
+            />
+          )}
           {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
           {!signingUp && (
           <p className="gate-switch">

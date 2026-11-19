@@ -60,7 +60,7 @@ export const VIEW_TITLES: Record<ViewId, string> = {
   keywords: '키워드 · 소재',
   search: '검색 결과',
   data: '데이터 연결',
-  admin: '어드민 관리',
+  admin: '견적 원본 관리',
   members: '계정 관리',
   usage: '이용 현황',
 };

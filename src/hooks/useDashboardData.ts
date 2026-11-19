@@ -29,6 +29,8 @@ import { adStatKey } from '../utils/creativeImage';
 import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
 import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../lib/access';
+import { usePreviewMode } from '../context/PreviewModeContext';
+import { isPreviewDeviceShares, previewPayload, setPreviewRealDevices } from '../data/previewPayload';
 
 export const DEFAULT_URL =
   'https://script.google.com/macros/s/AKfycbzQS9yMlp9L_eRaH77QWLsY6GOY7L5hyRk1fkuaAHg8GvJmHHwhPRgr2zWldgbX5-cNcg/exec';
@@ -47,11 +49,16 @@ export const SITE_SOURCES: Record<Exclude<SiteId, 'itket'>, { url: string; key: 
   },
 };
 
-/** 그 사이트의 수집기 웹앱이 연결돼 있는지 */
+/** 그 사이트의 수집기 웹앱이 연결돼 있는지 — 데이터는 로그인 토큰으로 받으므로 주소만 있으면 된다 */
 export function siteConnected(site: SiteId): boolean {
-  const c = getCfg(site);
-  return !!(c.url && c.key);
+  return !!getCfg(site).url;
 }
+
+/** 웹앱 주소에 조회 값을 붙인다 — 비밀키는 있을 때만 (새 웹앱은 데이터 조회에 키를 보지 않는다, 2026-11-19 보안 점검) */
+const webAppUrl = (c: { url: string; key: string }, params: Record<string, string> = {}): string => {
+  const q = new URLSearchParams(c.key ? { key: c.key, ...params } : params).toString();
+  return q ? `${c.url}${c.url.includes('?') ? '&' : '?'}${q}` : c.url;
+};
 
 export function getCfg(site: SiteId = 'itket'): { url: string; key: string } {
   if (site !== 'itket') return SITE_SOURCES[site];
@@ -230,7 +237,7 @@ export const quoteDetailsPending = (data: Pick<DashboardData, 'quotesSites' | 'q
 /** 고른 달의 일별 광고비 과거분을 받는다 (최근 구간보다 앞선 날짜를 고를 때) */
 export async function fetchDailyHist(months: string[], site: SiteId = 'itket'): Promise<SpendDailyRow[]> {
   const c = getCfg(site);
-  const res = await fetch(withAccessToken(`${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}&daily=${months.join(',')}`, await currentAccessToken()));
+  const res = await fetch(withAccessToken(webAppUrl(c, { daily: months.join(',') }), await currentAccessToken()));
   const j = (await res.json()) as { error?: string; g_adgroup_daily_hist?: RawSpendApiRow[]; n_adgroup_daily_hist?: RawSpendApiRow[] };
   if (j.error) throw new Error(j.error);
   // fromApi 를 거치면 판매·기기 등 전역 저장소가 빈 값으로 덮이므로 일별 행만 따로 만든다
@@ -583,8 +590,10 @@ const isUsableCache = (j: RawApiPayload | null, site: SiteId): j is RawApiPayloa
 
 /** site: 보고 있는 사이트 — 바뀌면 화면 데이터를 비우고 그 사이트의 웹앱에서 다시 받는다 */
 export function useDashboardData(site: SiteId = 'itket') {
-  const [data, setData] = useState<DashboardData>(emptyData);
-  const [status, setStatus] = useState<SyncStatus>('init');
+  // 로그인 전 미리보기는 웹앱에 묻지 않고 예시 데이터로 그린다 (캐시에도 남기지 않는다)
+  const preview = usePreviewMode();
+  const [data, setData] = useState<DashboardData>(() => (preview ? fromSiteApi(previewPayload(), site) : emptyData()));
+  const [status, setStatus] = useState<SyncStatus>(preview ? 'live' : 'init');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   // 실데이터가 먼저 도착하면 늦게 읽힌 캐시로 덮어쓰지 않는다
   const liveLoaded = useRef(false);
@@ -617,8 +626,9 @@ export function useDashboardData(site: SiteId = 'itket') {
   }, [site]);
 
   const load = useCallback(async () => {
+    if (preview) return;
     const c = getCfg(site);
-    if (!c.url || !c.key) {
+    if (!c.url) {
       setStatus((prev) => (prev !== 'live' ? 'unlinked' : prev));
       return;
     }
@@ -627,7 +637,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     setIsSyncing(true);
 
     try {
-      const fetchUrl = `${c.url}${c.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(c.key)}`;
+      const fetchUrl = webAppUrl(c);
       // 승인된 계정에만 데이터가, 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins·members 명단을 확인)
       const res = await fetch(withAccessToken(fetchUrl, await currentAccessToken()));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -649,9 +659,32 @@ export function useDashboardData(site: SiteId = 'itket') {
       // 뒤에 보낸 요청이 아직 받는 중이면 동기화 표시를 끄지 않는다
       if (id === reqId.current) setIsSyncing(false);
     }
-  }, [site, tryLoadStaticFallback]);
+  }, [site, preview, tryLoadStaticFallback]);
 
   useEffect(() => {
+    if (preview) {
+      setData(fromSiteApi(previewPayload(), site));
+      setStatus('live');
+      // 기기별 비중만은 실제 값 — 웹앱이 로그인 없이도 비중(절대값 없음)을 준다. 못 받으면 예시 비중 그대로 흐리게 둔다
+      let alive = true;
+      const c = getCfg(site);
+      if (c.url) {
+        fetch(webAppUrl(c, { preview: 'devices' }))
+          .then((res) => (res.ok ? res.json() : null))
+          .then((j: unknown) => {
+            if (!alive || !isPreviewDeviceShares(j)) return;
+            setData(fromSiteApi(previewPayload(j), site));
+            setPreviewRealDevices(true);
+          })
+          .catch(() => undefined);
+      }
+      // 미리보기를 닫을 때(로그인) 판매·기기 저장소에 남은 예시 값을 비운다 — 실제 데이터가 오기 전에 섞여 보이지 않게
+      return () => {
+        alive = false;
+        setPreviewRealDevices(false);
+        fromApi({});
+      };
+    }
     // 사이트가 바뀌면 이전 사이트 데이터를 지우고 처음부터 받는다
     liveLoaded.current = false;
     setData(emptyData());
@@ -671,7 +704,7 @@ export function useDashboardData(site: SiteId = 'itket') {
 
     const timer = setInterval(load, 15 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [site, load, tryLoadStaticFallback]);
+  }, [site, preview, load, tryLoadStaticFallback]);
 
   // 로그인·로그아웃하면 그 권한에 맞는 데이터로 다시 받는다 (토큰 갱신처럼 계정이 그대로면 받지 않는다)
   useEffect(() => {

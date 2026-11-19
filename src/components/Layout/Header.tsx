@@ -2,6 +2,8 @@ import React from 'react';
 import { HeaderProfileMenu } from './HeaderProfileMenu';
 import { Menu, Moon, Search, Sun } from 'lucide-react';
 import { Button } from '../common/Button';
+import type { ThemeMode } from '../../utils/theme';
+import type { ViewId } from '../../types/dashboard';
 
 interface HeaderProps {
   title: string;
@@ -13,6 +15,12 @@ interface HeaderProps {
   isDark: boolean;
   onOpenDrawer: () => void;
   onToggleTheme: () => void;
+  /** 지금 고른 테마 (프로필 메뉴 표시용 — 로그인 전 둘러보기 화면은 넘기지 않는다) */
+  themeMode?: ThemeMode;
+  /** 프로필 메뉴에서 테마를 고를 때 (없으면 메뉴에 테마 줄을 두지 않는다) */
+  onThemeMode?: (mode: ThemeMode) => void;
+  /** 프로필 메뉴의 바로가기(계정 관리 등)로 화면을 옮길 때 (없으면 바로가기를 두지 않는다) */
+  onNavigate?: (view: ViewId) => void;
   /** 헤더 로그인 버튼 → 로그인 모달 */
   onLogin: () => void;
   /** 헤더 검색 버튼 → 검색창 */
@@ -27,6 +35,9 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   onOpenDrawer,
   onToggleTheme,
+  themeMode,
+  onThemeMode,
+  onNavigate,
   onLogin,
   onSearch,
 }) => {
@@ -69,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
         />
 
         {/* 헤더 프로필 & 로그인 유도 버튼 */}
-        <HeaderProfileMenu onLogin={onLogin} />
+        <HeaderProfileMenu onLogin={onLogin} themeMode={themeMode} onThemeMode={onThemeMode} onNavigate={onNavigate} />
 
         {/* 테마 전환 버튼 */}
         <button

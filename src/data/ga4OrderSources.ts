@@ -4,7 +4,7 @@
  */
 import type { SiteId } from '../types/dashboard';
 import { prevM, THIS_M } from '../utils/format';
-import { loadOncoreGa4Months } from './oncoreGa4';
+import { loadGa4Months, loadOncoreGa4Months } from './oncoreGa4';
 
 export let GA4_ORDER_SOURCES_AS_OF = '2026-11-09';
 
@@ -41,13 +41,10 @@ export const GA4_PURCHASE_MONTHS = new Set<string>();
 async function fetchLatest(): Promise<boolean> {
   const months: string[] = [];
   for (let m = THIS_M; m >= GA4_ORDER_SOURCES_AS_OF.slice(0, 7); m = prevM(m)) months.unshift(m);
-  const files = await Promise.all(
-    months.map((m) =>
-      fetch(`https://raw.githubusercontent.com/its-mkt/analytics/main/data/ga4/${m}.json`)
-        .then((res): Promise<Ga4MonthFile | null> | null => (res.ok ? res.json() : null))
-        .catch(() => null),
-    ),
-  );
+  const all = await loadGa4Months<Ga4MonthFile>('itket');
+  const files = months.map((m) => all[m] ?? null);
+  // 받지 못했으면(로그인 전·네트워크) 다음 호출 때 다시 묻는다
+  if (!Object.keys(all).length) latest = null;
   let changed = false;
   let purchaseStarted = false;
   files.forEach((file, i) => {

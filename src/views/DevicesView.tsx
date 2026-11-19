@@ -30,6 +30,8 @@ import {
   type Ga4DeviceMonth,
 } from '../data/deviceStats';
 import { GODOMALL_ORDER_LINES, GODOMALL_ORDERS, lineInCutoff } from '../data/godomallOrders';
+import { usePreviewMode } from '../context/PreviewModeContext';
+import { previewRealDevices } from '../data/previewPayload';
 import { monthsUpTo, sameMonthsLastYear } from '../utils/allPeriod';
 import { ctrText, fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 
@@ -73,6 +75,9 @@ const addDevices = (acc: Map<string, number>, v: Partial<Record<DeviceKey, numbe
 const coverText = (measured: number, total: number) => (measured === 0 ? PENDING : measured < total ? `${total}개월 중 ${measured}개월 수집` : '');
 
 export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, cutoffDay, site = 'itket' }) => {
+  // 로그인 전 미리보기 — 기기 비중만 실제 값이라 광고·판매 표의 비중 칸만 흐림 없이 보여 준다 (절대값 칸은 예시 숫자라 흐리게)
+  const reveal = usePreviewMode() && previewRealDevices();
+  // 실제 비중을 받으면 두 표를 새로 그린다 — 먼저 그린 예시 칸의 * 처리가 같은 글자(100% 등)에 남지 않게 (key)
   const yr = selectedMonth.slice(0, 4);
   // GA4 수집 첫 달부터 이번 달까지
   const allMonths = useMemo(() => {
@@ -141,6 +146,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
       return { media, device, cost: sumBy(rows, (r) => r.cost), imp: sumBy(rows, (r) => r.imp), clk: sumBy(rows, (r) => r.clk), conv: sumBy(rows, (r) => r.conv), n: rows.length };
     }).filter((r) => r.n > 0);
   });
+  /** 매체 안에서의 지표 합 — 미리보기는 기기 비중을 매체마다 낸다 */
+  const adMediaTotal = (media: string, k: 'cost' | 'imp' | 'clk' | 'conv') => sumBy(adRows.filter((r) => r.media === media), (r) => r[k]);
   const adTotal = { cost: sumBy(adRows, (r) => r.cost), imp: sumBy(adRows, (r) => r.imp), clk: sumBy(adRows, (r) => r.clk), conv: sumBy(adRows, (r) => r.conv) };
   // 네이버는 날마다 쌓아 첫 수집일이 고른 기간 안이면 그날부터의 값이다
   const naverFrom = AD_DEVICE_FROM.Naver && scope.includes(AD_DEVICE_FROM.Naver.slice(0, 7)) ? ` (${+AD_DEVICE_FROM.Naver.slice(5, 7)}/${+AD_DEVICE_FROM.Naver.slice(8, 10)}부터)` : '';
@@ -336,7 +343,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         <TableFootnote unit="회" basis="산출 근거: GA4 세션 · 견적 완료 = 견적 요청 완료 화면을 본 세션 · 전환율 = 견적 완료 ÷ 방문" sources={['출처: GA4 (itket-analytics 수집)']} />
       </Card>
 
-      <Card name="device-ads" id="device-ads" title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap>
+      <Card key={reveal ? 'ads-real' : 'ads'} name="device-ads" id="device-ads" className={reveal ? 'preview-real' : undefined} title="기기별 광고 성과" subtitle={`(${periodLabel} · ${adCover})`} tableWrap>
         {adRows.length ? (
           <table className="stk" id="tbDeviceAds">
             <colgroup>
@@ -351,12 +358,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             <thead>
               <tr>
                 <Th>매체 · 기기</Th>
-                <Th className="n">노출</Th>
-                <Th className="n">클릭</Th>
+                <Th className="n">{reveal ? '노출 비중' : '노출'}</Th>
+                <Th className="n">{reveal ? '클릭 비중' : '클릭'}</Th>
                 <Th className="n">CTR</Th>
-                <Th className="n">광고전환</Th>
+                <Th className="n">{reveal ? '광고전환 비중' : '광고전환'}</Th>
                 <Th className="n">평균 CPC</Th>
-                <Th className="n">광고비</Th>
+                <Th className="n">{reveal ? '광고비 비중' : '광고비'}</Th>
               </tr>
             </thead>
             <tbody>
@@ -368,12 +375,25 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                       {DEVICE_LABELS[r.device]}
                     </span>
                   </td>
-                  <NumTd value={r.imp} />
-                  <NumTd value={r.clk} />
-                  <NumTd>{ctrText(r.clk, r.imp)}</NumTd>
-                  <NumTd value={r.conv} />
-                  <NumTd value={r.clk > 0 ? r.cost / r.clk : null} unit="원" />
-                  <NumTd value={r.cost} unit="원" />
+                  {reveal ? (
+                    <>
+                      <NumTd className="reveal">{pctText(share(r.imp, adMediaTotal(r.media, 'imp')))}</NumTd>
+                      <NumTd className="reveal">{pctText(share(r.clk, adMediaTotal(r.media, 'clk')))}</NumTd>
+                      <NumTd>{ctrText(r.clk, r.imp)}</NumTd>
+                      <NumTd className="reveal">{pctText(share(r.conv, adMediaTotal(r.media, 'conv')))}</NumTd>
+                      <NumTd value={r.clk > 0 ? r.cost / r.clk : null} unit="원" />
+                      <NumTd className="reveal">{pctText(share(r.cost, adMediaTotal(r.media, 'cost')))}</NumTd>
+                    </>
+                  ) : (
+                    <>
+                      <NumTd value={r.imp} />
+                      <NumTd value={r.clk} />
+                      <NumTd>{ctrText(r.clk, r.imp)}</NumTd>
+                      <NumTd value={r.conv} />
+                      <NumTd value={r.clk > 0 ? r.cost / r.clk : null} unit="원" />
+                      <NumTd value={r.cost} unit="원" />
+                    </>
+                  )}
                 </tr>
               ))}
               <TotalRow>
@@ -396,7 +416,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         />
       </Card>
 
-      <Card name="device-sales" id="device-sales" title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected || noSales ? '' : ` · 기기 ${PENDING}`})`} tableWrap>
+      <Card key={reveal ? 'sales-real' : 'sales'} name="device-sales" id="device-sales" className={reveal ? 'preview-real' : undefined} title="기기별 판매 (고도몰)" subtitle={`(${periodLabel}${saleCollected || noSales ? '' : ` · 기기 ${PENDING}`})`} tableWrap>
         {saleCollected ? (
           <table className="stk" id="tbDeviceSales">
             <colgroup>
@@ -418,13 +438,13 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
                 <tr key={r.label}>
                   <td>{r.label}</td>
                   <NumTd value={r.orders} unit="건" />
-                  <NumTd>{pctText(share(r.orders, saleTotal))}</NumTd>
+                  <NumTd className="reveal">{pctText(share(r.orders, saleTotal))}</NumTd>
                   <NumTd value={r.amount} unit="원" />
                 </tr>
               ))}
               <TotalRow>
                 <NumTd value={saleTotal} unit="건" bold />
-                <NumTd bold>100%</NumTd>
+                <NumTd className="reveal" bold>100%</NumTd>
                 <NumTd value={sumBy(saleRows, (r) => r.amount)} unit="원" bold />
               </TotalRow>
             </tbody>

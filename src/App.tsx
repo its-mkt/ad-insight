@@ -26,11 +26,12 @@ import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { UsageView } from './views/UsageView';
 import { MembersView } from './views/MembersView';
-import { applyTheme, getInitialDark } from './utils/theme';
+import { applyTheme, applyThemeMode, getInitialDark, getThemeMode, type ThemeMode } from './utils/theme';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { SearchDialog } from './components/Layout/SearchDialog';
 import { useAuth } from './context/AuthContext';
+import { focusPreviewLogin, usePreviewMode } from './context/PreviewModeContext';
 import { dayPeriodOf, rangeDays, rangeLabel, sameRangeLastMonth, type DayRange } from './utils/dayRange';
 import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist } from './utils/dayData';
 import type { SpendDailyRow } from './types/dashboard';
@@ -54,8 +55,11 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState(() => parseRoute().query);
   const [searchTab, setSearchTab] = useState<SearchTab | undefined>();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { isLoggedIn, loading: authLoading } = useAuth();
+  const { isLoggedIn, isSuperAdmin, loading: authLoading } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  // 로그인 전 미리보기(예시 데이터) — 로그인 버튼은 모달 대신 화면 위 로그인 카드로 보낸다
+  const preview = usePreviewMode();
+  const openLogin = preview ? focusPreviewLogin : () => setLoginOpen(true);
   const wasLoggedIn = useRef(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   // 로그인 상태마다 목록이 따로라 바뀌면 다시 읽는다
@@ -64,6 +68,7 @@ export const App: React.FC = () => {
   const queryIsFavorite = favorites.some((q) => sameSearch(q, searchQuery));
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [isDark, setIsDark] = useState<boolean>(getInitialDark);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getThemeMode);
   // 처음 열 때 사이트가 없는 주소('/', 예전 '#quotes'·'#itket/quotes')는 같은 화면의 경로 주소로 바꿔 둔다
   useEffect(() => {
     normalizeRoutePath();
@@ -312,18 +317,21 @@ export const App: React.FC = () => {
     if (authLoading) return;
     if (loginOnlyView && !isLoggedIn) {
       handleNavigate('overview');
-      if (!wasLoggedIn.current) setLoginOpen(true);
+      // 로그인 전 미리보기에는 로그인 카드가 이미 떠 있으므로 관리자 로그인 창을 겹쳐 띄우지 않는다
+      if (!wasLoggedIn.current && !preview) setLoginOpen(true);
     }
+    // 견적 원본 관리(화면 id admin)는 최고 관리자만 — 관리자가 주소(/admin)로 들어오면 종합 요약으로
+    else if (currentView === 'admin' && !isSuperAdmin) handleNavigate('overview');
     // 온코어는 로그인한 관리자만 — 로그아웃하면 아이티켓으로, 로그인 없이 주소(/oncore)로 들어오면 아이티켓 + 로그인 모달
     if (site === 'oncore' && !isLoggedIn) {
       setSite('itket');
       window.history.replaceState(null, '', routePath('itket', loginOnlyView ? 'overview' : currentView, searchQuery));
-      if (!wasLoggedIn.current) setLoginOpen(true);
+      if (!wasLoggedIn.current && !preview) setLoginOpen(true);
     }
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
     if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
     wasLoggedIn.current = isLoggedIn;
-  }, [authLoading, isLoggedIn, currentView, site]);
+  }, [authLoading, isLoggedIn, isSuperAdmin, currentView, site, preview]);
 
   useEffect(() => {
     // 뒤로·앞으로 가거나 앱 안 링크(navigateTo)로 주소가 바뀌면 사이트·화면을 주소에 맞춘다
@@ -370,6 +378,13 @@ export const App: React.FC = () => {
   const handleToggleTheme = () => {
     applyTheme(!isDark);
     setIsDark(!isDark);
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
+
+  // 프로필 메뉴의 테마 고르기 (라이트·다크·시스템)
+  const handleThemeMode = (mode: ThemeMode) => {
+    setIsDark(applyThemeMode(mode));
+    setThemeMode(mode);
   };
 
   const handleOpenDrawer = () => {
@@ -392,6 +407,7 @@ export const App: React.FC = () => {
           onReload={load}
           site={site}
           onSiteChange={changeSite}
+          preview={preview}
         />
         <div className="wrap">
           <Header
@@ -417,8 +433,11 @@ export const App: React.FC = () => {
             isDark={isDark}
             onOpenDrawer={handleOpenDrawer}
             onToggleTheme={handleToggleTheme}
-            onLogin={() => setLoginOpen(true)}
-            onSearch={() => setSearchOpen(true)}
+            themeMode={themeMode}
+            onThemeMode={handleThemeMode}
+            onNavigate={handleNavigate}
+            onLogin={openLogin}
+            onSearch={preview ? focusPreviewLogin : () => setSearchOpen(true)}
           />
           {/* 데이터 연결·계정 관리는 기간과 상관없는 화면이라 기간 바를 두지 않는다 */}
           {currentView !== 'data' && currentView !== 'members' && !oncorePending && (
@@ -546,7 +565,7 @@ export const App: React.FC = () => {
                   dayRange={searchDay}
                   dayCovered={dayCovered}
                   isLoggedIn={isLoggedIn}
-                  onLogin={() => setLoginOpen(true)}
+                  onLogin={openLogin}
                   onSelectAllPeriod={selectAllPeriod}
                 />
               )}
@@ -556,7 +575,7 @@ export const App: React.FC = () => {
               )}
               {/* 로그인 세션을 확인하는 동안은 표 자리표시, 로그인한 경우에만 어드민 화면 */}
               {currentView === 'admin' && authLoading && <SkeletonView title={VIEW_TITLES.admin} variant="table" />}
-              {currentView === 'admin' && isLoggedIn && (
+              {currentView === 'admin' && isSuperAdmin && (
                 <AdminView data={data} isSyncing={isSyncing || status === 'init'} selectedMonth={viewMonth} allPeriod={allPeriod} yearTotal={yearTotal} dayRange={searchDay} onUpdateQuotesRaw={updateQuotesRaw} onUpdateQuotesSites={updateQuotesSites} onReload={load} />
               )}
               {currentView === 'members' && authLoading && <SkeletonView title={VIEW_TITLES.members} variant="table" />}
