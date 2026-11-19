@@ -279,7 +279,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
                         <React.Fragment key={a.userId}>
                           <TreeParentRow
                             label={a.name || a.email.split('@')[0] || '(알 수 없음)'}
-                            sub={[[a.company, a.team].filter(Boolean).join(' '), a.email].filter(Boolean).join(' · ')}
+                            sub={[[a.company, a.team].filter(Boolean).join(' · '), a.email].filter(Boolean).join(' · ')}
                             childCount={a.views.length}
                             showCount={false}
                             open={isOpen}
