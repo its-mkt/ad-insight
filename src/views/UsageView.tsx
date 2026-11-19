@@ -433,8 +433,8 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
     <View name="usage" title={TITLE}>
       <ViewHeader title={TITLE} description="직원들이 광고 인사이트를 얼마나 자주, 얼마나 오래 보는지 보여 줍니다." status="live" />
       <ViewNote>
-        ※ 방문은 기기당 하루 1회(브라우저·시크릿 창 무관) · 이용 기기는 기간 중 접속한 기기 대수 · 체류시간은 탭이 보이는 동안만(5분 무조작 제외) · 계정별 이용은 로그인 상태 기록만 · localhost 미기록 · 진행 중인 달은 전월 같은 날짜까지와 비교{since && ` · 수집 시작 ${since.replace(/-/g, '.')}`}
-        {!USAGE_TRACKING_ON && ' (지금 창은 개발 환경이라 기록되지 않습니다)'}
+        ※ 방문은 기기당 하루 1회 · 체류시간은 5분 무조작 제외{since && ` · ${since.replace(/-/g, '.')}부터 수집`}
+        {!USAGE_TRACKING_ON && ' · 개발 환경은 기록 안 함'}
       </ViewNote>
       <div className="usage-tools">
         <SegmentedControl<number>

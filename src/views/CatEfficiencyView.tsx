@@ -274,13 +274,13 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
 
       {allPeriod && (
         <ViewNote>
-          ※ 전체 기간은 광고비·견적이 모두 있는 {dotYm(cpaFrom)} 이후만 합산해, 종합 요약의 누적 광고비보다 적습니다.
+          ※ {dotYm(cpaFrom)} 이후만 합산 (종합 요약 누적보다 적음)
         </ViewNote>
       )}
 
       {yearTotal && curMonths[0] < cpaFrom && (
         <ViewNote>
-          ※ {dotYm(cpaFrom)} 이전은 광고비·견적이 모두 갖춰지지 않아 CPA가 실제와 다를 수 있습니다.
+          ※ {dotYm(cpaFrom)} 이전 CPA는 자료가 부족해 부정확할 수 있음
         </ViewNote>
       )}
 

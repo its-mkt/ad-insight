@@ -12,7 +12,7 @@ export const MembersView: React.FC = () => (
   <View name="members" title={TITLE} className="members-view">
     <ViewHeader title={TITLE} description="광고 인사이트 가입 요청을 승인·거절하고, 승인된 계정의 등급(뷰어·운영자)과 열람 권한을 관리합니다." status="live" />
     <ViewNote>
-      ※ 승인된 계정만 열람 · 뷰어(대시보드) · 운영자(+원문 데이터·계정 승인·이용 현황·데이터 연결) · 소유자(전부+등급 변경·삭제). 해제는 바로 적용(온코어 최대 5분)되고 다시 승인할 수 있습니다.
+      ※ 뷰어 대시보드 · 운영자 +원문 데이터·계정 승인·이용 현황 · 소유자 전체 권한
     </ViewNote>
     <OwnerCard />
     <MemberApprovals />

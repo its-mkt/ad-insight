@@ -54,9 +54,6 @@ const TITLE = '검색 결과';
 const DESCRIPTION = '검색어와 관련된 광고와 견적을 한 화면에 요약합니다';
 const SEARCH_HINT = '화면 위쪽 돋보기 버튼이나 Ctrl+K로 검색할 수 있습니다.';
 
-/** 견적 카드의 판매 건수 기준 — 판매 주문은 유입 경로가 기록되지 않아 제품으로만 검색어와 이어진다 */
-const SALES_NOTE =
-  '판매는 제품명·카테고리 일치 고도몰 결제 주문 수(캠페인·키워드는 제품명에 들어 있을 때만)';
 
 export const SearchView: React.FC<SearchViewProps> = ({
   data,
@@ -269,18 +266,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {dayRange && (
         <ViewNote>
           {dayCovered
-            ? '※ 선택한 날짜 그대로 집계(키워드·소재 성과는 월 단위라 그 달 전체) · 전월 비교 없음'
-            : `※ 일별 광고비 수집 전 기간 — 견적만 날짜 그대로, 광고 지표는 ${monthsOfRange(dayRange).map(mLabel).join('·')} 전체 · 비교·CPA 없음`}
+            ? '※ 선택 날짜 기준 · 키워드·소재는 월 단위 · 비교 없음'
+            : `※ 광고 지표는 ${monthsOfRange(dayRange).map(mLabel).join('·')} 전체(일별 수집 전) · 비교·CPA 없음`}
         </ViewNote>
       )}
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만(2026.10~ 추적) · 매체는 광고비와 연결되지 않아 광고비·CPA 없음 · {SALES_NOTE}
+          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만 · 광고비·CPA 없음
         </ViewNote>
       ) : (
       <ViewNote>
-          ※ {periodLabel} 기준 · 광고비는 이름·카테고리·매체 일치 광고그룹·키워드 합, 견적은 제목·카테고리·유입 매체 일치 건(2026.10~ 추적) · CPA는 추정({cpaLabel}), 전환당 비용은 정확 · {SALES_NOTE}
+          ※ {periodLabel} 기준 · 이름·카테고리·매체 일치 합계 · CPA는 추정({cpaLabel})
       </ViewNote>
       )}
 
