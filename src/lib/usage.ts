@@ -211,6 +211,31 @@ export interface UsageByCategory {
   views: string[];
 }
 
+export interface UsageAccountView {
+  view: string;
+  /** 그 화면을 연 날 수 */
+  days: number;
+  pageviews: number;
+  seconds: number;
+}
+
+export interface UsageByAccount {
+  userId: string;
+  email: string;
+  /** 가입 때 넣은 이름·회사·팀 (없으면 '') */
+  name: string;
+  company: string;
+  team: string;
+  /** 이용한 날 수 */
+  days: number;
+  pageviews: number;
+  seconds: number;
+  /** 마지막 기록 시각 (ISO) */
+  lastAt: string;
+  /** 화면별 이용 (페이지뷰 많은 순) */
+  views: UsageAccountView[];
+}
+
 export interface UsageStats {
   daily: UsageDay[];
   views: UsageByView[];
@@ -226,6 +251,10 @@ export interface UsageStats {
   deviceKinds: { pc: number; tablet: number; mobile: number; unknown: number } | null;
   /** 수집을 시작한 날 (기록이 없으면 null) */
   since: string | null;
+  /** 계정별 이용 — 'setup' 은 계정별 기록 SQL 을 아직 실행하지 않음, null 은 관리자가 아니라 받지 못함 */
+  accounts: UsageByAccount[] | 'setup' | null;
+  /** 계정별 기록을 시작한 날 */
+  accountSince: string | null;
 }
 
 /** 기간 이용 현황 (로그인 필요). 테이블·함수가 아직 없으면 setupNeeded */
@@ -243,6 +272,8 @@ export async function loadUsageStats(
     categories?: Partial<UsageByCategory>[];
     category_groups?: Partial<UsageByCategory>[];
     category_since?: string | null;
+    accounts?: Record<string, unknown>[] | null;
+    account_since?: string | null;
   };
   const num = (v: unknown) => Number(v) || 0;
   const cat = (c: Partial<UsageByCategory>): UsageByCategory => ({
@@ -265,6 +296,28 @@ export async function loadUsageStats(
       categories: raw.categories ? raw.categories.map(cat) : null,
       categoryGroups: (raw.category_groups || []).map(cat),
       categorySince: raw.category_since ? String(raw.category_since) : null,
+      accounts: !('accounts' in raw)
+        ? 'setup'
+        : raw.accounts
+          ? raw.accounts.map((a) => ({
+              userId: String(a.user_id ?? ''),
+              email: String(a.email ?? ''),
+              name: String(a.name ?? ''),
+              company: String(a.company ?? ''),
+              team: String(a.team ?? ''),
+              days: num(a.days),
+              pageviews: num(a.pageviews),
+              seconds: num(a.seconds),
+              lastAt: String(a.last_at ?? ''),
+              views: (Array.isArray(a.views) ? (a.views as Record<string, unknown>[]) : []).map((v) => ({
+                view: String(v.view ?? ''),
+                days: num(v.days),
+                pageviews: num(v.pageviews),
+                seconds: num(v.seconds),
+              })),
+            }))
+          : null,
+      accountSince: raw.account_since ? String(raw.account_since) : null,
     },
   };
 }
