@@ -1435,7 +1435,7 @@ tr.kw-more-row td {
     background: var(--bg);
 
     &.err {
-      border-color: var(--warn);
+      border-color: var(--err);
     }
   }
 
@@ -1445,7 +1445,7 @@ tr.kw-more-row td {
     gap: 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--warn);
+    color: var(--err);
     text-align: left;
   }
 
@@ -2681,7 +2681,7 @@ tr.kw-more-row td {
   p.gate-code-sent {
     margin: 0;
     font-size: 0.8125rem;
-    text-align: left;
+    text-align: center; // 제목·진행도·인증번호 칸과 같은 가운데 정렬
     word-break: break-all;
 
     strong {
