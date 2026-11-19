@@ -17,7 +17,7 @@ import {
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { CompareLegend } from '../components/common/Legend';
-import type { DayPeriod } from '../utils/dayRange';
+import type { DayPeriod, MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
@@ -53,6 +53,8 @@ interface OverviewViewProps {
   monthly?: DashboardData;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달 보기의 비교 기준 — 주면 증감을 전월 동기간(전월 1일~같은 날짜)과 비교한 것으로 표기한다 */
+  compare?: MonthToDateCompare;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
 }
 
@@ -73,6 +75,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSearchName,
   monthly,
   period,
+  compare,
 }) => {
   // 견적은 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더한 값으로 센다 (2026-11-06 사용자 결정)
   const stats = useQuoteStats(data);
@@ -112,8 +115,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     THIS_M;
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const pvCaption = period ? period.cmpLabel : mLabel(pv);
-  const cmp = period ? period.cmpLabel : '전월';
+  const pvCaption = period ? period.cmpLabel : compare ? compare.cmpLabel : mLabel(pv);
+  const cmp = period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
   const months = monthsUpTo(curM);
@@ -266,7 +269,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // 유입 매체 비중
   // 월별: 선택한 달 vs 전월 / 연간: 1~선택월 vs 전년 동기 / 전체 기간: 비교 없음
   const srcRaw = stats.quotesRaw || [];
-  const srcCompareLabel = cmpLabelOf({ allPeriod, yearTotal, period });
+  const srcCompareLabel = cmpLabelOf({ allPeriod, yearTotal, period: period ?? compare });
   const srcCur = allPeriod
     ? buildSourceShareData(srcRaw, '', stats.quotes)
     : yearTotal
@@ -455,7 +458,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             curLabel={yearTotal ? yearLabel : undefined}
             totalCur={sumBy(fullList, (c) => c.cur)}
             totalPrev={sumBy(fullList, (c) => c.prev)}
-            prevLabel={yearTotal ? '전년 동기' : period ? cmp : undefined}
+            prevLabel={yearTotal ? '전년 동기' : period || compare ? cmp : undefined}
             emptyMessage="취합된 카테고리 데이터가 없습니다."
             onSelect={onSearchName && ((k) => onSearchName(formatCategoryScope(k)))}
           />

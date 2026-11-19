@@ -130,3 +130,19 @@ export const dayPeriodOf = (r: DayRange): DayPeriod => {
   const prevRange = sameRangeLastMonth(r);
   return { label, days, cmpLabel: '전월 동기간', range: r, prevRange, prevDays: rangeDays(prevRange) };
 };
+
+/** 진행 중인 달 보기의 비교 기준 — 전월 1일~같은 날짜 (2026-11-19 사용자 요청: 전월 전체와 비교하면 증감이 늘 하락으로 보인다) */
+export interface MonthToDateCompare {
+  /** 비교 문구 — '전월 동기간' */
+  cmpLabel: string;
+  /** 비교 범위 — 전월 1일~같은 날짜 (말일은 전월 말일로 맞춤) */
+  prevRange: DayRange;
+  /** 비교 범위 일수 */
+  prevDays: number;
+}
+
+/** 당월 1일~to 를 전월 같은 날짜와 비교하는 기준을 만든다 */
+export const monthToDateCompareOf = (to: string): MonthToDateCompare => {
+  const prevRange = sameRangeLastMonth({ from: `${to.slice(0, 7)}-01`, to });
+  return { cmpLabel: '전월 동기간', prevRange, prevDays: rangeDays(prevRange) };
+};

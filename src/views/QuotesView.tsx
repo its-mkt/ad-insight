@@ -14,7 +14,7 @@ import {
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { quoteDetailsPending } from '../utils/quoteStats';
-import { inDayRange, type DayPeriod } from '../utils/dayRange';
+import { inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
@@ -48,6 +48,8 @@ interface QuotesViewProps {
   monthly?: DashboardData;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달 보기의 비교 기준 — 주면 증감을 전월 동기간(전월 1일~같은 날짜)과 비교한 것으로 표기한다 */
+  compare?: MonthToDateCompare;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
 }
 
@@ -71,7 +73,7 @@ const ORIGIN_COLORS: Record<string, string> = {
   톡플러스: '--c-ka',
 };
 
-export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period }) => {
+export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing = false, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, compare }) => {
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useQuoteStats(data);
   const { quotes: trendQuotes, quotesRaw: trendRaw } = useQuoteStats(monthly ?? data);
@@ -199,7 +201,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? rowsByPeriod(quotes)(yr).filter((r) => r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : '전월';
+  const cmp = period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');

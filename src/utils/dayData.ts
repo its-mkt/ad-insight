@@ -134,3 +134,25 @@ export function applyDayRange(data: DashboardData, range: DayRange | null, opts:
     quotesExtra: both(data.quotesExtra),
   };
 }
+
+/**
+ * 진행 중인 달 보기 — 이 달 값은 그대로 두고, 전달 자리만 전월 같은 날짜 구간(prevRange)의 값으로 바꾼다 (2026-11-19 사용자 요청).
+ * 광고비는 일별 자료가 있는 매체(구글·네이버)만 바꾸고, 월 단위로만 모으는 매체는 나눌 근거가 없어 전달 값을 그대로 둔다.
+ * 비교 구간이 일별 자료 밖이면 null — 광고비만 전월 전체로 남으면 견적과 기준이 달라지므로 전체를 월 단위 비교로 둔다.
+ */
+export function withPrevSamePeriod(data: DashboardData, prevRange: DayRange): DashboardData | null {
+  if (!rangeCovered(data, prevRange)) return null;
+  const prevMonth = prevRange.to.slice(0, 7);
+  const keepSpend = (r: SpendRow) => r.month !== prevMonth || !DAILY_MEDIA.includes(r.media);
+  const keepRaw = <T extends QuoteRawRow>(rows: T[]): T[] => rows.filter((r) => (r.date || '').slice(0, 7) !== prevMonth || inDayRange(r.date, prevRange));
+  const quotesRaw = keepRaw(data.quotesRaw);
+  return {
+    ...data,
+    spend: [...data.spend.filter(keepSpend), ...spendInRange(data.spendDaily, prevRange, prevMonth).filter((r) => DAILY_MEDIA.includes(r.media))],
+    quotes: [...data.quotes.filter((r) => r.month !== prevMonth), ...quoteRowsOf(quotesRaw.filter((r) => (r.date || '').slice(0, 7) === prevMonth), prevMonth)],
+    quotesRaw,
+    quotesSites: keepRaw(data.quotesSites),
+    quotesPhone: keepRaw(data.quotesPhone),
+    quotesExtra: keepRaw(data.quotesExtra),
+  };
+}

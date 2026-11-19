@@ -8,7 +8,7 @@ import type {
 import { catSum, catsOf, ctrText, fmt, fmtWon, sumBy, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
 import { EXTERNAL_LINKS } from '../utils/constants';
-import type { DayPeriod } from '../utils/dayRange';
+import type { DayPeriod, MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
@@ -41,6 +41,8 @@ interface KeywordsViewProps {
   yearTotal?: boolean;
   /** 일·기간 보기일 때 기간 문구·일수 (월 단위 보기면 없음) */
   period?: DayPeriod;
+  /** 진행 중인 달 보기의 비교 기준 — 주면 증감을 전월 동기간(전월 1일~같은 날짜)과 비교한 것으로 표기한다 */
+  compare?: MonthToDateCompare;
   /** 진행 중인 달을 전월 같은 날짜와 비교할 때의 기준 */
 }
 
@@ -60,6 +62,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   allPeriod = false,
   yearTotal = false,
   period,
+  compare,
 }) => {
   const [media, setMedia] = useState<'all' | 'Google' | 'Naver'>('all');
   const [type, setType] = useState<'SA' | 'DA'>('SA');
@@ -126,7 +129,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
   const pvClk  = sumBy(pvRows, (r) => r.clk);
   const pvConv = sumBy(pvRows, (r) => r.conv);
   const pvCpc  = pvClk > 0 ? Math.round(pvCost / pvClk) : 0;
-  const cmpLabel = cmpLabelOf({ allPeriod, yearTotal, period });
+  const cmpLabel = cmpLabelOf({ allPeriod, yearTotal, period: period ?? compare });
 
   // 매체별 집계
   const naverRows  = rows.filter((r) => r.media === 'Naver');
