@@ -2819,13 +2819,54 @@ tr.kw-more-row td {
     }
   }
 
-  .access-loading-status {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    margin: 0 0 1rem;
-    font-size: 0.8125rem;
-    color: var(--sub);
+}
+
+// 권한 확인 중 카드 — 뼈대 위 가운데. 금방 끝나면 보이지 않게 0.3초 뒤 서서히 나타난다
+.login-backdrop.access-checking-backdrop {
+  animation: access-checking-in 0.25s ease-out 0.3s both;
+
+  .card.login-modal.access-checking {
+    max-width: 22rem;
+    text-align: center;
+
+    p {
+      margin-bottom: 0;
+    }
+
+    .btn-login {
+      margin-top: 1.25rem;
+    }
+  }
+}
+
+// 자물쇠 둘레를 도는 링 — 확인 중임을 보여 준다
+.card.login-modal .gate-icon.gate-icon-spin {
+  position: relative;
+  border-color: var(--line2);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--acc);
+    animation: access-checking-spin 0.9s linear infinite;
+  }
+}
+
+@keyframes access-checking-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes access-checking-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -2843,6 +2884,11 @@ tr.kw-more-row td {
     animation: none;
     width: 100%;
     opacity: 0.4;
+  }
+
+  .login-backdrop.access-checking-backdrop,
+  .card.login-modal .gate-icon.gate-icon-spin::after {
+    animation: none;
   }
 }
 

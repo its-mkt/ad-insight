@@ -4,9 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { SkeletonView } from '../common/SkeletonView';
+import { Modal } from '../common/Modal';
 import { DevLoginButton, GateError, LoginForm, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
 import { GuestPreview } from './GuestPreview';
+
+/** 권한 확인이 이보다 오래 걸리면 새로 고침 안내를 띄운다 */
+const ACCESS_SLOW_MS = 10 * 1000;
 
 /** 승인 대기 화면이 승인 여부를 다시 묻는 간격 */
 const PENDING_POLL_MS = 30 * 1000;
@@ -154,6 +158,50 @@ const PendingWatch: React.FC = () => {
  * 접속 관문 — 관리자 또는 승인된 계정만 대시보드(children)를 연다.
  * 그 밖에는 대시보드를 아예 그리지 않아 데이터 요청도 나가지 않는다 (경쟁사·봇이 데이터를 보지 못하게, 2026-11-18 사용자 결정).
  */
+/**
+ * 접속 권한 확인 중 — 대시보드 뼈대 위 화면 가운데에 확인 중 카드를 띄운다 (닫을 수 없음).
+ * 금방 끝나면 깜빡이지 않게 카드는 잠깐 늦게 나타나고(CSS), 오래 걸리면 새로 고침을 안내한다.
+ */
+const AccessChecking: React.FC = () => {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), ACCESS_SLOW_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div className="access-loading">
+      <div className="access-loading-bar" aria-hidden="true" />
+      <SkeletonView title="아이티스 광고 인사이트" />
+      <Modal open onClose={() => undefined} dismissible={false} labelledBy="access-checking-title" className="access-checking" backdropClassName="access-checking-backdrop">
+        <div className="gate-icon gate-icon-spin">
+          <Lock size="1.25rem" aria-hidden="true" />
+        </div>
+        <h2 id="access-checking-title">접속 권한을 확인하고 있습니다</h2>
+        <p role="status">
+          {slow ? (
+            <>
+              평소보다 오래 걸리고 있습니다.
+              <br />
+              잠시 뒤에도 그대로면 새로 고침해 주세요.
+            </>
+          ) : (
+            <>
+              승인된 계정인지 확인하는 중입니다.
+              <br />
+              잠시만 기다려 주세요.
+            </>
+          )}
+        </p>
+        {slow && (
+          <Button variant="primary" className="btn-login" data-btn="access-reload" onClick={() => window.location.reload()}>
+            새로 고침
+          </Button>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
 export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loading, isSignedIn, role, canView, refreshRole, signupInProgress } = useAuth();
   const [tab, setTab] = useState<GateTab>('login');
@@ -166,16 +214,7 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // 권한 확인 중 — 대부분 승인된 사람이므로 잠금 카드 대신 대시보드 모양 로딩을 보여 준다 (화면이 열릴 때 들썩이지 않게)
   if (loading && !signingUp) {
-    return (
-      <div className="access-loading">
-        <div className="access-loading-bar" aria-hidden="true" />
-        <p className="access-loading-status" role="status">
-          <Lock size="0.875rem" aria-hidden="true" />
-          접속 권한을 확인하고 있습니다
-        </p>
-        <SkeletonView title="아이티스 광고 인사이트" />
-      </div>
-    );
+    return <AccessChecking />;
   }
 
   // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
