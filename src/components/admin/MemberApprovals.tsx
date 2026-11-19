@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Crown, KeyRound, RefreshCw, Trash2, UserCheck, UserMinus, UserX } from 'lucide-react';
+import { Crown, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -20,6 +20,20 @@ const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> =
   revoked: { label: '해제', level: 'err' },
 };
 
+/** 지금 상태에서 바꿀 수 있는 상태 — 결정한 요청을 '승인 대기'로 되돌리지는 않는다 */
+const NEXT_STATUS: Record<MemberStatus, Exclude<MemberStatus, 'pending'>[]> = {
+  pending: ['approved', 'rejected'],
+  approved: ['revoked'],
+  rejected: ['approved'],
+  revoked: ['approved'],
+};
+const STATUS_TITLE: Record<MemberStatus, string> = {
+  pending: '아직 승인하지 않은 요청',
+  approved: '데이터를 볼 수 있다',
+  rejected: '가입 요청을 거절한다 (다시 승인할 수 있다)',
+  revoked: '열람 권한을 해제한다 (다시 승인할 수 있다)',
+};
+
 const ROLE_TEXT: Record<MemberRole, string> = { member: '뷰어', manager: '운영자' };
 const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
   { value: 'member', label: ROLE_TEXT.member, title: '대시보드만' },
@@ -30,7 +44,7 @@ const ROLE_OPTIONS: DropdownOption<MemberRole>[] = [
  * 가입 요청·열람 권한 관리 — 관리자만 보인다 (계정 관리 화면).
  * 명단은 데이터 시트 members 탭이고, 승인·거절·해제는 웹앱이 관리자 토큰을 확인한 뒤 바꾼다.
  * 명단 상태는 사이드바 승인 대기 뱃지와 함께 쓴다 (useMembers).
- * 승인·거절·해제·삭제는 줄 끝 설정 버튼의 메뉴에 모은다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
+ * 승인·거절·해제는 상태 뱃지를 눌러 고르고(지금 상태에서 갈 수 있는 상태만), 비밀번호 안내·소유자 넘기기·삭제는 줄 끝 설정 버튼 메뉴에 둔다 — 삭제는 메뉴에서 한 번 더 눌러 확인한 뒤 명단(과 로그인 계정)에서 지운다
  * 등급(일반·관리자) 변경과 삭제는 최고 관리자만, 관리자는 일반 계정의 승인·거절·해제만 한다 (웹앱도 같은 규칙으로 막는다)
  */
 export const MemberApprovals: React.FC = () => {
@@ -87,9 +101,29 @@ export const MemberApprovals: React.FC = () => {
                 <td>{r.team}</td>
                 <td>{r.email}</td>
                 <td>
-                  <StatusBadge level={STATUS_TEXT[r.status]?.level || 'warn'} size="sm">
-                    {STATUS_TEXT[r.status]?.label || r.status}
-                  </StatusBadge>
+                  {(() => {
+                    const badge = (
+                      <StatusBadge level={STATUS_TEXT[r.status]?.level || 'warn'} size="sm">
+                        {STATUS_TEXT[r.status]?.label || r.status}
+                      </StatusBadge>
+                    );
+                    const next = NEXT_STATUS[r.status];
+                    // 바꿀 권한이 없거나 갈 상태가 없으면 뱃지만
+                    if (!canDecide || !next?.length) return badge;
+                    const options: DropdownOption<MemberStatus>[] = [r.status, ...next].map((s) => ({ value: s, label: STATUS_TEXT[s].label, title: STATUS_TITLE[s] }));
+                    return (
+                      <Dropdown<MemberStatus>
+                        className="dd-badge"
+                        options={options}
+                        value={r.status}
+                        valueLabel={badge}
+                        onChange={(s) => s !== 'pending' && s !== r.status && decide(r.email, s)}
+                        ariaLabel={`${r.name || r.email} 열람 상태 바꾸기`}
+                        disabled={busy === r.email}
+                        fixedMenu
+                      />
+                    );
+                  })()}
                 </td>
                 <td>
                   {r.status !== 'approved' ? (
@@ -112,10 +146,7 @@ export const MemberApprovals: React.FC = () => {
                 <td className="member-actions">
                   {(() => {
                     const items: ActionMenuItem[] = [];
-                    if (canDecide && r.status !== 'approved') items.push({ key: 'approve', label: '승인', icon: UserCheck, onSelect: () => decide(r.email, 'approved') });
-                    if (canDecide && r.status === 'pending') items.push({ key: 'reject', label: '거절', icon: UserX, onSelect: () => decide(r.email, 'rejected') });
                     if (canDecide && r.status === 'approved') items.push({ key: 'password', label: '비밀번호 재설정 안내 보내기', icon: KeyRound, onSelect: () => void sendPasswordGuide(r.email) });
-                    if (canDecide && r.status === 'approved') items.push({ key: 'revoke', label: '열람 권한 해제', icon: UserMinus, onSelect: () => decide(r.email, 'revoked') });
                     // 소유자 넘기기는 승인된 운영자에게만 (뷰어는 먼저 운영자로 바꾼다)
                     if (isSuperAdmin && r.status === 'approved' && role === 'manager')
                       items.push({ key: 'owner', label: '소유자 권한 넘기기', icon: Crown, onSelect: () => setTransferTo({ email: r.email, name: r.name }) });

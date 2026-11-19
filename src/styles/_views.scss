@@ -1395,6 +1395,21 @@ tr.kw-more-row td {
     .dd .dd-trigger {
       height: 1.5rem;
     }
+    // 상태 뱃지 드롭다운 — 뱃지 모양 그대로, 눌러서 바꿀 수 있다는 표시로 작은 ▾ 만 붙인다
+    .dd.dd-badge .dd-trigger {
+      gap: 0.25rem;
+      height: auto;
+      padding: 0.125rem;
+      border-color: transparent;
+      background: transparent;
+
+      &:hover:not(:disabled) {
+        border-color: var(--line2);
+      }
+    }
+    .dd.dd-badge.open .dd-trigger {
+      border-color: var(--acc);
+    }
   }
   .member-actions {
     text-align: left;
