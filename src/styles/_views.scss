@@ -1377,7 +1377,20 @@ tr.kw-more-row td {
       white-space: nowrap;
     }
     .col-mem-name {
-      width: 9.5%;
+      width: 11%; // 이니셜 동그라미 + 이름 세 글자
+    }
+    // 담당자 칸 — 이니셜 동그라미 + 이름 (이름이 넘치면 말줄임)
+    .grp-acc-main {
+      display: flex;
+      max-width: 100%;
+    }
+    .pm-avatar {
+      @include mixins.avatar-circle;
+      width: 1.5rem;
+      height: 1.5rem;
+      background: var(--accbg);
+      color: var(--accink);
+      font-size: 0.75rem;
     }
     // 소속을 회사·팀으로 나눔 (예전 소속 15%와 이메일 일부를 나눠 쓴다)
     .col-mem-company {
@@ -1387,7 +1400,7 @@ tr.kw-more-row td {
       width: 7.5%;
     }
     .col-mem-email {
-      width: 19%;
+      width: 17.5%;
     }
     .col-mem-status {
       width: 12%; // 승인·해제 두 칸 토글이 들어가게

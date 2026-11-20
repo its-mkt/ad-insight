@@ -8,6 +8,8 @@ import { StatusBadge, type StatusLevel } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
 import { SkelRows } from '../common/SkeletonView';
 import { Notice } from '../common/Notice';
+import { Avatar } from '../common/Avatar';
+import { IconLabel } from '../common/IconLabel';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { SegmentedControl, type SegmentOption } from '../common/SegmentedControl';
 import { useAuth } from '../../context/AuthContext';
@@ -101,7 +103,10 @@ export const MemberApprovals: React.FC = () => {
               const org = splitAffiliation(r.team || '');
               return (
               <tr key={r.email}>
-                <td>{r.name}</td>
+                {/* 담당자 — 프로필 사진이 없으면 이름(없으면 이메일) 첫 글자 동그라미. 다른 계정의 사진은 명단에 없어 내 줄만 사진을 쓴다 */}
+                <td title={r.name || undefined}>
+                  <IconLabel icon={<Avatar src={r.email.toLowerCase() === myEmail ? user?.avatarUrl : undefined} name={r.name || r.email} />} title={r.name || '–'} />
+                </td>
                 <td title={org.company || undefined}>{org.company || '–'}</td>
                 <td title={org.team || undefined}>{org.team || '–'}</td>
                 <td title={r.email}>{r.email}</td>
