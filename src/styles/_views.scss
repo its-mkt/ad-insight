@@ -3165,6 +3165,20 @@ tr.kw-more-row td {
   }
 }
 
+// 계정 정보 수정 창 (admin/MemberEditModal) — 입력칸 모양은 내 계정 설정(.acct-modal)과 같고, 아래에 취소·저장
+.card.login-modal.member-edit-modal {
+  h2 {
+    margin-bottom: 1rem;
+  }
+
+  .member-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+}
+
 // 등급 변경 확인 창 — 뷰어 → 운영자 흐름, 달라지는 점 한 줄, 취소·바꾸기 버튼
 .card.login-modal.role-change-modal {
   .role-change-flow {

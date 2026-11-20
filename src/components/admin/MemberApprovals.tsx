@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Crown, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
+import { Crown, KeyRound, RefreshCw, Trash2, UserPen } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Th } from '../common/Th';
 import { Button } from '../common/Button';
@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { splitAffiliation } from '../../lib/authErrors';
 import { OwnerTransferModal } from './OwnerTransferModal';
 import { RoleChangeModal, type RoleChange } from './RoleChangeModal';
+import { MemberEditModal, type MemberEditTarget } from './MemberEditModal';
 import { decideMember, deleteMember, loadMembers, sendPasswordGuide, useMembers, type MemberRole, type MemberStatus } from '../../hooks/useMembers';
 
 const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> = {
@@ -55,6 +56,7 @@ export const MemberApprovals: React.FC = () => {
   const decide = (email: string, status: Exclude<MemberStatus, 'pending'>) => void decideMember(email, status);
   // 소유자 권한을 넘길 운영자 (창이 열려 있을 때만)
   const [transferTo, setTransferTo] = useState<{ email: string; name: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<MemberEditTarget | null>(null);
   // 등급 선택칸에서 고른 변경 — 확인 창에서 한 번 더 확인한 뒤 바꾼다
   const [roleChange, setRoleChange] = useState<RoleChange | null>(null);
 
@@ -156,6 +158,8 @@ export const MemberApprovals: React.FC = () => {
                 <td className="member-actions">
                   {(() => {
                     const items: ActionMenuItem[] = [];
+                    // 담당자·회사·팀 고치기 — 승인·해제와 같은 권한, 대기 중인 요청도 오타를 고칠 수 있게 모든 상태에서
+                    if (canDecide) items.push({ key: 'edit', label: '정보 수정', icon: UserPen, onSelect: () => setEditTarget({ email: r.email, name: r.name, team: r.team || '' }) });
                     if (canDecide && r.status === 'approved') items.push({ key: 'password', label: '비밀번호 재설정 안내 보내기', icon: KeyRound, onSelect: () => void sendPasswordGuide(r.email) });
                     // 소유자 넘기기는 승인된 운영자에게만 (뷰어는 먼저 운영자로 바꾼다)
                     if (isSuperAdmin && r.status === 'approved' && role === 'manager')
@@ -178,6 +182,7 @@ export const MemberApprovals: React.FC = () => {
       {rows && rows.length === 0 && !error && <EmptyState message="가입 요청이 없습니다." />}
       <OwnerTransferModal target={transferTo} onClose={() => setTransferTo(null)} />
       <RoleChangeModal change={roleChange} onClose={() => setRoleChange(null)} />
+      <MemberEditModal target={editTarget} onClose={() => setEditTarget(null)} />
     </Card>
   );
 };
