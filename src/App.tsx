@@ -29,7 +29,7 @@ import { DataView } from './views/DataView';
 import { AdminView } from './views/AdminView';
 import { UsageView } from './views/UsageView';
 import { MembersView } from './views/MembersView';
-import { applyTheme, applyThemeMode, getInitialDark, getThemeMode, type ThemeMode } from './utils/theme';
+import { applyThemeMode, getThemeMode, type ThemeMode } from './utils/theme';
 import { trackCategoryOpen, trackPageview } from './lib/usage';
 import { LoginModal } from './components/Layout/LoginModal';
 import { ToastHost } from './components/common/Toast';
@@ -71,7 +71,6 @@ export const App: React.FC = () => {
   const toggleFavorite = (query: string) => setFavorites(toggleFavoriteSearch(query, isLoggedIn));
   const queryIsFavorite = favorites.some((q) => sameSearch(q, searchQuery));
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
-  const [isDark, setIsDark] = useState<boolean>(getInitialDark);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getThemeMode);
   // 처음 열 때 사이트가 없는 주소('/', 예전 '#quotes'·'#itket/quotes')는 같은 화면의 경로 주소로 바꿔 둔다
   useEffect(() => {
@@ -375,37 +374,22 @@ export const App: React.FC = () => {
     const onResize = () => {
       if (window.innerWidth > 768) closeDrawer();
     };
-    const mq = window.matchMedia('(prefers-color-scheme:dark)');
-    const onSystemThemeChange = () => {
-      if (!document.documentElement.dataset.theme) {
-        setIsDark(mq.matches);
-      }
-    };
-
     window.addEventListener('popstate', onRouteChange);
     window.addEventListener('hashchange', onRouteChange);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', onResize);
-    mq.addEventListener('change', onSystemThemeChange);
 
     return () => {
       window.removeEventListener('popstate', onRouteChange);
       window.removeEventListener('hashchange', onRouteChange);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', onResize);
-      mq.removeEventListener('change', onSystemThemeChange);
     };
   }, []);
 
-  const handleToggleTheme = () => {
-    applyTheme(!isDark);
-    setIsDark(!isDark);
-    setThemeMode(isDark ? 'light' : 'dark');
-  };
-
   // 프로필 메뉴의 테마 고르기 (라이트·다크·시스템)
   const handleThemeMode = (mode: ThemeMode) => {
-    setIsDark(applyThemeMode(mode));
+    applyThemeMode(mode);
     setThemeMode(mode);
   };
 
@@ -452,9 +436,7 @@ export const App: React.FC = () => {
               ) : undefined
             }
             drawerOpen={drawerOpen}
-            isDark={isDark}
             onOpenDrawer={handleOpenDrawer}
-            onToggleTheme={handleToggleTheme}
             themeMode={themeMode}
             onThemeMode={handleThemeMode}
             onNavigate={handleNavigate}
