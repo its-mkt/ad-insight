@@ -151,6 +151,39 @@ export async function sendPasswordGuide(email: string): Promise<void> {
 }
 
 /**
+ * 다른 계정의 담당자·회사·팀 고치기 (이메일은 바꾸지 않는다) — 권한은 승인·해제와 같다.
+ * 웹앱이 명단을 고치고, Supabase 관리자 키가 있으면 그 사람 로그인 계정의 이름·소속도 맞춘다.
+ * 실패면 창에 남길 문구를 돌려주고, 성공·부분 성공은 토스트로 알린다
+ */
+export async function editMember(email: string, info: { name: string; company: string; team: string }): Promise<{ error?: string }> {
+  const next = { name: info.name.trim(), company: info.company.trim(), team: info.team.trim() };
+  // 테스트 계정 — 웹앱 없이 예시 명단만 고친다
+  if (isDevSession()) {
+    setState({ rows: (state.rows || []).map((r) => (r.email === email ? { ...r, name: next.name, team: affiliationText(next.company, next.team) } : r)) });
+    showToast(`${whoOf(email)}의 정보를 고쳤습니다. (테스트 계정이라 예시 명단만 바뀝니다)`);
+    return {};
+  }
+  setState({ busy: email });
+  const res = await postAuthedAction<{ account?: string }>('editMember', { email, ...next });
+  setState({ busy: '' });
+  if (res.error) {
+    const text: Record<string, string> = {
+      forbidden: '이 계정을 고칠 권한이 없습니다. 운영자 계정·내 계정은 소유자만 고칠 수 있습니다.',
+      not_found: '명단에 없는 계정입니다. 새로 고침한 뒤 다시 시도해 주세요.',
+      bad_request: '담당자·회사·팀을 모두 입력해 주세요.',
+    };
+    return { error: text[res.error] || '저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
+  }
+  const who = whoOf(email);
+  await loadMembers();
+  // 명단은 고쳤지만 로그인 계정 정보가 그대로면, 본인 내 계정 설정에는 옛 이름이 남는다
+  if (res.account === 'failed' || res.account === 'kept')
+    showToast(`${who}의 정보를 명단에 저장했지만, 로그인 계정(내 계정 설정)의 이름·소속은 맞추지 못했습니다.`, 'warn');
+  else showToast(`${who}의 정보를 고쳤습니다.`);
+  return {};
+}
+
+/**
  * 이용자 삭제 (해제와 별도) — 명단에서 지우고, 웹앱에 Supabase 관리자 키가 있으면 로그인 계정도 지운다.
  * 계정까지 지우면 다시 쓰려면 처음부터 회원가입해야 한다
  */

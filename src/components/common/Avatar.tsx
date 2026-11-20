@@ -13,5 +13,5 @@ interface AvatarProps {
 
 /** 사용자 프로필 사진 동그라미 — 사진이 없으면 이름 첫 글자 */
 export const Avatar: React.FC<AvatarProps> = ({ src, name, size = 'sm', as: Tag = 'span' }) => (
-  <Tag className={`pm-avatar${size !== 'sm' ? ` ${size}` : ''}`}>{src ? <img src={src} alt="" /> : (name || 'A')[0].toUpperCase()}</Tag>
+  <Tag className={`pm-avatar${size !== 'sm' ? ` ${size}` : ''}`}>{src ? <img src={src} alt="" /> : (name?.trim() || 'A')[0].toUpperCase()}</Tag>
 );

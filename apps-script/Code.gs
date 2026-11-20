@@ -1825,6 +1825,63 @@ function sendPasswordGuide_(accessToken, email) {
   }
   return { success: true, email };
 }
+/**
+ * 최고 관리자·관리자 — 계정 관리 표에서 다른 계정의 담당자·소속(회사 · 팀)을 고친다. 이메일은 바꾸지 않는다.
+ * 권한은 승인·해제와 같다 (관리자는 일반 계정만, 다른 관리자·자기 자신은 최고 관리자만).
+ * 명단(members 탭)을 고치고, SUPABASE_SERVICE_KEY 가 있으면 로그인 계정의 이름·회사·팀(user_metadata)도 맞춘다 — 본인 내 계정 설정·프로필 이니셜에 바로 보이게.
+ * account: synced · kept(키 없음) · missing(로그인 계정 없음) · failed
+ */
+function editMember_(data) {
+  const acc = accessOf_(data.access_token);
+  if (!isStaffRole_(acc.role)) return { error: 'forbidden' };
+  const email = String(data.email || '').trim().toLowerCase();
+  const clean = (v) => String(v || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 40);
+  const name = clean(data.name), company = clean(data.company), team = clean(data.team);
+  if (!email || !name || !company || !team) return { error: 'bad_request' };
+  const affiliation = company + ' · ' + team; // 프런트 affiliationText 와 같은 형식
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20 * 1000)) return { error: 'busy' };
+  try {
+    const ss = authSheet_(), m = memberRows_(ss).find((r) => r.email === email);
+    if (!m) return { error: 'not_found' };
+    if (acc.role !== 'admin' && (m.role === 'manager' || email === acc.email)) return { error: 'forbidden' };
+    if (m.name !== name || m.team !== affiliation) membersSheet_(ss).getRange(m.row, 2, 1, 2).setValues([[name, affiliation]]);
+    CacheService.getScriptCache().remove('acc:' + email);
+    return { success: true, email, account: updateAuthUserMeta_(email, { name, company, team }) };
+  } finally { lock.releaseLock(); }
+}
+/** 로그인 계정(Supabase) 찾기 — 관리자 키 머리글로 사용자 목록을 넘겨 가며 찾는다. 사용자 객체 · 'missing' · 'failed' */
+function findAuthUser_(email, headers) {
+  for (let page = 1; page <= 20; page++) {
+    const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users?per_page=200&page=' + page, { headers, muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return 'failed';
+    const users = JSON.parse(res.getContentText()).users || [];
+    const u = users.find((x) => String(x.email || '').toLowerCase() === email);
+    if (u) return u;
+    if (users.length < 200) return 'missing';
+  }
+  return 'missing';
+}
+/** 로그인 계정의 user_metadata 일부를 고친다 (주는 키만 바뀌고 사진 등 나머지는 그대로) — synced · kept · missing · failed */
+function updateAuthUserMeta_(email, meta) {
+  const key = PROPS.getProperty('SUPABASE_SERVICE_KEY');
+  if (!key) return 'kept';
+  const headers = supabaseServiceHeaders_(key);
+  try {
+    const u = findAuthUser_(email, headers);
+    if (typeof u === 'string') return u;
+    const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users/' + u.id, {
+      method: 'put', contentType: 'application/json', headers, muteHttpExceptions: true,
+      payload: JSON.stringify({ user_metadata: Object.assign({}, u.user_metadata || {}, meta) }),
+    });
+    if (res.getResponseCode() < 300) return 'synced';
+    console.warn('로그인 계정 정보 수정 실패 ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 200));
+    return 'failed';
+  } catch (err) {
+    console.warn('로그인 계정 정보 수정 실패: ' + err.message);
+    return 'failed';
+  }
+}
 /** Supabase 관리자 키(SUPABASE_SERVICE_KEY) 요청 머리글 — 새 형식 비밀 키(sb_secret_…)는 apikey 만 (게이트웨이가 토큰을 만든다), 예전 service_role(JWT)는 Bearer 도 함께 */
 function supabaseServiceHeaders_(key) {
   return /^sb_/.test(key) ? { apikey: key } : { apikey: key, Authorization: 'Bearer ' + key };
@@ -1880,18 +1937,10 @@ function deleteAuthUser_(email) {
   if (!key) return 'kept';
   const headers = supabaseServiceHeaders_(key);
   try {
-    for (let page = 1; page <= 20; page++) {
-      const res = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users?per_page=200&page=' + page, { headers, muteHttpExceptions: true });
-      if (res.getResponseCode() !== 200) return 'failed';
-      const users = JSON.parse(res.getContentText()).users || [];
-      const u = users.find((x) => String(x.email || '').toLowerCase() === email);
-      if (u) {
-        const del = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users/' + u.id, { method: 'delete', headers, muteHttpExceptions: true });
-        return del.getResponseCode() < 300 ? 'deleted' : 'failed';
-      }
-      if (users.length < 200) return 'missing';
-    }
-    return 'missing';
+    const u = findAuthUser_(email, headers);
+    if (typeof u === 'string') return u;
+    const del = UrlFetchApp.fetch(CFG.SUPABASE_URL + '/auth/v1/admin/users/' + u.id, { method: 'delete', headers, muteHttpExceptions: true });
+    return del.getResponseCode() < 300 ? 'deleted' : 'failed';
   } catch (err) {
     console.error('로그인 계정 삭제 실패: ' + err.message);
     return 'failed';
@@ -1984,6 +2033,7 @@ function memberPost_(e) {
   if (data.action === 'setMemberRole') return json_(setMemberRole_(data.access_token, data.email, data.role));
   if (data.action === 'transferOwner') return json_(transferOwner_(data));
   if (data.action === 'sendPasswordGuide') return json_(sendPasswordGuide_(data.access_token, data.email));
+  if (data.action === 'editMember') return json_(editMember_(data));
   return null;
 }
 function doPostBody_(e) {

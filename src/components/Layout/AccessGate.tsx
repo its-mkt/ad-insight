@@ -6,7 +6,6 @@ import { SkeletonView } from '../common/SkeletonView';
 import { Modal } from '../common/Modal';
 import { DevLoginButton, GateError, LoginForm, ProfileFields, SignupForm, SignupSteps } from './LoginForm';
 import { currentAccessToken, fetchAccessRole } from '../../lib/access';
-import { GuestPreview } from './GuestPreview';
 
 /** 권한 확인이 이보다 오래 걸리면 새로 고침 안내를 띄운다 */
 const ACCESS_SLOW_MS = 10 * 1000;
@@ -219,37 +218,35 @@ export const AccessGate: React.FC<{ children: React.ReactNode }> = ({ children }
     return <AccessChecking />;
   }
 
-  // 로그인 전 — 화면 틀은 둘러볼 수 있게 두고, 숫자 자리 위에 로그인 카드를 띄운다 (데이터는 받지 않는다)
+  // 로그인 전 — 대시보드(미리보기)를 그리지 않고 첫 화면부터 로그인·회원가입 폼을 보여 준다 (데이터는 받지 않는다, 2026-11-20 사용자 결정)
   if (!isSignedIn || signingUp) {
     return (
-      <GuestPreview app={children} keepOpen={signingUp} initialOpen={OPENED_FROM_RESET_LINK}>
-        <GateCardBody
-          icon={<Lock size="1.25rem" aria-hidden="true" />}
-          title={tab === 'login' && !signingUp ? '로그인하면 확인할 수 있습니다' : '회원가입 및 열람 요청'}
-          desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
-        >
-          {tab === 'login' && !signingUp ? (
-            <LoginForm key={loginPreset?.seq ?? 0} showDevLogin={false} initialEmail={loginPreset?.email} initialResetting={loginPreset?.reset} />
-          ) : (
-            <SignupForm
-              onExistingAccount={(email, next) => {
-                setLoginPreset((prev) => ({ email, reset: next === 'reset', seq: (prev?.seq ?? 0) + 1 }));
-                setTab('login');
-              }}
-            />
-          )}
-          {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
-          {!signingUp && (
-          <p className="gate-switch">
-            {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
-            <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
-              {tab === 'login' ? '회원가입' : '로그인'}
-            </Button>
-          </p>
-          )}
-          {tab === 'login' && !signingUp && <DevLoginButton />}
-        </GateCardBody>
-      </GuestPreview>
+      <GateCard
+        icon={<Lock size="1.25rem" aria-hidden="true" />}
+        title={tab === 'login' && !signingUp ? '로그인하면 확인할 수 있습니다' : '회원가입 및 열람 요청'}
+        desc={tab === 'login' && !signingUp ? '승인된 계정만 데이터를 볼 수 있습니다.' : '이메일 인증 → 정보 입력 → 관리자 승인 순서로 진행합니다. 승인되면 데이터를 볼 수 있습니다.'}
+      >
+        {tab === 'login' && !signingUp ? (
+          <LoginForm key={loginPreset?.seq ?? 0} showDevLogin={false} initialEmail={loginPreset?.email} initialResetting={loginPreset?.reset} />
+        ) : (
+          <SignupForm
+            onExistingAccount={(email, next) => {
+              setLoginPreset((prev) => ({ email, reset: next === 'reset', seq: (prev?.seq ?? 0) + 1 }));
+              setTab('login');
+            }}
+          />
+        )}
+        {/* 로그인 버튼 밑 — 회원가입 ↔ 로그인 전환 */}
+        {!signingUp && (
+        <p className="gate-switch">
+          {tab === 'login' ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}{' '}
+          <Button variant="link" data-btn={tab === 'login' ? 'gate-signup' : 'gate-login'} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
+            {tab === 'login' ? '회원가입' : '로그인'}
+          </Button>
+        </p>
+        )}
+        {tab === 'login' && !signingUp && <DevLoginButton />}
+      </GateCard>
     );
   }
 
