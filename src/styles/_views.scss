@@ -3236,7 +3236,7 @@ tr.kw-more-row td {
     gap: 0.625rem;
     padding: 0.625rem 0.75rem;
     border-left: 3px solid var(--line2);
-    background: color-mix(in srgb, var(--line) 35%, var(--card));
+    background: var(--card);
     font-size: 0.875rem;
     line-height: 1.55;
   }
