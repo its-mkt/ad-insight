@@ -20,6 +20,8 @@ interface InsightPanelProps {
   foot?: React.ReactNode;
   /** 화면 제목 (예: '종합 요약') — 주면 화면을 열 때 이 카드의 문장만 Claude 에 보내 핵심 요약을 받아 둔다 */
   aiPage?: string;
+  /** Claude 에 함께 보낼 화면 수치 요약 (utils/aiFacts) — 규칙 문장만으로 부족한 화면에서 쓴다 */
+  aiData?: Record<string, unknown>;
   /** 카테고리 이름을 누르면 그 카테고리로 검색한다 */
   onSelectCategory?: (cat1: string) => void;
   /** 키워드를 누르면 그 키워드로 검색한다 */
@@ -60,13 +62,13 @@ type AiState = { key: string; result?: AiInsightResult; error?: string; loading?
  * aiPage 를 주면 화면을 열 때 Claude 요약을 받아 핵심 요약 자리에 둔다 (받는 동안·실패하면 규칙 요약).
  * 규칙 문장은 utils/insights 가 만든다.
  */
-export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, onSelectCategory, onSelectKeyword }) => {
+export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, aiData, onSelectCategory, onSelectKeyword }) => {
   const facts = useMemo<AiInsightFacts | null>(
     () =>
       aiPage && items.length
-        ? { page: aiPage, basis, today: todayKey(), insights: items.map((it) => ({ type: it.tone, head: it.head, target: it.target, text: it.text })) }
+        ? { page: aiPage, basis, today: todayKey(), insights: items.map((it) => ({ type: it.tone, head: it.head, target: it.target, text: it.text })), ...(aiData && { data: aiData }) }
         : null,
-    [aiPage, basis, items]
+    [aiPage, aiData, basis, items]
   );
   const factsKey = facts ? JSON.stringify(facts) : '';
   const [ai, setAi] = useState<AiState>({ key: '' });

@@ -33,6 +33,7 @@ import { SearchKeywordTable } from '../components/search/SearchKeywordTable';
 import { SearchQuoteBreakdown } from '../components/search/SearchQuoteBreakdown';
 import { SearchQuoteTable } from '../components/search/SearchQuoteTable';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { searchAiData } from '../utils/aiFacts';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 import { keywordInsights, quoteInsights, quoteRowsOfRaw, scopeCpaInsight, summaryInsight, INSIGHT_FOOT_SEARCH } from '../utils/insights';
@@ -287,6 +288,21 @@ export const SearchView: React.FC<SearchViewProps> = ({
     ...(prevResult && cmpLabel ? quoteInsights(quoteRowsOfRaw(result.quotes), quoteRowsOfRaw(prevResult.quotes), cmpLabel) : []),
   ];
   const monthlyTotal = axis.map((key) => sumBy(chartQuotesAt(key), (r) => r.count));
+  // Claude 분석에 함께 보낼 수치 — KPI·비교·추이·견적 구성·상위 캠페인·키워드 (고객 정보·담당자 이름은 넣지 않는다)
+  const searchAi = searchAiData({
+    query,
+    result,
+    prevResult,
+    cmpLabel,
+    months,
+    allSpend: data.spend,
+    allQuotes: quoteStats.quotes,
+    overallCpa,
+    sourceScope,
+    trend: { labels: axisLabels, spend: axis.map((key) => sumBy(chartSpendAt(key), (r) => r.cost)), quotes: monthlyTotal },
+    breakdowns: breakdowns.slice(0, 3),
+    campaigns,
+  });
 
   return (
     <View name="search" title={TITLE}>
@@ -400,7 +416,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </KpiSection>
       )}
 
-      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
+      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} aiData={searchAi} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
 
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'table' ? (

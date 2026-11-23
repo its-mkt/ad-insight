@@ -14,6 +14,8 @@ export interface AiInsightFacts {
   /** 오늘 날짜 — 진행 중인 기간인지 판단하게 한다 */
   today: string;
   insights: { type: string; head: string; target?: string; text: string }[];
+  /** 화면 수치 요약 (KPI·추이·상위 키워드 등, utils/aiFacts) — 있으면 Claude 가 규칙 문장과 함께 읽는다 */
+  data?: Record<string, unknown>;
 }
 
 const CACHE_PREFIX = 'adi:ai-insight:';
