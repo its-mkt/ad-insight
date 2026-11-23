@@ -3346,3 +3346,50 @@ tr.kw-more-row td {
     gap: 0.5rem;
   }
 }
+
+/* 자동 인사이트 — 핵심 요약(항상 보임) + 자세히 보기 */
+.card-insight {
+  .ins-key {
+    padding: 0.75rem 0.875rem;
+    border-left: 3px solid var(--acc);
+    background: color-mix(in srgb, var(--acc) 6%, var(--card));
+  }
+
+  .ins-key-text {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+
+  .ins-key-ic {
+    margin-right: 0.375rem;
+    vertical-align: -0.125rem;
+    color: var(--acc);
+  }
+
+  .ins-key .ins-ai-skel {
+    margin-top: 0.5rem;
+  }
+
+  .ins-more {
+    margin-top: 0.5rem;
+  }
+
+  .ins-detail {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.75rem;
+
+    .ins-ai {
+      margin-bottom: 0;
+    }
+  }
+
+  .ins-sub-head {
+    margin: 0 0 -0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--sub);
+  }
+}
