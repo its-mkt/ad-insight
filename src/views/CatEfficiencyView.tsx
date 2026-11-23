@@ -331,6 +331,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
       {/* 1차를 고르면 그 안의 2차끼리, 아니면 1차끼리 비교한다 (최고 효율 KPI 와 같은 단위) */}
       <InsightPanel
         name="cat-eff"
+        aiPage="카테고리 효율"
         items={categoryInsights(catFilter.cat1 ? catData.filter((c) => c.k.includes(' > ')) : groupCat1(catData))}
         basis={catFilter.cat1 ? `${periodLabel} · ${catFilter.cat1}` : periodLabel}
         foot={INSIGHT_FOOT_CAT}

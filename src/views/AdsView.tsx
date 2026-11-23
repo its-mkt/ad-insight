@@ -347,6 +347,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
       {/* 아래 매체별 성과 표와 같은 기간·비교 기준 */}
       <InsightPanel
         name="ads"
+        aiPage="매체 광고비"
         items={mediaInsights(statsRows, statsPrev, allPeriod ? undefined : statsCmp)}
         basis={statsLabel}
         foot={INSIGHT_FOOT_MEDIA}

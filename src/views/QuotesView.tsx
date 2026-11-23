@@ -373,6 +373,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
       {!allPeriod && (
         <InsightPanel
           name="quotes"
+          aiPage="견적 상세"
           items={quoteInsights(
             kpiQuotes,
             yearTotal ? quotes.filter(inMonths(lastYrMonths)) : quotes.filter((r) => r.month === pv),

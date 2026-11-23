@@ -428,6 +428,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       <InsightPanel
         name="overview"
+        aiPage="종합 요약"
         items={insights}
         basis={insightBasis}
         foot={INSIGHT_FOOT_CAT_KW}

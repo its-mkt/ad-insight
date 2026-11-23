@@ -400,7 +400,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </KpiSection>
       )}
 
-      <InsightPanel name="search" items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
+      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
 
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'table' ? (
