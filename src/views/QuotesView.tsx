@@ -13,6 +13,8 @@ import {
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { quoteInsights, INSIGHT_FOOT_QUOTE } from '../utils/insights';
 import { quoteDetailsPending } from '../utils/quoteStats';
 import { inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
@@ -366,6 +368,20 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
           </>
         )}
       </KpiSection>
+
+      {/* KPI 와 같은 범위(달 → 전월·전월 동기간, 연도 → 전년 동기). 전체 기간은 비교 대상이 없어 뺀다 */}
+      {!allPeriod && (
+        <InsightPanel
+          name="quotes"
+          items={quoteInsights(
+            kpiQuotes,
+            yearTotal ? quotes.filter(inMonths(lastYrMonths)) : quotes.filter((r) => r.month === pv),
+            yearTotal ? '전년 동기' : cmp
+          )}
+          basis={kpiLabel}
+          foot={INSIGHT_FOOT_QUOTE}
+        />
+      )}
 
       <ChartTableToggle value={mode} onChange={setMode} />
 

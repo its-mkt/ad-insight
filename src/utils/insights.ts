@@ -157,10 +157,10 @@ export function categoryInsights(stats: Cat1Stat[]): Insight[] {
 
 const mediaName = (m: string): string => (m === 'Naver' ? '네이버' : m === 'Google' ? '구글' : m === 'Meta' ? '메타' : m);
 
-/** 키워드 축소·유지 추천 — 매체 전환(conv) 기준. 같은 매체·키워드는 광고그룹을 합쳐 본다 */
-export function keywordInsights(rows: KeywordRow[], months: string[]): Insight[] {
+/** 키워드 축소·유지 추천 — 매체 전환(conv) 기준. 같은 매체·키워드는 광고그룹을 합쳐 본다. months 를 안 주면 받은 행 전체 */
+export function keywordInsights(rows: KeywordRow[], months?: string[]): Insight[] {
   const map = new Map<string, { media: string; keyword: string; cost: number; clk: number; conv: number }>();
-  rows.filter(inMonths(months)).forEach((r) => {
+  (months ? rows.filter(inMonths(months)) : rows).forEach((r) => {
     if (!r.keyword) return;
     const key = `${r.media}\u0001${r.keyword}`;
     const cur = map.get(key) || { media: r.media, keyword: r.keyword, cost: 0, clk: 0, conv: 0 };
@@ -199,9 +199,197 @@ export function keywordInsights(rows: KeywordRow[], months: string[]): Insight[]
           tone: 'good',
           head: '키워드 유지',
           target: k.keyword,
-          text: `${mediaName(k.media)} · 전환 ${fmt(k.conv)}건, 전환당 ${fmt(k.cost / k.conv)}원으로 평균(${fmt(avgConvCost)}원)의 절반 이하 — 노출이 끊기지 않게 입찰을 유지·확대해 보세요.`,
+          text: `${mediaName(k.media)} · 전환 ${fmt(k.conv)}건, 전환당 ${fmt(k.cost / k.conv)}원으로 키워드 평균(${fmt(avgConvCost)}원)의 절반 이하 — 노출이 끊기지 않게 입찰을 유지·확대해 보세요.`,
         })
       );
   }
   return out;
+}
+
+/** 카드 아래 기준 설명 — 카테고리·키워드 추천을 함께 보여 주는 화면 */
+export const INSIGHT_FOOT_CAT_KW =
+  '※ 견적은 카테고리 효율 화면과 같은 기준, 키워드는 매체 전환 기준입니다. 견적이 3건 미만인 카테고리는 확대 추천에서 뺍니다.';
+export const INSIGHT_FOOT_CAT = '※ 견적은 위 표와 같은 기준입니다. 견적이 3건 미만인 카테고리는 확대 추천에서 뺍니다. \'기타\'는 평균에만 넣습니다.';
+export const INSIGHT_FOOT_KW = '※ 매체 전환(광고 플랫폼이 집계한 전환) 기준이며, 견적 건수와는 다릅니다.';
+export const INSIGHT_FOOT_MEDIA = '※ 매체 전환(광고 플랫폼이 집계한 전환) 기준입니다. 전환이 3건 미만인 매체는 비교하지 않습니다.';
+export const INSIGHT_FOOT_QUOTE = '※ 1차 카테고리·유입 경로별로 3건 이상, 30% 이상 달라진 것만 보여 줍니다.';
+
+/** 키워드 화면 요약 — 광고비·클릭·전환과 비교 기준 대비 증감 */
+export function adTotalsInsight(
+  cur: { cost: number; clk: number; conv: number },
+  prev: { cost: number; clk: number; conv: number } | null,
+  cmpLabel?: string
+): Insight | null {
+  if (cur.cost <= 0) return null;
+  const d = (c: number, p: number | undefined) => {
+    const v = cmpLabel && p != null ? pctChange(c, p) : null;
+    return v == null ? '' : `(${signedPct(v)})`;
+  };
+  const cpc = cur.clk > 0 ? cur.cost / cur.clk : 0;
+  const prevCpc = prev && prev.clk > 0 ? prev.cost / prev.clk : undefined;
+  const convCost = cur.conv > 0 ? cur.cost / cur.conv : 0;
+  const prevConvCost = prev && prev.conv > 0 ? prev.cost / prev.conv : undefined;
+  const parts = [
+    `광고비 ${fmt(cur.cost)}원${d(cur.cost, prev?.cost)}`,
+    `클릭 ${fmt(cur.clk)}회${d(cur.clk, prev?.clk)}`,
+    ...(cpc ? [`CPC ${fmt(cpc)}원${d(cpc, prevCpc)}`] : []),
+    `전환 ${fmt(cur.conv)}건${d(cur.conv, prev?.conv)}`,
+    ...(convCost ? [`전환당 ${fmt(convCost)}원${d(convCost, prevConvCost)}`] : []),
+  ];
+  return { tone: 'summary', head: '요약', text: `${parts.join(' · ')}${cmpLabel && prev ? ` (${cmpLabel} 대비)` : ''}.` };
+}
+
+interface MediaAgg {
+  cost: number;
+  clk: number;
+  conv: number;
+}
+
+const aggBy = <K extends string>(rows: SpendRow[], keyOf: (r: SpendRow) => K): Map<K, MediaAgg> => {
+  const map = new Map<K, MediaAgg>();
+  rows.forEach((r) => {
+    const k = keyOf(r);
+    const cur = map.get(k) || { cost: 0, clk: 0, conv: 0 };
+    cur.cost += r.cost;
+    cur.clk += r.clk;
+    cur.conv += r.conv;
+    map.set(k, cur);
+  });
+  return map;
+};
+
+/** 매체 광고비 화면 — 매체 간 전환당 비용 비교, 비용은 늘었는데 전환이 준 매체, 전환 없는 큰 캠페인 */
+export function mediaInsights(cur: SpendRow[], prev: SpendRow[] | null, cmpLabel?: string): Insight[] {
+  const totCost = sumBy(cur, (r) => r.cost);
+  if (totCost <= 0) return [];
+  const out: Insight[] = [];
+  const byMedia = aggBy(cur, (r) => r.media);
+
+  // 매체 간 전환당 비용 — 전환 3건 이상인 매체끼리만
+  const ranked = [...byMedia]
+    .filter(([, v]) => v.conv >= 3 && v.cost > 0)
+    .map(([m, v]) => ({ m, cpa: v.cost / v.conv, conv: v.conv, cost: v.cost }))
+    .sort((a, b) => a.cpa - b.cpa);
+  if (ranked.length >= 2) {
+    const best = ranked[0];
+    const worst = ranked[ranked.length - 1];
+    if (best.cpa <= worst.cpa * 0.7) {
+      out.push({
+        tone: 'good',
+        head: '매체 비교',
+        target: mediaName(best.m),
+        text: `전환당 ${fmt(best.cpa)}원으로 ${mediaName(worst.m)}(${fmt(worst.cpa)}원)보다 ${Math.round((1 - best.cpa / worst.cpa) * 100)}% 낮습니다 — 다음 달 ${mediaName(best.m)} 비중을 늘려 볼 만합니다.`,
+      });
+    }
+  }
+
+  // 비용은 10% 이상 늘었는데 전환은 줄어든 매체
+  if (prev && cmpLabel) {
+    const prevMedia = aggBy(prev, (r) => r.media);
+    byMedia.forEach((v, m) => {
+      const p = prevMedia.get(m);
+      if (!p || p.cost <= 0) return;
+      const costP = pctChange(v.cost, p.cost);
+      if (costP != null && costP >= 10 && v.conv < p.conv) {
+        out.push({
+          tone: 'bad',
+          head: '효율 하락',
+          target: mediaName(m),
+          text: `광고비는 ${cmpLabel}보다 ${costP.toFixed(0)}% 늘었지만 전환은 ${fmt(p.conv)}건 → ${fmt(v.conv)}건으로 줄었습니다 — 늘어난 예산이 어느 캠페인에 쓰였는지 확인해 보세요.`,
+        });
+      }
+    });
+  }
+
+  // 전환 없이 광고비 비중 5% 이상을 쓴 캠페인
+  const byCamp = aggBy(cur, (r) => `${r.media}\u0001${r.campaign}`);
+  [...byCamp]
+    .filter(([, v]) => v.conv === 0 && v.cost >= totCost * 0.05)
+    .sort((a, b) => b[1].cost - a[1].cost)
+    .slice(0, MAX_PER_GROUP)
+    .forEach(([k, v]) => {
+      const [m, camp] = k.split('\u0001');
+      out.push({
+        tone: 'bad',
+        head: '캠페인 점검',
+        target: camp || '(이름 없음)',
+        text: `${mediaName(m)} · 광고비 ${fmtWon(v.cost)}(전체의 ${Math.round((v.cost / totCost) * 100)}%), 클릭 ${fmt(v.clk)}회인데 전환 0건 — 예산·타기팅을 점검해 보세요.`,
+      });
+    });
+  return out;
+}
+
+/** 견적 상세 화면 — 1차 카테고리·유입 경로별 견적 증감 (3건 이상·30% 이상 달라진 것만) */
+export function quoteInsights(cur: QuoteRow[], prev: QuoteRow[], cmpLabel: string): Insight[] {
+  const out: Insight[] = [];
+  const sumByKey = (rows: QuoteRow[], keyOf: (r: QuoteRow) => string) => {
+    const o: Record<string, number> = {};
+    rows.forEach((r) => {
+      const k = keyOf(r);
+      if (k) o[k] = (o[k] || 0) + r.count;
+    });
+    return o;
+  };
+  const changes = (keyOf: (r: QuoteRow) => string) => {
+    const c = sumByKey(cur, keyOf);
+    const p = sumByKey(prev, keyOf);
+    return [...new Set([...Object.keys(c), ...Object.keys(p)])]
+      .map((k) => ({ k, cur: c[k] || 0, prev: p[k] || 0 }))
+      .filter((x) => x.k !== '기타' && Math.abs(x.cur - x.prev) >= 3 && (x.prev === 0 || Math.abs(x.cur - x.prev) / x.prev >= 0.3));
+  };
+
+  const cats = changes((r) => cat1Of(r.category || ''));
+  cats
+    .filter((x) => x.cur > x.prev)
+    .sort((a, b) => b.cur - b.prev - (a.cur - a.prev))
+    .slice(0, MAX_PER_GROUP)
+    .forEach((x) =>
+      out.push({
+        tone: 'good',
+        head: '견적 증가',
+        target: x.k,
+        category: x.k,
+        text: `${cmpLabel} ${fmt(x.prev)}건 → ${fmt(x.cur)}건 — 수요가 오르는 중이니 이 카테고리 광고 예산을 유지·확대해 볼 만합니다.`,
+      })
+    );
+  cats
+    .filter((x) => x.cur < x.prev)
+    .sort((a, b) => a.cur - a.prev - (b.cur - b.prev))
+    .slice(0, MAX_PER_GROUP)
+    .forEach((x) =>
+      out.push({
+        tone: 'bad',
+        head: '견적 감소',
+        target: x.k,
+        category: x.k,
+        text: `${cmpLabel} ${fmt(x.prev)}건 → ${fmt(x.cur)}건 — 광고 노출·키워드 순위·소재에 변화가 있었는지 점검해 보세요.`,
+      })
+    );
+
+  // '미수집'은 유입 경로가 아니라 기록 누락이라 뺀다
+  changes((r) => (r.source === '미수집' ? '' : r.source || ''))
+    .sort((a, b) => Math.abs(b.cur - b.prev) - Math.abs(a.cur - a.prev))
+    .slice(0, 2)
+    .forEach((x) =>
+      out.push({
+        tone: 'info',
+        head: '유입 경로',
+        target: x.k,
+        text: `${cmpLabel} ${fmt(x.prev)}건 → ${fmt(x.cur)}건으로 ${x.cur > x.prev ? '늘었습니다' : '줄었습니다'}.`,
+      })
+    );
+  return out;
+}
+
+/** 카테고리별 광고비·견적을 1차로 합친다 (카테고리 효율 화면의 2차 행 → 1차 추천) */
+export function groupCat1(items: { k: string; cost: number; quotes: number }[]): Cat1Stat[] {
+  const map = new Map<string, Cat1Stat>();
+  items.forEach(({ k, cost, quotes }) => {
+    const key = cat1Of(k);
+    const cur = map.get(key) || { k: key, cost: 0, quotes: 0 };
+    cur.cost += cost;
+    cur.quotes += quotes;
+    map.set(key, cur);
+  });
+  return [...map.values()];
 }

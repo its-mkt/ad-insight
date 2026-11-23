@@ -37,8 +37,8 @@ import { Card } from '../components/common/Card';
 import { cmpLabelOf, dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
-import { cat1Stats, categoryInsights, keywordInsights, summaryInsight, type InsightTotals } from '../utils/insights';
-import { InsightPanel } from '../components/overview/InsightPanel';
+import { cat1Stats, categoryInsights, keywordInsights, summaryInsight, INSIGHT_FOOT_CAT_KW, type InsightTotals } from '../utils/insights';
+import { InsightPanel } from '../components/common/InsightPanel';
 
 interface OverviewViewProps {
   data: DashboardData;
@@ -427,9 +427,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </KpiSection>
 
       <InsightPanel
+        name="overview"
         items={insights}
         basis={insightBasis}
-        onSelectCategory={onSearchName && ((k) => onSearchName(formatCategoryScope(k)))}
+        foot={INSIGHT_FOOT_CAT_KW}
+        onSelectCategory={onSearchName && ((k: string) => onSearchName(formatCategoryScope(k)))}
         onSelectKeyword={onSearchName}
       />
 

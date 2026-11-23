@@ -26,6 +26,8 @@ import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsT
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel, ymLabel } from '../utils/allPeriod';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { mediaInsights, INSIGHT_FOOT_MEDIA } from '../utils/insights';
 import { spendSeriesOf } from '../utils/chartSeries';
 
 interface AdsViewProps {
@@ -341,6 +343,14 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           </>
         )}
       </KpiSection>
+
+      {/* 아래 매체별 성과 표와 같은 기간·비교 기준 */}
+      <InsightPanel
+        name="ads"
+        items={mediaInsights(statsRows, statsPrev, allPeriod ? undefined : statsCmp)}
+        basis={statsLabel}
+        foot={INSIGHT_FOOT_MEDIA}
+      />
 
       <ChartTableToggle value={mode} onChange={setMode} />
 

@@ -36,6 +36,8 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, monthsUpTo, periodStartsOf, yearRangeLabel } from '../utils/allPeriod';
 import { useQuoteStats } from '../hooks/useQuoteStats';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { categoryInsights, groupCat1, INSIGHT_FOOT_CAT } from '../utils/insights';
 
 interface CatEfficiencyViewProps {
   data: DashboardData;
@@ -325,6 +327,14 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           detail={<KpiDetailItems items={[['광고비', fmtWon(totSpend)], ['견적', `${fmt(totQuotes)}건`]]} />}
         />
       </KpiSection>
+
+      {/* 1차를 고르면 그 안의 2차끼리, 아니면 1차끼리 비교한다 (최고 효율 KPI 와 같은 단위) */}
+      <InsightPanel
+        name="cat-eff"
+        items={categoryInsights(catFilter.cat1 ? catData.filter((c) => c.k.includes(' > ')) : groupCat1(catData))}
+        basis={catFilter.cat1 ? `${periodLabel} · ${catFilter.cat1}` : periodLabel}
+        foot={INSIGHT_FOOT_CAT}
+      />
 
       <div className="grid">
         <Card

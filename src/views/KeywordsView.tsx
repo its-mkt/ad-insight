@@ -27,6 +27,8 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, mergeKeywordMonths, monthsUpTo, uncollectedItems, yearRangeLabel, ymLabel } from '../utils/allPeriod';
 import { campaignBuckets, groupKeywordRows, withGroupTotals } from '../utils/keywordGroups';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { adTotalsInsight, keywordInsights, INSIGHT_FOOT_KW } from '../utils/insights';
 
 interface KeywordsViewProps {
   data: DashboardData;
@@ -253,6 +255,17 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
           detail={<KpiDetailItems items={[['건당', `${fmt(kpiAdCpa)}원`]]} />}
         />
       </KpiSection>
+
+      {/* 요약은 위 KPI 와 같은 값, 키워드 추천은 아래 키워드 표와 같은 범위(매체·유형·카테고리 필터). 키워드는 달 단위라 일·기간 보기에서는 요약만 */}
+      <InsightPanel
+        name="keywords"
+        items={[
+          ...[adTotalsInsight({ cost: totalCost, clk: totalClk, conv: totalConv }, hasPvData ? { cost: pvCost, clk: pvClk, conv: pvConv } : null, cmpLabel)].filter((x) => x != null),
+          ...(period ? [] : keywordInsights(activeGroups.flatMap((g) => g.list))),
+        ]}
+        basis={period ? period.label : periodLabel}
+        foot={INSIGHT_FOOT_KW}
+      />
 
       {allPeriod && (
         <ViewNote>
