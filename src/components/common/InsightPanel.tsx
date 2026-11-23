@@ -56,7 +56,7 @@ const InsightLine: React.FC<{ tone: InsightTone; head: string; target?: React.Re
 type AiState = { key: string; result?: AiInsightResult; error?: string; loading?: boolean };
 
 /**
- * KPI 아래의 자동 인사이트 — 핵심 요약 한 단락만 보이고, 추천·근거는 「자세히 보기」로 펼친다.
+ * KPI 아래의 자동 인사이트 — 핵심 요약 한 단락만 보이고, 추천은 「자세히 보기」로 펼친다.
  * aiPage 를 주면 화면을 열 때 Claude 요약을 받아 핵심 요약 자리에 둔다 (받는 동안·실패하면 규칙 요약).
  * 규칙 문장은 utils/insights 가 만든다.
  */
@@ -92,9 +92,10 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
 
   const view: AiState = ai.key === factsKey ? ai : { key: factsKey, loading: !!facts };
   const ruleSummary = items.find((it) => it.tone === 'summary');
-  // Claude 요약이 없으면 규칙 요약(없으면 첫 줄)을 핵심 요약 자리에 쓰고, 자세히 보기에서는 뺀다
+  // Claude 답이 있으면 추천이 규칙 문장을 이미 반영하므로 규칙 목록은 보여 주지 않는다.
+  // 없으면(받는 중·실패·aiPage 없음) 규칙 요약(없으면 첫 줄)을 핵심 요약 자리에 쓰고 나머지를 자세히 보기에 둔다
   const ruleKey = ruleSummary ?? items[0];
-  const details = view.result ? items : items.filter((it) => it !== ruleKey);
+  const details = view.result ? [] : items.filter((it) => it !== ruleKey);
   const detailCount = (view.result?.actions.length ?? 0) + details.length;
   const targetOf = (it: Insight) => {
     if (!it.target) return undefined;
@@ -156,7 +157,7 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
       {detailCount > 0 && (
         <div className="ins-more">
           <MoreButton
-            label={open ? '접기' : `자세히 보기 (추천·근거 ${detailCount}건)`}
+            label={open ? '접기' : `자세히 보기 (${view.result ? '추천' : '인사이트'} ${detailCount}건)`}
             open={open}
             onClick={() => setOpen((v) => !v)}
             dataBtn={`${name}-insight-more`}
@@ -187,16 +188,13 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
             </div>
           )}
           {details.length > 0 && (
-            <>
-              {view.result && <p className="ins-sub-head">근거 (수집 데이터 규칙 분석)</p>}
-              <ul className="ins-list">
-                {details.map((it, i) => (
-                  <InsightLine key={i} tone={it.tone} head={it.head} target={targetOf(it)} text={it.text} />
-                ))}
-              </ul>
-            </>
+            <ul className="ins-list">
+              {details.map((it, i) => (
+                <InsightLine key={i} tone={it.tone} head={it.head} target={targetOf(it)} text={it.text} />
+              ))}
+            </ul>
           )}
-          {foot && (
+          {foot && !view.result && (
             <Muted as="p" className="ins-foot">
               {foot}
             </Muted>
