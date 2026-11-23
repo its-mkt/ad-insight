@@ -32,6 +32,10 @@ import { BREAKDOWN_LIMIT, INQUIRY_WEB, breakdownOf, type KeywordSort } from '../
 import { SearchKeywordTable } from '../components/search/SearchKeywordTable';
 import { SearchQuoteBreakdown } from '../components/search/SearchQuoteBreakdown';
 import { SearchQuoteTable } from '../components/search/SearchQuoteTable';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { useQuoteStats } from '../hooks/useQuoteStats';
+import { cpaInMonths, cpaSince } from '../utils/cpa';
+import { keywordInsights, quoteInsights, quoteRowsOfRaw, scopeCpaInsight, summaryInsight, INSIGHT_FOOT_SEARCH } from '../utils/insights';
 
 interface SearchViewProps {
   data: DashboardData;
@@ -95,6 +99,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     const prevMonths = compareMonthsOf({ allPeriod, yearTotal, months: months || [], curM: selectedMonth });
     return searchDashboard(data, categoryMap, query, prevMonths);
   }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
+  // 자동 인사이트의 '전체 평균 CPA' — 검색 결과 CPA 와 같은 견적 범위(아이티켓+다른 사이트·전화문의)
+  const quoteStats = useQuoteStats(data);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
   const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
@@ -260,6 +266,26 @@ export const SearchView: React.FC<SearchViewProps> = ({
     if ((cmpLabel || !items.length) && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
     return items.length ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['건수', '0건']]} />;
   };
+  // 자동 인사이트 — 위 KPI 와 같은 값으로 요약하고, 검색 범위 CPA 를 같은 기간 전체 평균과 비교한다.
+  // 유입 매체 검색은 광고비·CPA 가 없어 견적만, 키워드는 달 단위라 일·기간 보기에서는 뺀다
+  const scopeCpa = !sourceScope && !result.cpaHidden ? result.cpa : 0;
+  const overallCpa = months ? cpaInMonths(data.spend, quoteStats.quotes, months, cpaFrom) : cpaSince(data.spend, quoteStats.quotes, cpaFrom).cpa;
+  const searchSummary = summaryInsight({
+    spend: sourceScope ? 0 : result.cost,
+    prevSpend: prevResult && !sourceScope ? prevResult.cost : null,
+    quotes: result.quotes.length,
+    prevQuotes: prevResult ? prevResult.quotes.length : null,
+    cpa: scopeCpa,
+    prevCpa: prevResult && scopeCpa ? prevResult.cpa || null : null,
+    cmpLabel,
+  });
+  const searchCpa = dayRange ? null : scopeCpaInsight(query, scopeCpa, overallCpa);
+  const searchInsights = [
+    ...(searchSummary ? [searchSummary] : []),
+    ...(searchCpa ? [searchCpa] : []),
+    ...(dayRange || sourceScope ? [] : keywordInsights(result.keywords)),
+    ...(prevResult && cmpLabel ? quoteInsights(quoteRowsOfRaw(result.quotes), quoteRowsOfRaw(prevResult.quotes), cmpLabel) : []),
+  ];
   const monthlyTotal = axis.map((key) => sumBy(chartQuotesAt(key), (r) => r.count));
 
   return (
@@ -373,6 +399,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
         />
       </KpiSection>
       )}
+
+      <InsightPanel name="search" items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
 
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'table' ? (

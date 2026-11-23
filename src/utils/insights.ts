@@ -60,7 +60,8 @@ export function summaryInsight(t: InsightTotals): Insight | null {
     const p = t.cmpLabel ? pctChange(cur, prev) : null;
     parts.push(p == null ? `${label} ${value}` : `${label} ${value}(${signedPct(p)})`);
   };
-  withDelta('광고비', `${fmt(t.spend)}원`, t.spend, t.prevSpend);
+  // 유입 매체 검색처럼 광고비가 없는 범위는 견적만 말한다 ('광고비 0원'으로 읽히지 않게)
+  if (t.spend > 0) withDelta('광고비', `${fmt(t.spend)}원`, t.spend, t.prevSpend);
   withDelta('견적', `${fmt(t.quotes)}건`, t.quotes, t.prevQuotes);
   if (t.cpa > 0) withDelta('CPA', `${fmt(t.cpa)}원`, t.cpa, t.prevCpa);
 
@@ -393,3 +394,32 @@ export function groupCat1(items: { k: string; cost: number; quotes: number }[]):
   });
   return [...map.values()];
 }
+
+/** 검색 결과 — 검색한 범위의 추정 CPA 를 같은 기간 전체 평균 CPA 와 비교한다 (±20% 안이면 말하지 않음) */
+export function scopeCpaInsight(query: string, scopeCpa: number, overallCpa: number): Insight | null {
+  if (scopeCpa <= 0 || overallCpa <= 0) return null;
+  const ratio = scopeCpa / overallCpa;
+  if (ratio <= 0.8) {
+    return {
+      tone: 'good',
+      head: '확대 검토',
+      target: query,
+      text: `추정 CPA ${fmt(scopeCpa)}원으로 같은 기간 전체 평균(${fmt(overallCpa)}원)보다 ${Math.round((1 - ratio) * 100)}% 낮습니다 — 예산 비중을 늘려 볼 만합니다.`,
+    };
+  }
+  if (ratio >= 1.2) {
+    return {
+      tone: 'bad',
+      head: '축소 검토',
+      target: query,
+      text: `추정 CPA ${fmt(scopeCpa)}원으로 같은 기간 전체 평균(${fmt(overallCpa)}원)의 ${ratio.toFixed(1)}배입니다 — 아래 키워드·광고그룹 중 전환 없는 곳부터 줄여 보세요.`,
+    };
+  }
+  return null;
+}
+
+export const INSIGHT_FOOT_SEARCH = '※ 검색어와 일치한 광고그룹·키워드·견적만으로 계산합니다. CPA는 추정이며, 키워드는 매체 전환 기준입니다.';
+
+/** 견적 원장 행(1건씩)을 집계 행으로 — quoteInsights 에 넘길 때 쓴다 */
+export const quoteRowsOfRaw = (rows: { date: string; category: string; source: string }[]): QuoteRow[] =>
+  rows.map((r) => ({ month: (r.date || '').slice(0, 7), category: r.category || '', source: r.source || '', count: 1 }));
