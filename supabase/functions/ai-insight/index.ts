@@ -1,7 +1,7 @@
 // AI 인사이트 — 화면이 이미 계산한 숫자(KPI·규칙 인사이트)를 Claude 에 보내 요약·추천 문장을 받는다.
 // 배포: supabase functions deploy ai-insight   (비밀값: supabase secrets set ANTHROPIC_API_KEY=...)
 // 숫자는 화면이 넘긴 것만 쓰게 하고(새 숫자 금지), 견적 고객 정보는 화면에서 아예 보내지 않는다.
-import Anthropic from 'npm:@anthropic-ai/sdk';
+import Anthropic from 'npm:@anthropic-ai/sdk@1.12.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const MODEL = 'claude-opus-5-5';
