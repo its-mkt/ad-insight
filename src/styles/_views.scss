@@ -3215,3 +3215,97 @@ tr.kw-more-row td {
     margin-top: 1.25rem;
   }
 }
+
+/* ── 종합 요약: 자동 인사이트 (KPI 아래) ── */
+.card-overview-insight {
+  .ins-title-ic {
+    color: var(--acc);
+  }
+
+  .ins-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .ins-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    border-left: 3px solid var(--line2);
+    background: color-mix(in srgb, var(--line) 35%, var(--card));
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  // 확대·유지는 초록, 축소·점검은 경고색 (증감 붉은/푸른색과 겹치지 않게)
+  .ins-summary {
+    border-left-color: var(--acc);
+    background: color-mix(in srgb, var(--acc) 6%, var(--card));
+  }
+
+  .ins-good {
+    border-left-color: var(--ok);
+  }
+
+  .ins-bad {
+    border-left-color: var(--warn);
+  }
+
+  .ins-ic {
+    flex: none;
+    margin-top: 0.2rem;
+    color: var(--sub);
+  }
+
+  .ins-summary .ins-ic {
+    color: var(--acc);
+  }
+
+  .ins-good .ins-ic {
+    color: var(--ok);
+  }
+
+  .ins-bad .ins-ic {
+    color: var(--warn);
+  }
+
+  .ins-body {
+    min-width: 0;
+    color: var(--ink2);
+  }
+
+  .ins-head {
+    margin-right: 0.5rem;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .ins-target {
+    margin-right: 0.375rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  button.ins-target {
+    cursor: pointer;
+    color: var(--accink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: var(--acc);
+    }
+  }
+
+  .ins-foot {
+    margin: 0.75rem 0 0;
+  }
+}
