@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { toggledSet } from '../utils/toggleSet';
 import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, mLabel, sourceColorVar, sumBy } from '../utils/format';
+import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, isOpenPeriod, mLabel, sourceColorVar, sumBy } from '../utils/format';
 import { compareMonthsOf, dotYm, monthsUpTo, periodStartsOf, yearRangeLabel, yearsOf, ymLabel } from '../utils/allPeriod';
 import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
-import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
+import { monthOfDay, monthsOfRange, rangeLabel, type DayRange, type MonthToDateCompare } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
 import { campaignBuckets } from '../utils/keywordGroups';
 import { mediaKo } from '../utils/constants';
@@ -32,6 +32,11 @@ import { BREAKDOWN_LIMIT, INQUIRY_WEB, breakdownOf, type KeywordSort } from '../
 import { SearchKeywordTable } from '../components/search/SearchKeywordTable';
 import { SearchQuoteBreakdown } from '../components/search/SearchQuoteBreakdown';
 import { SearchQuoteTable } from '../components/search/SearchQuoteTable';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { aiOpenDay, isClosedAiPeriod, searchAiData } from '../utils/aiFacts';
+import { useQuoteStats } from '../hooks/useQuoteStats';
+import { cpaInMonths, cpaSince } from '../utils/cpa';
+import { keywordInsights, quoteInsights, quoteRowsOfRaw, scopeCpaInsight, summaryInsight, INSIGHT_FOOT_SEARCH } from '../utils/insights';
 
 interface SearchViewProps {
   data: DashboardData;
@@ -46,6 +51,10 @@ interface SearchViewProps {
   dayRange?: DayRange | null;
   /** 일·기간의 광고비가 일별 자료로 정확히 모인 상태 (아니면 걸친 달 전체) */
   dayCovered?: boolean;
+  /** 진행 중인 달 보기의 비교 기준 — 주면 data 의 전달 자리가 전월 동기간 값이고, 증감을 전월 동기간 대비로 표기한다 */
+  compare?: MonthToDateCompare;
+  /** compare 가 있을 때 추이 차트를 그릴 원본 월 데이터 (전달도 한 달 전체) */
+  monthly?: DashboardData;
   /** 견적 목록을 볼 수 있는 계정인지 (승인된 계정 — 아니면 로그인 안내) */
   isLoggedIn: boolean;
   onLogin: () => void;
@@ -68,6 +77,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   yearTotal = false,
   dayRange = null,
   dayCovered = false,
+  compare,
+  monthly,
   isLoggedIn,
   onLogin,
   onSelectAllPeriod,
@@ -86,8 +97,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
     [allPeriod, dayRange, selectedMonth]
   );
   const chartResult = useMemo(
-    () => (query && !allPeriod && !yearTotal ? searchDashboard(data, categoryMap, query, chartMonths) : result),
-    [data, categoryMap, query, allPeriod, yearTotal, chartMonths, result]
+    // 추이는 달마다 한 달 전체로 그린다 — 진행 중인 달 비교용 data 는 전달이 동기간 값으로 바뀌어 있어 원본(monthly)을 쓴다
+    () => (query && !allPeriod && !yearTotal ? searchDashboard(monthly ?? data, categoryMap, query, chartMonths) : result),
+    [data, monthly, categoryMap, query, allPeriod, yearTotal, chartMonths, result]
   );
   // 비교 기간: 한 달이면 전월, 연도 합계면 전년 동기, 전체 기간은 비교 없음 (종합 요약 KPI 와 같은 기준)
   const prevResult = useMemo(() => {
@@ -95,6 +107,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     const prevMonths = compareMonthsOf({ allPeriod, yearTotal, months: months || [], curM: selectedMonth });
     return searchDashboard(data, categoryMap, query, prevMonths);
   }, [data, categoryMap, query, allPeriod, dayRange, yearTotal, months, selectedMonth]);
+  // 자동 인사이트의 '전체 평균 CPA' — 검색 결과 CPA 와 같은 견적 범위(아이티켓+다른 사이트·전화문의)
+  const quoteStats = useQuoteStats(data);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
   const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
@@ -150,7 +164,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       <View name="search" title={TITLE}>
         <ViewHeader title={`"${query}" ${TITLE}`} highlight={query} description={DESCRIPTION} status={status} />
         <Card name="empty" id="search-empty">
-          <EmptyState message={`${periodLabel}에 "${query}"와 일치하는 결과가 없습니다.`} subMessage={SEARCH_HINT} />
+          <EmptyState message={`${periodLabel}에 "${query}" 검색 결과가 없습니다.`} subMessage={SEARCH_HINT} />
           {!allPeriod && (
             <div className="search-actions">
               <Button size="sm" className="btn-search-all" id="btn-search-all" data-btn="search-all" onClick={onSelectAllPeriod}>
@@ -210,7 +224,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const cpaFrom = periodStartsOf(data).cpaFrom;
   // 카드 제목용 짧은 기간 (예: 11월, 전체 기간)
   const kpiPeriod = dayRange || allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
-  const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : '전월') : undefined;
+  const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : compare ? compare.cmpLabel : '전월') : undefined;
   // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 견적과 같은 규칙으로 제품명·제품 카테고리가 일치한 주문 수
   const periodSales = result.sales;
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
@@ -260,7 +274,44 @@ export const SearchView: React.FC<SearchViewProps> = ({
     if ((cmpLabel || !items.length) && top) items.unshift(['건수', `${fmt(top[1])}건 (${fmtShare((top[1] / result.quotes.length) * 100)})`]);
     return items.length ? <KpiDetailItems items={items} /> : <KpiDetailItems items={[['건수', '0건']]} />;
   };
+  // 자동 인사이트 — 위 KPI 와 같은 값으로 요약하고, 검색 범위 CPA 를 같은 기간 전체 평균과 비교한다.
+  // 유입 매체 검색은 광고비·CPA 가 없어 견적만, 키워드는 달 단위라 일·기간 보기에서는 뺀다
+  const scopeCpa = !sourceScope && !result.cpaHidden ? result.cpa : 0;
+  const overallCpa = months ? cpaInMonths(data.spend, quoteStats.quotes, months, cpaFrom) : cpaSince(data.spend, quoteStats.quotes, cpaFrom).cpa;
+  const searchSummary = summaryInsight({
+    spend: sourceScope ? 0 : result.cost,
+    prevSpend: prevResult && !sourceScope ? prevResult.cost : null,
+    quotes: result.quotes.length,
+    prevQuotes: prevResult ? prevResult.quotes.length : null,
+    cpa: scopeCpa,
+    prevCpa: prevResult && scopeCpa ? prevResult.cpa || null : null,
+    cmpLabel,
+  });
+  const searchCpa = dayRange ? null : scopeCpaInsight(query, scopeCpa, overallCpa);
+  const searchInsights = [
+    ...(searchSummary ? [searchSummary] : []),
+    ...(searchCpa ? [searchCpa] : []),
+    ...(dayRange || sourceScope ? [] : keywordInsights(result.keywords)),
+    ...(prevResult && cmpLabel ? quoteInsights(quoteRowsOfRaw(result.quotes), quoteRowsOfRaw(prevResult.quotes), cmpLabel) : []),
+  ];
   const monthlyTotal = axis.map((key) => sumBy(chartQuotesAt(key), (r) => r.count));
+  // Claude 분석에 함께 보낼 수치 — KPI·비교·추이·견적 구성·상위 캠페인·키워드 (고객 정보·담당자 이름은 넣지 않는다)
+  const searchAi = searchAiData({
+    query,
+    result,
+    prevResult,
+    cmpLabel,
+    // 전월 동기간 비교(compare)가 있으면 비교 기간이 이미 같은 날짜까지라 따로 자르지 않는다
+    openDay: compare ? undefined : aiOpenDay({ selectedMonth, allPeriod, yearTotal, dayRange }),
+    months,
+    allSpend: data.spend,
+    allQuotes: quoteStats.quotes,
+    overallCpa,
+    sourceScope,
+    trend: { labels: axisLabels, spend: axis.map((key) => sumBy(chartSpendAt(key), (r) => r.cost)), quotes: monthlyTotal },
+    breakdowns: breakdowns.slice(0, 3),
+    campaigns,
+  });
 
   return (
     <View name="search" title={TITLE}>
@@ -276,7 +327,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만(2026.10~ 추적) · 광고비·CPA 없음
+          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만 (2026.10.12부터 추적) · 광고비·CPA 없음
         </ViewNote>
       ) : (
       <ViewNote>
@@ -374,6 +425,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </KpiSection>
       )}
 
+      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} aiData={searchAi} aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: dayRange?.to })} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
+
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'table' ? (
         <>
@@ -418,6 +471,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             labels={axisLabels}
             series={[{ k: sourceScope, c: sourceColorVar(sourceScope), v: monthlyTotal }].filter((s) => s.v.some((x) => x))}
             unit="건"
+            partialLast={isOpenPeriod(axis.at(-1))}
             emptyMessage="일치하는 견적이 없습니다."
           />
         ) : (
@@ -427,6 +481,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             labels={axisLabels}
             series={spendSeries}
             unit="만원"
+            partialLast={isOpenPeriod(axis.at(-1))}
             emptyMessage="일치하는 광고비가 없습니다."
           />
         )}
@@ -436,6 +491,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           labels={axisLabels}
           series={quoteSeries}
           unit="건"
+          partialLast={isOpenPeriod(axis.at(-1))}
           emptyMessage="일치하는 견적이 없습니다."
         />
       </div>
@@ -509,7 +565,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             )}
             <TableFootnote
               unit="건"
-              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 (매체 추적은 2026년 10월부터)"
+              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 (매체 추적은 2026.10.12부터)"
             />
           </>
         )}

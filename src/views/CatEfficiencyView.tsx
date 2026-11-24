@@ -36,6 +36,9 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, monthsUpTo, periodStartsOf, yearRangeLabel } from '../utils/allPeriod';
 import { useQuoteStats } from '../hooks/useQuoteStats';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
+import { categoryInsights, groupCat1, INSIGHT_FOOT_CAT } from '../utils/insights';
 
 interface CatEfficiencyViewProps {
   data: DashboardData;
@@ -86,7 +89,7 @@ function memoByKey(f: (k: string) => number): (k: string) => number {
 
 /** 화면 설명 — 아이티켓은 zbyhp·cadkorea·전화문의 견적을 합산하고, 다른 사이트는 그 사이트 견적만 */
 const catEffDescription = (site?: SiteId) =>
-  `카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 ${site === 'oncore' ? '온코어' : '아이티켓·zbyhp·cadkorea·전화문의 합산'})`;
+  `카테고리별 광고비 소진 대비 견적 획득 성과 및 견적당 광고비(CPA) 비교 (견적은 ${site === 'oncore' ? '온코어' : '아이티켓·zbyhp·cadkorea·전화문의 합산'})`;
 
 export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   data,
@@ -325,6 +328,17 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
           detail={<KpiDetailItems items={[['광고비', fmtWon(totSpend)], ['견적', `${fmt(totQuotes)}건`]]} />}
         />
       </KpiSection>
+
+      {/* 1차를 고르면 그 안의 2차끼리, 아니면 1차끼리 비교한다 (최고 효율 KPI 와 같은 단위) */}
+      <InsightPanel
+        name="cat-eff"
+        aiPage="카테고리 효율"
+        aiScope={[catFilter.cat1, catFilter.cat2].join('/')}
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
+        items={categoryInsights(catFilter.cat1 ? catData.filter((c) => c.k.includes(' > ')) : groupCat1(catData))}
+        basis={catFilter.cat1 ? `${periodLabel} · ${catFilter.cat1}` : periodLabel}
+        foot={INSIGHT_FOOT_CAT}
+      />
 
       <div className="grid">
         <Card

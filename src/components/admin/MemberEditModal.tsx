@@ -89,7 +89,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({ target, onClos
             취소
           </Button>
           <Button type="submit" variant="primary" disabled={!dirty || saving} data-btn="member-edit-save">
-            {saving ? '저장하는 중' : '저장'}
+            {saving ? '저장 중...' : '저장'}
           </Button>
         </div>
       </form>

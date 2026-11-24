@@ -10,9 +10,13 @@ import {
   quoteCat1Order,
   sumBy,
   ym,
+  isOpenPeriod,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
+import { quoteInsights, INSIGHT_FOOT_QUOTE } from '../utils/insights';
 import { quoteDetailsPending } from '../utils/quoteStats';
 import { inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
@@ -61,7 +65,7 @@ const QUOTES_SOURCES: SourceLinkItem[] = [
 ];
 
 /** 견적 상세 제목·설명 — 아이티켓은 zbyhp·cadkorea·전화문의를 합산하고, 다른 사이트는 그 사이트 견적만 */
-const quotesTitle = (site?: SiteId) => (site === 'oncore' ? '온코어 견적 상세 현황' : 'ITKET 견적 상세 현황');
+const quotesTitle = (site?: SiteId) => (site === 'oncore' ? '온코어 견적 상세 현황' : '아이티켓 견적 상세 현황');
 const quotesDescription = (site?: SiteId) =>
   site === 'oncore' ? '온코어 견적의 월별·카테고리별 유입 추이' : '아이티켓·zbyhp·cadkorea 견적과 전화문의의 월별·카테고리별 유입 추이';
 
@@ -295,7 +299,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
 
       {allPeriod && (
         <ViewNote>
-          ※ 전체 기간 합산. 견적은 {dotYm(firstM)}부터, 유입 매체는 2026년 10월부터 추적합니다.
+          ※ 전체 기간 합산. 견적은 {dotYm(firstM)}부터, 유입 매체는 2026.10.12부터 추적합니다.
         </ViewNote>
       )}
 
@@ -367,11 +371,27 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
         )}
       </KpiSection>
 
+      {/* KPI 와 같은 범위(달 → 전월·전월 동기간, 연도 → 전년 동기). 전체 기간은 비교 대상이 없어 뺀다 */}
+      {!allPeriod && (
+        <InsightPanel
+          name="quotes"
+          aiPage="견적 상세"
+          aiClosed={isClosedAiPeriod({ selectedMonth, yearTotal, dayTo: period?.range.to })}
+          items={quoteInsights(
+            kpiQuotes,
+            yearTotal ? quotes.filter(inMonths(lastYrMonths)) : quotes.filter((r) => r.month === pv),
+            yearTotal ? '전년 동기' : cmp
+          )}
+          basis={kpiLabel}
+          foot={INSIGHT_FOOT_QUOTE}
+        />
+      )}
+
       <ChartTableToggle value={mode} onChange={setMode} />
 
       {/* 추이는 여러 기간을 비교할 때만 의미가 있어 '전체'(연도 합계·전체 기간)에서만 보여 준다 */}
       {showTrendChart && (mode === 'chart' ? (
-        <MultiChart id="chQuote" title={trendTitle} labels={labels} series={series} unit="건" />
+        <MultiChart id="chQuote" title={trendTitle} labels={labels} series={series} unit="건" partialLast={isOpenPeriod(axisKeys.at(-1))} />
       ) : (
         <TrendTable id="quotes-trend" title={trendTitle} nameLabel="카테고리" labels={labels} series={trendTableSeries} />
       ))}
@@ -383,7 +403,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
           ) : (
             <SourceShareTable items={srcItems} emptyMessage="취합된 실제 유입 매체 데이터가 없습니다." />
           )}
-          <ViewNote>※ 유입 경로가 확인된 건만 집계 (2026.10.12부터 추적)</ViewNote>
+          <ViewNote>※ 유입경로가 확인된 건만 집계 (2026.10.12부터 추적)</ViewNote>
         </Card>
         <Card name="quotes-origin" id="quotes-origin" title="접수처 비중" subtitle={`(${listPeriod} · ${fmt(listRows.length)}건)`}>
           {mode === 'chart' ? (

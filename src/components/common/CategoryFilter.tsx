@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { trackCategoryFilter } from '../../lib/usage';
-import { CATEGORY_HIERARCHY } from '../../utils/constants';
+import { CATEGORY_HIERARCHY, type CatHierarchyNode } from '../../utils/constants';
 import { parseCatParts } from '../../utils/format';
+import { CategoryHierarchyContext } from '../../utils/categoryHierarchy';
 import { Dropdown, type DropdownOption } from './Dropdown';
 
 /** 1차·2차 카테고리 선택 상태. 1차를 바꾸면 2차는 '전체'로 돌아간다 (뷰 최상단에서 호출) */
@@ -13,7 +14,9 @@ export function useCategoryFilterState() {
     setCat2('');
   };
   useTrackCategoryFilter(cat1, cat2);
-  return { cat1, cat2, setCat1, setCat2 };
+  // 사이트마다 다른 분류표 (아이티켓 분류표 · 온코어 데이터의 분류)
+  const hierarchy = useContext(CategoryHierarchyContext);
+  return { cat1, cat2, setCat1, setCat2, hierarchy };
 }
 
 /**
@@ -44,12 +47,14 @@ export interface CategoryFilterModel {
  */
 export function buildCategoryFilter(
   keys: string[],
-  state: ReturnType<typeof useCategoryFilterState>
+  state: { cat1: string; cat2: string; setCat1: (v: string) => void; setCat2: (v: string) => void; hierarchy?: CatHierarchyNode[] },
+  /** 항상 보여 줄 분류표 — 사이트마다 다르다 (utils/categoryHierarchy). 기본은 state 의 분류표(useCategoryFilterState 가 사이트 것을 넣는다), 없으면 아이티켓 분류표 */
+  hierarchy: CatHierarchyNode[] = state.hierarchy ?? CATEGORY_HIERARCHY
 ): CategoryFilterModel {
   // 1차: 분류표(CATEGORY_HIERARCHY) 전체를 항상 보여 주고, 데이터에만 있는 값(옛 견적 분류 등)은 뒤에 붙인다
   const cat1Set = [
     ...new Set([
-      ...CATEGORY_HIERARCHY.map((n) => n.cat1),
+      ...hierarchy.map((n) => n.cat1),
       ...keys.map((k) => parseCatParts(k).cat1),
     ]),
   ];
@@ -65,7 +70,7 @@ export function buildCategoryFilter(
           .filter(Boolean)
       ),
     ];
-    const known = CATEGORY_HIERARCHY.find((n) => n.cat1 === c1)?.cat2 ?? [];
+    const known = hierarchy.find((n) => n.cat1 === c1)?.cat2 ?? [];
     return [...known, ...inData.filter((c) => !known.includes(c))];
   };
   const cat2Set = cat1 ? cat2Of(cat1) : [];

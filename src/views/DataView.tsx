@@ -65,11 +65,11 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
     {
       media: '견적',
       variant: 'it',
-      titleSuffix: 'ITKET · 캐드코리아 · ZbyHP · 전화상담',
+      titleSuffix: '아이티켓 · zbyhp · cadkorea · 전화문의',
       desc: '견적 일시·카테고리·유입 매체',
       method: '쇼핑몰(고도몰5) 견적 접수 즉시 웹훅·시트 자동 적재',
       liveSummary: `원장 ${fmt(totalQuotesCount)}건 · 월별 요약 ${fmt(data.quotes.length)}행`,
-      statusLabel: totalQuotesCount > 0 ? '실시간 자동' : '수집 대기',
+      statusLabel: totalQuotesCount > 0 ? '정상 연동' : '수집 대기',
       statusCls: totalQuotesCount > 0 ? 'ok' : 'chk',
     },
     {
@@ -79,7 +79,7 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
       desc: '쇼핑검색 캠페인 · 수수료·프로모션비',
       method: '검색광고 쇼핑검색 + 커머스 API 자동 적재',
       liveSummary: `쇼핑검색 ${fmt(storeSpendRows.length)}행 (${fmt(sumBy(storeSpendRows, (r) => r.cost))}원)${storeManualRows.length ? ` · 정산 ${storeManualRows.length}행` : ''}`,
-      statusLabel: storeSpendRows.length > 0 || storeManualRows.length > 0 ? 'API 자동 연동' : '수집 대기',
+      statusLabel: storeSpendRows.length > 0 || storeManualRows.length > 0 ? '정상 연동' : '수집 대기',
       statusCls: storeSpendRows.length > 0 || storeManualRows.length > 0 ? 'ok' : 'chk',
     },
     {
@@ -89,7 +89,7 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
       desc: '제조사(HPE 등) 협약 지원금 캠페인',
       method: '네이버·구글 검색광고 API → MDF 캠페인 자동 집계',
       liveSummary: `MDF 캠페인 ${fmt(mdfSpendRows.length)}행 (${fmt(sumBy(mdfSpendRows, (r) => r.cost))}원)${mdfManualRows.length ? ` · 수동 ${mdfManualRows.length}행` : ''}`,
-      statusLabel: mdfSpendRows.length > 0 || mdfManualRows.length > 0 ? 'API 자동 연동' : '수집 대기',
+      statusLabel: mdfSpendRows.length > 0 || mdfManualRows.length > 0 ? '정상 연동' : '수집 대기',
       statusCls: mdfSpendRows.length > 0 || mdfManualRows.length > 0 ? 'ok' : 'chk',
     },
     {
@@ -115,7 +115,7 @@ export const DataView: React.FC<DataViewProps> = ({ data, categoryMap, status, l
         naverDaRows.length > 0
           ? `월별 ${fmt(naverDaRows.length)}행 (${fmt(sumBy(naverDaRows, (r) => r.cost))}원)`
           : '해당 기간 GFA 집행 내역 없음 (0행)',
-      statusLabel: naverDaRows.length > 0 ? '무인 수집' : '집행 없음',
+      statusLabel: naverDaRows.length > 0 ? '정상 연동' : '집행 없음',
       statusCls: naverDaRows.length > 0 ? 'ok' : 'man',
     },
     {

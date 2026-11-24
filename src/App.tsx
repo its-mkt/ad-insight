@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteId, ViewId } from './types/dashboard';
 import { VALID_VIEWS, VIEW_TITLES } from './utils/constants';
-import { normalizeRoutePath, parseRoute, routePath } from './utils/route';
+import { normalizeRoutePath, parseRoute, routePath, SITES } from './utils/route';
 import { prevM, THIS_M, THIS_Y } from './utils/format';
 import { fetchDailyHist, siteConnected, useDashboardData } from './hooks/useDashboardData';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -11,7 +11,7 @@ import { PeriodNav } from './components/common/PeriodNav';
 import { lastMonthOfYear, TOTAL_PERIOD_VIEWS } from './utils/allPeriod';
 
 /** 진행 중인 달을 전월 동기간과 비교하는 화면 (광고비·견적 증감을 보여 주는 화면) */
-const MTD_COMPARE_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes'];
+const MTD_COMPARE_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes', 'search'];
 import { categoryOfQuery, type SearchTab } from './utils/search';
 import { addRecentSearch, clearRecentSearches, loadFavoriteSearches, sameSearch, toggleFavoriteSearch } from './utils/recentSearches';
 import { Star } from 'lucide-react';
@@ -41,6 +41,8 @@ import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withPrev
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
+import { AiInsightContext } from './lib/aiInsight';
+import { CategoryHierarchyContext, categoryHierarchyOf } from './utils/categoryHierarchy';
 
 /** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
 const cmpRangeText = (r: DayRange): string => {
@@ -67,8 +69,9 @@ export const App: React.FC = () => {
   const wasLoggedIn = useRef(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   // 로그인 상태마다 목록이 따로라 바뀌면 다시 읽는다
-  useEffect(() => setFavorites(loadFavoriteSearches(isLoggedIn)), [isLoggedIn]);
-  const toggleFavorite = (query: string) => setFavorites(toggleFavoriteSearch(query, isLoggedIn));
+  // 즐겨찾기·최근 검색어는 사이트마다 따로 둔다
+  useEffect(() => setFavorites(loadFavoriteSearches(isLoggedIn, site)), [isLoggedIn, site]);
+  const toggleFavorite = (query: string) => setFavorites(toggleFavoriteSearch(query, isLoggedIn, site));
   const queryIsFavorite = favorites.some((q) => sameSearch(q, searchQuery));
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getThemeMode);
@@ -308,7 +311,7 @@ export const App: React.FC = () => {
     tab?: SearchTab,
     opts?: { record?: boolean }
   ) => {
-    if (opts?.record !== false) addRecentSearch(query, isLoggedIn);
+    if (opts?.record !== false) addRecentSearch(query, isLoggedIn, site);
     setSearchQuery(query);
     setSearchTab(tab);
     setSearchOpen(false);
@@ -350,7 +353,7 @@ export const App: React.FC = () => {
       if (!wasLoggedIn.current && !preview) setLoginOpen(true);
     }
     // 관리자가 찾은 고객사 이름이 로그아웃 상태 화면에 남지 않게 한다
-    if (wasLoggedIn.current && !isLoggedIn) clearRecentSearches(true);
+    if (wasLoggedIn.current && !isLoggedIn) SITES.forEach((s) => clearRecentSearches(true, s));
     wasLoggedIn.current = isLoggedIn;
   }, [authLoading, isLoggedIn, isSuperAdmin, canView, currentView, site, preview]);
 
@@ -398,8 +401,14 @@ export const App: React.FC = () => {
     document.body.classList.add('lock');
   };
 
+  // 표준 카테고리 분류표 (검색 창·카테고리 필터) — 아이티켓은 분류표, 온코어는 온코어 데이터에 쓰인 분류
+  const categoryHierarchy = useMemo(() => categoryHierarchyOf(site, data), [site, data]);
+  // AI 요약 — 최신 데이터가 왔을 때만 묻고, 답은 사이트별로 서버에 저장한다
+  const aiContext = useMemo(() => ({ ready: status === 'live' && !isSyncing, site }), [status, isSyncing, site]);
+
   return (
-    <>
+    <AiInsightContext.Provider value={aiContext}>
+    <CategoryHierarchyContext.Provider value={categoryHierarchy}>
       <div className="app">
         <Sidebar
           currentView={currentView}
@@ -568,6 +577,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                   dayRange={searchDay}
                   dayCovered={dayCovered}
+                  compare={mtdCompare}
+                  monthly={mtdCompare ? baseData : undefined}
                   // 승인된 계정(뷰어 포함)은 견적 목록을 본다 — 뷰어는 웹앱이 고객 정보를 *** 로 가려 준다. 로그인 전 미리보기만 로그인 안내
                   isLoggedIn={canView}
                   onLogin={openLogin}
@@ -605,6 +616,8 @@ export const App: React.FC = () => {
         <SearchDialog
           data={data}
           categoryMap={categoryMap}
+          categoryHierarchy={categoryHierarchy}
+          site={site}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           initialQuery={currentView === 'search' ? searchQuery : ''}
@@ -614,6 +627,7 @@ export const App: React.FC = () => {
           onSubmit={goSearch}
         />
       )}
-    </>
+    </CategoryHierarchyContext.Provider>
+    </AiInsightContext.Provider>
   );
 };

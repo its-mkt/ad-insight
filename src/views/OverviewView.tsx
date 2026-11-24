@@ -13,6 +13,7 @@ import {
   sumBy,
   THIS_M,
   ym,
+  isOpenPeriod,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
@@ -37,6 +38,9 @@ import { Card } from '../components/common/Card';
 import { cmpLabelOf, dotYm, firstMonth, inMonths, monthsUpTo, periodStartsOf, sameMonthsLastYear, yearRangeLabel, yearsOf } from '../utils/allPeriod';
 import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
+import { cat1Stats, categoryInsights, keywordInsights, summaryInsight, INSIGHT_FOOT_CAT_KW, type InsightTotals } from '../utils/insights';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 
 interface OverviewViewProps {
   data: DashboardData;
@@ -95,7 +99,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           status={status}
         />
         <KpiSection id="kpiOverview">
-          <KpiPlaceholder label="데이터 상태" value="연결 대기" message="상단 [연결 설정]을 완료해 주세요" />
+          <KpiPlaceholder label="데이터 상태" value="연결 대기" message="상단 [연결 설정]을 완료해 주세요." />
         </KpiSection>
         <SecSrc sources={OVERVIEW_SOURCES} />
       </View>
@@ -282,6 +286,30 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       : buildSourceShareData(srcRaw, pv, stats.quotes, pv);
   const srcItems = srcPrev ? withSourceCompare(srcCur.items, srcPrev.items) : srcCur.items;
 
+  // 자동 인사이트: KPI 카드와 같은 합계로 요약하고, CPA 를 낼 수 있는 달만으로 카테고리·키워드 추천을 만든다
+  const insightTotals: InsightTotals = allPeriod
+    ? { spend: allSpend, prevSpend: null, quotes: allQuotes, prevQuotes: null, cpa: allCpa, prevCpa: null }
+    : yearTotal
+      ? {
+          spend: ytdSpend,
+          prevSpend: lastYrSpend,
+          quotes: ytdQuotes,
+          prevQuotes: quotesIn(lastYrMonths),
+          cpa: ytdCpa,
+          prevCpa: lastYrMonths[0] >= starts.cpaFrom ? cpaIn(lastYrMonths) : null,
+          cmpLabel: '전년 동기',
+        }
+      : { spend: curSpendTot, prevSpend: pvSpendTot, quotes: curQuotesTot, prevQuotes: pvQuotesTot, cpa: curCpa, prevCpa: pvCpa || null, cmpLabel: cmp };
+  const insightMonths = (allPeriod ? allMonths : yearTotal ? months : [curM]).filter((mo) => mo >= starts.cpaFrom);
+  const insightSummary = summaryInsight(insightTotals);
+  const insights = [
+    ...(insightSummary ? [insightSummary] : []),
+    ...categoryInsights(cat1Stats(categoryMap, data.spend, stats.quotes, insightMonths)),
+    // 키워드는 달 단위로만 수집되므로 일·기간 보기에서는 뺀다
+    ...(period ? [] : keywordInsights((monthly ?? data).keywords, insightMonths)),
+  ];
+  const insightBasis = allPeriod ? `${dotYm(starts.cpaFrom)} 이후` : yearTotal ? yearLabel : curCaption;
+
   return (
     <View name="overview" title="종합 요약">
       <ViewHeader
@@ -400,6 +428,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         )}
       </KpiSection>
 
+      <InsightPanel
+        name="overview"
+        aiPage="종합 요약"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
+        items={insights}
+        basis={insightBasis}
+        foot={INSIGHT_FOOT_CAT_KW}
+        onSelectCategory={onSearchName && ((k: string) => onSearchName(formatCategoryScope(k)))}
+        onSelectKeyword={onSearchName}
+      />
+
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'chart' ? (
       <div className="grid">
@@ -409,6 +448,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           labels={allPeriod ? spendYears.map((y) => `${y}년`) : months.map(mLabel)}
           series={spendSeries}
           unit="만원"
+          partialLast={isOpenPeriod(allPeriod ? spendYears.at(-1) : months.at(-1))}
           emptyMessage="취합된 광고비 데이터가 없습니다."
         />
         <MultiChart
@@ -417,6 +457,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           labels={allPeriod ? quoteYears.map((y) => `${y}년`) : months.map(mLabel)}
           series={quoteSeries}
           unit="건"
+          partialLast={isOpenPeriod(allPeriod ? quoteYears.at(-1) : months.at(-1))}
           emptyMessage="취합된 견적 데이터가 없습니다."
         />
       </div>

@@ -74,7 +74,7 @@ export const OwnerTransferModal: React.FC<OwnerTransferModalProps> = ({ target, 
             {dev && <Notice tone="ok">테스트 계정입니다. 세 단계를 똑같이 거치지만 실제로는 넘기지 않습니다 (비밀번호는 아무 값이나 넣으면 됩니다).</Notice>}
             <Notice tone="warn">
               넘기면 나는 바로 운영자가 되어 견적 원본 관리·등급 변경·계정 삭제를 할 수 없습니다. 내가 다시 되돌릴 수 없고, 새 소유자만 돌려줄 수 있습니다.
-              화면 안의 권한만 넘어가며 권한 시트·웹앱·Supabase 의 실제 소유권은 그대로입니다.
+              화면 안의 권한만 넘어가며 권한 시트·웹앱·Supabase의 실제 소유권은 그대로입니다.
             </Notice>
             <Button type="submit" variant="primary" className="btn-login" data-btn="owner-transfer-next">
               계속
@@ -83,7 +83,7 @@ export const OwnerTransferModal: React.FC<OwnerTransferModalProps> = ({ target, 
         )}
         {step === 'confirm' && (
           <>
-            <Field label="받는 사람 이메일" help={`확인을 위해 ${target.email} 을 그대로 입력해 주세요.`}>
+            <Field label="받는 사람 이메일" help={`확인을 위해 받는 사람 이메일(${target.email})을 그대로 입력해 주세요.`}>
               <TextInput className="gate-input" name="owner-confirm" autoComplete="off" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoFocus />
             </Field>
             <Button type="submit" variant="primary" className="btn-login" data-btn="owner-transfer-confirm" disabled={!confirmOk}>
@@ -98,7 +98,7 @@ export const OwnerTransferModal: React.FC<OwnerTransferModalProps> = ({ target, 
             </Field>
             {error && <GateError message={error} />}
             <Button type="submit" variant="primary" className="btn-login" data-btn="owner-transfer-submit" disabled={!password || busy}>
-              {busy ? '넘기는 중' : '소유자 권한 넘기기'}
+              {busy ? '넘기는 중...' : '소유자 권한 넘기기'}
             </Button>
           </>
         )}

@@ -15,7 +15,7 @@ import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { loadUsageStats, USAGE_TRACKING_ON, type UsageDay, type UsageStats } from '../lib/usage';
 import { addDays, daysBetween, toDayKey, type DayRange } from '../utils/dayRange';
-import { fmt, sumBy } from '../utils/format';
+import { fmt, isOpenPeriod, sumBy } from '../utils/format';
 import { toggledSet } from '../utils/toggleSet';
 import { dayWithWeekday, daySlashLabel, durationText, lastAtText, monthText, viewTitle } from '../utils/usageFormat';
 import { usagePeriodOf } from '../utils/usagePeriod';
@@ -114,7 +114,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   } else if ('error' in loaded) {
     body = loaded.setupNeeded ? (
       <Notice tone="warn">
-        이용 현황 테이블이 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 실행하면 그때부터 기록이 쌓입니다.
+        이용 현황 테이블이 아직 없습니다. Supabase SQL Editor에서 <code>supabase/usage.sql</code>을 실행하면 그때부터 기록이 쌓입니다.
       </Notice>
     ) : (
       <Notice tone="warn">이용 현황을 불러오지 못했습니다 ({loaded.error})</Notice>
@@ -208,7 +208,8 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
           labels={trendLabels}
           series={trendSeries}
           unit="회"
-          emptyMessage="이 기간에 기록된 방문이 없습니다"
+          partialLast={isOpenPeriod(buckets.at(-1)?.date)}
+          emptyMessage="이 기간에 기록된 방문이 없습니다."
         />
         ) : (
           // 방문과 페이지뷰는 더해도 뜻이 없어 열 합계 줄은 뺀다 (줄 끝 합계는 각자의 기간 합)
@@ -220,7 +221,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
             totalRow={false}
             labels={trendLabels}
             series={trendSeries}
-            emptyMessage="이 기간에 기록된 방문이 없습니다"
+            emptyMessage="이 기간에 기록된 방문이 없습니다."
           />
         )}
 
@@ -271,7 +272,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
             <>
               {cur.accounts === 'setup' ? (
                 <Notice tone="warn">
-                  계정별 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
+                  계정별 기록 함수가 아직 없습니다. Supabase SQL Editor에서 <code>supabase/usage.sql</code>을 다시 실행하면 그때부터 계정별 기록이 쌓입니다.
                 </Notice>
               ) : cur.accounts.length ? (
                 <table className="stk usage-table usage-accounts">
@@ -334,7 +335,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
               ) : (
                 <EmptyState
                   message="이 기간에 로그인해서 이용한 기록이 없습니다."
-                  subMessage={cur.accountSince ? `계정별 기록은 ${cur.accountSince.replace(/-/g, '.')} 부터 쌓였습니다.` : '계정별 기록은 배포 후부터 쌓입니다.'}
+                  subMessage={cur.accountSince ? `계정별 기록은 ${cur.accountSince.replace(/-/g, '.')}부터 쌓였습니다.` : '계정별 기록은 배포 후부터 쌓입니다.'}
                 />
               )}
             </>
@@ -343,7 +344,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
             <>
               {cur.categories === null ? (
                 <Notice tone="warn">
-                  카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>supabase/usage.sql</code> 을 다시 실행하면 그때부터 기록이 쌓입니다.
+                  카테고리 기록 함수가 아직 없습니다. Supabase SQL Editor에서 <code>supabase/usage.sql</code>을 다시 실행하면 그때부터 기록이 쌓입니다.
                 </Notice>
               ) : cur.categoryGroups.length ? (
                 <table className="stk usage-table">

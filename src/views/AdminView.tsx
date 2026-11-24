@@ -132,7 +132,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
   // Apps Script manual_categories 시트에 오버라이드 저장 → 서버가 바로 quotes_monthly 재산출 (실패하면 다음 정기 수집 때)
   const handleSaveOverrides = async () => {
     if (pendingOverrides.size === 0) {
-      showToast('저장할 변경 사항이 없습니다.', 'warn');
+      showToast('저장할 변경사항이 없습니다.', 'warn');
       return;
     }
     setSaving(true);
@@ -193,7 +193,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ data, isSyncing = false, s
       setOriginals(new Map());
       if (onUpdateQuotesRaw) onUpdateQuotesRaw(original);
       if (onUpdateQuotesSites) onUpdateQuotesSites(baseSites.current);
-      showToast(count ? `저장하지 않은 변경 ${count}건을 되돌렸습니다.` : '변경 사항을 되돌렸습니다.');
+      showToast(count ? `저장하지 않은 변경 ${count}건을 되돌렸습니다.` : '변경사항을 되돌렸습니다.');
     }
   };
 

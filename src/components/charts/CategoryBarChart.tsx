@@ -30,7 +30,7 @@ interface CategoryBarChartProps {
 export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({
   id,
   list,
-  emptyMessage = '표시할 데이터가 없습니다',
+  emptyMessage = '표시할 데이터가 없습니다.',
   hidePrev = false,
   prevLabel = '전월',
   curLabel = '기준월',

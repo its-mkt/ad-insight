@@ -11,6 +11,7 @@ import {
   THIS_M,
   THIS_Y,
   ym,
+  isOpenPeriod,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { daysOfMonth, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
@@ -26,6 +27,9 @@ import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsT
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel, ymLabel } from '../utils/allPeriod';
+import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
+import { mediaInsights, INSIGHT_FOOT_MEDIA } from '../utils/insights';
 import { spendSeriesOf } from '../utils/chartSeries';
 
 interface AdsViewProps {
@@ -230,7 +234,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={monthAvgDetail(yearKeys, allSpendMonths)}
             />
             <KpiCard label="전체 MDF 소진" value={`${fmt(mdfIn(yearKeys))}원`} sub="전체 기간 합계" detail={mdfShareOf(yearKeys)} />
-            <KpiCard label="전체 전환 1건당 광고비" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
+            <KpiCard label="전체 전환당 비용" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
           </>
         ) : yearTotal ? (
           <>
@@ -264,7 +268,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={mdfShareOf(yearMonths)}
             />
             <KpiCard
-              label={`${yearLabel} 전환 1건당 광고비`}
+              label={`${yearLabel} 전환당 비용`}
               value={cpaText(cpaIn(yearMonths))}
               cur={cpaIn(yearMonths) || null}
               prev={cpaIn(lastYrMonths) || null}
@@ -331,7 +335,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           detail={mdfRatioPct ? <p>광고비 대비 <b>{mdfRatioPct}%</b></p> : <p>광고비 대비 <b>0%</b></p>}
         />
         <KpiCard
-          label={`${curCaption} 전환 1건당 광고비`}
+          label={`${curCaption} 전환당 비용`}
           value={cpaText(cpa(curM))}
           cur={cpa(curM) || null}
           prev={cpa(pv) || null}
@@ -342,6 +346,16 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
         )}
       </KpiSection>
 
+      {/* 아래 매체별 성과 표와 같은 기간·비교 기준 */}
+      <InsightPanel
+        name="ads"
+        aiPage="매체 광고비"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
+        items={mediaInsights(statsRows, statsPrev, allPeriod ? undefined : statsCmp)}
+        basis={statsLabel}
+        foot={INSIGHT_FOOT_MEDIA}
+      />
+
       <ChartTableToggle value={mode} onChange={setMode} />
 
       {mode === 'chart' ? (
@@ -351,6 +365,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           labels={months.map(colLabel)}
           series={chartSet === 'media' ? series : detailSeries}
           unit="만원"
+          partialLast={isOpenPeriod(months.at(-1))}
           tools={
             <SegmentedControl<'media' | 'compare'>
               mini

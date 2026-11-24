@@ -179,7 +179,7 @@ const AccessChecking: React.FC = () => {
             <>
               평소보다 오래 걸리고 있습니다.
               <br />
-              잠시 뒤에도 그대로면 새로 고침해 주세요.
+              잠시 뒤에도 그대로면 새로고침해 주세요.
             </>
           ) : (
             <>
@@ -191,7 +191,7 @@ const AccessChecking: React.FC = () => {
         </p>
         {slow && (
           <Button variant="primary" className="btn-login" data-btn="access-reload" onClick={() => window.location.reload()}>
-            새로 고침
+            새로고침
           </Button>
         )}
       </Modal>

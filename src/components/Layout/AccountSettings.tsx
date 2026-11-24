@@ -74,7 +74,7 @@ const ProfilePanel: React.FC = () => {
       </Field>
       <ResultLine result={result} okText="저장했습니다. 관리자 명단에도 반영했습니다." />
       <Button type="submit" variant="primary" className="btn-login" data-btn="account-save-profile" disabled={!dirty || saving}>
-        {saving ? '저장하는 중' : '저장'}
+        {saving ? '저장 중...' : '저장'}
       </Button>
     </form>
   );
@@ -125,7 +125,7 @@ const PasswordPanel: React.FC = () => {
       </Field>
       <ResultLine result={result} okText="비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 씁니다." />
       <Button type="submit" variant="primary" className="btn-login" data-btn="account-save-password" disabled={saving || !current || !next || !next2}>
-        {saving ? '바꾸는 중' : '비밀번호 바꾸기'}
+        {saving ? '바꾸는 중...' : '비밀번호 바꾸기'}
       </Button>
     </form>
   );

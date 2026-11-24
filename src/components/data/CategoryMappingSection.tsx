@@ -28,7 +28,7 @@ export const CategoryMappingSection: React.FC<CategoryMappingSectionProps> = ({ 
       <Card name="flow" id="cat-flow" title="카테고리 매칭" subtitle={`(${audit.curMonth} 기준 실시간 매핑 현황)`}>
       <p className="lead-t">
         매체마다 다른 캠페인·광고그룹 이름과 견적 제목을 직접 잇지 않고, <b>분류표(1차 카테고리)</b>를 가운데 두고
-        양쪽을 연결한다. 정확한 매핑표에 없으면 이름·제목으로 찾는다.
+        양쪽을 연결합니다. 정확한 매핑표에 없으면 이름·제목으로 찾습니다.
       </p>
         <div className="flow">
           <div className="col">

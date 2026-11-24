@@ -12,7 +12,7 @@ export const MembersView: React.FC = () => (
   <View name="members" title={TITLE} className="members-view">
     <ViewHeader title={TITLE} description="광고 인사이트 가입 요청을 승인·거절하고, 승인된 계정의 등급(뷰어·운영자)과 열람 권한을 관리합니다." status="live" />
     <ViewNote>
-      ※ 뷰어 대시보드 · 운영자 +원문 데이터·계정 승인·이용 현황 · 소유자 전체 권한
+      ※ 뷰어: 대시보드 · 운영자: 대시보드 + 원문 데이터·계정 승인·이용 현황 · 소유자: 전체 권한
     </ViewNote>
     <OwnerCard />
     <MemberApprovals />
