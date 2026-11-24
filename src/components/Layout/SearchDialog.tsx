@@ -7,6 +7,7 @@ import { adDisplayTitle } from '../../utils/creativeImage';
 import { formatCategoryScope, formatScope, parseScope, searchDashboard, type SearchTab } from '../../utils/search';
 import { clearRecentSearches, loadRecentSearches, removeRecentSearch, sameSearch } from '../../utils/recentSearches';
 import { buildCategoryFilter } from '../common/CategoryFilter';
+import { searchExamplesOf } from '../../utils/categoryHierarchy';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { TextInput } from '../common/TextInput';
@@ -16,6 +17,8 @@ interface SearchDialogProps {
   categoryMap: CategoryMap;
   /** 표준 카테고리 목록 — 사이트마다 다르다 (utils/categoryHierarchy categoryHierarchyOf) */
   categoryHierarchy: CatHierarchyNode[];
+  /** 지금 사이트 — 최근 검색어를 사이트마다 따로 두고, 예시 검색어를 고른다 */
+  site: string;
   initialQuery: string;
   isLoggedIn: boolean;
   /** 새 검색의 기준 달(YYYY-MM) — 결과 페이지와 같은 기간으로 미리 보여 준다 */
@@ -49,6 +52,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
   data,
   categoryMap,
   categoryHierarchy,
+  site,
   initialQuery,
   isLoggedIn,
   month,
@@ -59,7 +63,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
 }) => {
   const PERIOD_LABEL = mLabel(month);
   const [query, setQuery] = useState(initialQuery);
-  const [recents, setRecents] = useState(() => loadRecentSearches(isLoggedIn));
+  const [recents, setRecents] = useState(() => loadRecentSearches(isLoggedIn, site));
   // 단계 선택(1차 캠페인 › 2차 광고그룹) — 표준 카테고리 필터(1차·2차)와 같은 방식. 지금 검색어가 단계 검색이면 그 값으로 시작한다
   const initialScope = parseScope(initialQuery);
   // 찾는 기준: 캠페인·광고그룹 이름, 또는 표준 카테고리(분류표) 1차·2차
@@ -284,7 +288,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
           <div className="sd-main">
             {!q ? (
               <p className="sd-hint">
-                관련된 광고와 견적을 {PERIOD_LABEL} 기준으로 찾습니다(결과 화면에서 전체 기간으로 넓힐 수 있습니다). 예: HPE, 워크스테이션, 네이버, cadkorea
+                관련된 광고와 견적을 {PERIOD_LABEL} 기준으로 찾습니다. 결과 화면에서 전체 기간으로 넓힐 수 있습니다. 예: {searchExamplesOf(site, categoryHierarchy)}
                 {isLoggedIn ? ', 고객사 이름' : ''}
               </p>
             ) : !result ? null : empty ? (
@@ -367,7 +371,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
                       type="button"
                       className="sd-recent-clear btn-search-recent-clear"
                       data-btn="search-recent-clear"
-                      onClick={() => setRecents(clearRecentSearches(isLoggedIn))}
+                      onClick={() => setRecents(clearRecentSearches(isLoggedIn, site))}
                     >
                       전체 삭제
                     </button>
@@ -385,7 +389,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
                           className="sd-recent-del btn-search-recent-del"
                           data-btn="search-recent-del"
                           aria-label={`최근 검색어 ${r} 삭제`}
-                          onClick={() => setRecents(removeRecentSearch(r, isLoggedIn))}
+                          onClick={() => setRecents(removeRecentSearch(r, isLoggedIn, site))}
                         >
                           <X size="0.875rem" aria-hidden="true" />
                         </button>

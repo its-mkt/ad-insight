@@ -1,3 +1,4 @@
+import { createContext } from 'react';
 import type { DashboardData } from '../types/dashboard';
 import { CATEGORY_HIERARCHY, type CatHierarchyNode } from './constants';
 import { parseCatParts } from './format';
@@ -28,4 +29,13 @@ export function categoryHierarchyOf(site: string, data: DashboardData): CatHiera
   return byCount(count)
     .sort((a, b) => Number(a === '기타') - Number(b === '기타'))
     .map((cat1) => ({ cat1, cat2: cat2Count.has(cat1) ? byCount(cat2Count.get(cat1)!) : [] }));
+}
+
+/** 지금 사이트의 분류표 — App 이 categoryHierarchyOf 결과를 넣고, useCategoryFilterState 가 읽어 모든 카테고리 필터에 쓴다 */
+export const CategoryHierarchyContext = createContext<CatHierarchyNode[]>(CATEGORY_HIERARCHY);
+
+/** 검색 창의 "예:" 검색어 — 아이티켓은 정해 둔 예시, 다른 사이트는 그 사이트에서 많이 쓰인 분류 두 개와 매체 이름 */
+export function searchExamplesOf(site: string, hierarchy: CatHierarchyNode[]): string {
+  if (site === 'itket') return 'HPE, 워크스테이션, 네이버, cadkorea';
+  return [...hierarchy.map((n) => n.cat1).filter((c) => c !== '기타').slice(0, 2), '네이버'].join(', ');
 }
