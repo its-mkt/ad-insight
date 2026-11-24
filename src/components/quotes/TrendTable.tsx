@@ -24,7 +24,7 @@ interface TrendTableProps {
 }
 
 /** 추이 차트(MultiChart)의 표 보기 — 같은 labels·series 를 행·열로 펼친다 */
-export const TrendTable: React.FC<TrendTableProps> = ({ id, title, subtitle, totalRow = true, nameLabel, labels, series, emptyMessage = '표시할 데이터가 없습니다', isFuture }) => {
+export const TrendTable: React.FC<TrendTableProps> = ({ id, title, subtitle, totalRow = true, nameLabel, labels, series, emptyMessage = '표시할 데이터가 없습니다.', isFuture }) => {
   const [showAll, setShowAll] = useState(false);
   const columns = labels.map((_, i) => String(i));
   // 합계 줄은 접힌 행까지 포함한 전체 합계다

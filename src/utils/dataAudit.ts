@@ -88,7 +88,7 @@ export function runDataAudit(
       summary: `전체 ${allQuoteMonths.length}개 월 · 총 ${fmt(totalRawQuotes)}건 (월별 집계 ${fmt(totalMonthlyQuotes)}건)`,
       detail: isExact
         ? `${allQuoteMonths[0] || ''} ~ ${allQuoteMonths[allQuoteMonths.length - 1] || ''} 모든 월·카테고리·매체 오차 0건`
-        : `불일치 월 ${mismatchedMonths.length}건 (${mismatchedMonths.join(', ')})`,
+        : `불일치 ${mismatchedMonths.length}개 월 (${mismatchedMonths.join(', ')})`,
       level: isExact ? 'ok' : 'err',
       badgeText: isExact ? '100% 일치' : '오차 발생',
     });
@@ -204,7 +204,7 @@ export function runDataAudit(
     title: `${yr}년 누적(YTD) 화면 간 통계 수식 교차 검증`,
     summary: `누적 광고비 ${fmt(ytdSpendTotal)}원 (매체별 합 ${fmt(ytdSeriesSum)}원) · 누적 견적 ${fmt(ytdQuotesByCat)}건 (매체별 합 ${fmt(ytdQuotesRaw)}건)`,
     detail: crossOk
-      ? '종합 요약 · 매체 광고비 · 카테고리 효율 · 견적 상세 4개 뷰의 YTD 및 당월 합계 100% 일치'
+      ? '종합 요약 · 매체 광고비 · 카테고리 효율 · 견적 상세 4개 화면의 YTD 및 당월 합계 100% 일치'
       : `광고비 차이 ${fmt(Math.abs(ytdSpendTotal - ytdSeriesSum))}원 · 견적 차이 ${fmt(Math.abs(ytdQuotesByCat - ytdQuotesRaw))}건`,
     level: crossOk ? 'ok' : 'err',
     badgeText: crossOk ? '교차 검증 통과' : '수식 점검',
@@ -231,7 +231,7 @@ export function runDataAudit(
     summary: `활성 키워드 ${fmt(data.keywords.length)}개 (${kwGroups.size}개 그룹) · 소재 ${fmt(data.ads.length)}개 (${adGroups.size}개 그룹)`,
     detail: kwLinkOk
       ? `실집행 키워드 미매칭 0개${zeroSpendOnlyKws.length ? ` (노출 0건 대기 키워드 ${zeroSpendOnlyKws.length}개 별도)` : ''} · 비정상 수치(NaN/음수) 0건 · 공백 정규화 완료`
-      : `실집행 미매칭 키워드 ${orphanActiveKws.length}개 · 수치 오류 ${hasInvalidNum ? '있음' : '없음'}`,
+      : `실집행 키워드 미매칭 ${orphanActiveKws.length}개 · 수치 오류 ${hasInvalidNum ? '있음' : '없음'}`,
     level: kwLinkOk ? 'ok' : 'warn',
     badgeText: kwLinkOk ? '정상 연동' : '확인 필요',
   });

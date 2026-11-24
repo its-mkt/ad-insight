@@ -43,7 +43,7 @@ export const keywordMetric = (k: KeywordRow, key: KeywordSort): number =>
 
 /** 견적 상세 머리말의 칩으로 올릴 짧은 항목, 그리고 한 줄 전체 폭을 쓰는 긴 항목 */
 export const QUOTE_CHIP_LABELS = ['번호', '사이트', '문의 유형'];
-export const QUOTE_WIDE_LABEL = '유입 경로';
+export const QUOTE_WIDE_LABEL = '유입경로';
 
 /** 견적 상세 펼침의 항목 — 값이 있는 것만 */
 export const quoteDetails = (r: QuoteRawRow): [string, string][] =>
@@ -51,7 +51,7 @@ export const quoteDetails = (r: QuoteRawRow): [string, string][] =>
     [
       ['번호', String(r.sno ?? '')],
       ['사이트', !r.site ? '아이티켓' : r.site === 'phone' ? '전화문의' : r.site],
-      ['유입 경로', [r.source, r.sourceDetail].filter(Boolean).join(' - ')],
+      ['유입경로', [r.source, r.sourceDetail].filter(Boolean).join(' - ')],
       ['문의 유형', r.inquiryType || INQUIRY_WEB],
       ['이메일', r.email || ''],
       ['전화번호', r.phone || ''],

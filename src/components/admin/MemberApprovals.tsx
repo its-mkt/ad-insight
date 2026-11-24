@@ -28,9 +28,9 @@ const STATUS_TEXT: Record<MemberStatus, { label: string; level: StatusLevel }> =
 
 const STATUS_TITLE: Record<MemberStatus, string> = {
   pending: '아직 승인하지 않은 요청',
-  approved: '데이터를 볼 수 있다',
-  rejected: '가입 요청을 거절한다 (다시 승인할 수 있다)',
-  revoked: '열람 권한을 해제한다 (다시 승인할 수 있다)',
+  approved: '데이터를 볼 수 있습니다',
+  rejected: '가입 요청을 거절했습니다 (다시 승인할 수 있습니다)',
+  revoked: '열람 권한을 해제했습니다 (다시 승인할 수 있습니다)',
 };
 
 /** 요청·처리 시각 '2026-11-19 13:37' → '26.11.19 13:37' (칸을 좁게, 전체 값은 마우스를 올리면) */
@@ -68,7 +68,7 @@ export const MemberApprovals: React.FC = () => {
       tools={
         // 받는 동안 아이콘이 돌고 다시 누를 수 없다 — 끝나면 제목 줄의 '○○:○○ 기준'이 바뀐다
         <Button size="sm" icon={RefreshCw} className={refreshing ? 'is-spinning' : undefined} disabled={refreshing} aria-busy={refreshing} data-btn="members-refresh" onClick={() => void loadMembers()}>
-          새로 고침
+          새로고침
         </Button>
       }
       tableWrap
@@ -76,7 +76,7 @@ export const MemberApprovals: React.FC = () => {
       {error && <Notice tone="warn">{error}</Notice>}
       {pending > 0 && (
         <Notice tone="warn">
-          이메일 인증번호로 이메일 주인은 확인됐습니다. 승인 전에 요청자가 열람해도 되는 사람인지 팀즈·전화로 확인해 주세요. 확인되지 않으면 거절합니다.
+          이메일 인증번호로 이메일 본인 여부는 확인됐습니다. 승인 전에 요청자가 열람해도 되는 사람인지 팀즈·전화로 확인해 주세요. 확인되지 않으면 거절합니다.
         </Notice>
       )}
       <table className="stk member-table">
@@ -87,7 +87,7 @@ export const MemberApprovals: React.FC = () => {
             <Th className="col-mem-team">팀</Th>
             <Th className="col-mem-email">이메일</Th>
             <Th className="col-mem-status">상태</Th>
-            <Th className="col-mem-role" tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꾼다)">등급</Th>
+            <Th className="col-mem-role" tip="등급|뷰어: 대시보드만 · 운영자: 대시보드와 원문 데이터·계정 관리·이용 현황·데이터 연결 (소유자만 바꿀 수 있습니다)">등급</Th>
             <Th className="col-mem-date">요청</Th>
             <Th className="col-mem-date">처리</Th>
             <Th className="col-mem-actions">관리</Th>

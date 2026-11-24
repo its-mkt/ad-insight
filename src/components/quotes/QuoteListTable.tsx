@@ -184,7 +184,7 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
           }}
         />
         <Dropdown fixedMenu ariaLabel="2차 카테고리 필터" value={cat2} disabled={cat2Values.length === 0} options={optionsOf(cat2Values, '2차 카테고리 전체', cat2)} onChange={setCat2} />
-        <Dropdown fixedMenu ariaLabel="유입 경로 필터" value={source} options={optionsOf(rows.map(sourceOf), '유입 경로 전체', source)} onChange={setSource} />
+        <Dropdown fixedMenu ariaLabel="유입경로 필터" value={source} options={optionsOf(rows.map(sourceOf), '유입경로 전체', source)} onChange={setSource} />
         {[origin, rep, cat1, source].some((v) => v !== ALL) && <FilterReset onClick={resetFilters} />}
       </div>
       {filtered.length === 0 ? (
@@ -210,7 +210,7 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
                 <tr>
                   {th('origin', '사이트')}
                   {th('sno', 'SNO')}
-                  {th('date', '접수날짜')}
+                  {th('date', '접수일')}
                   {th('subject', '제목 (문의 내용)')}
                   {th('company', '회사명')}
                   {th('name', '작성자')}

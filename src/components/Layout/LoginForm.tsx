@@ -47,7 +47,7 @@ const CodeStep: React.FC<{
 }> = ({ sentTo, code, onCode, err, wait, submitting, onResend, onChangeEmail }) => (
   <>
     <p className="gate-code-sent">
-      <strong>{sentTo}</strong> 로 보낸 6자리 인증번호를 입력해 주세요.
+      <strong>{sentTo}</strong> 주소로 보낸 6자리 인증번호를 입력해 주세요.
       <br />
       메일이 없으면 스팸함도 확인해 주세요.
     </p>

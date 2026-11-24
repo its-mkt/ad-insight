@@ -58,7 +58,7 @@ export const RoleChangeModal: React.FC<RoleChangeModalProps> = ({ change, onClos
           취소
         </Button>
         <Button variant="primary" onClick={() => void confirm()} disabled={busy} data-btn="role-change-confirm" autoFocus>
-          {busy ? '바꾸는 중' : `${ROLE_LABEL[change.to]}로 바꾸기`}
+          {busy ? '바꾸는 중...' : `${ROLE_LABEL[change.to]}로 바꾸기`}
         </Button>
       </div>
     </Modal>

@@ -169,7 +169,7 @@ export const PurchasedGoodsTable: React.FC<PurchasedGoodsTableProps> = ({ months
                 {header('orders', '판매 건수')}
                 {header('qty', '수량')}
                 {header('amount', '금액')}
-                <Th>유입 경로</Th>
+                <Th>유입경로</Th>
               </tr>
             </thead>
             <tbody>
@@ -212,7 +212,7 @@ export const PurchasedGoodsTable: React.FC<PurchasedGoodsTableProps> = ({ months
             </tbody>
           </table>
           <ShowMoreButton noun="제품" total={rows.length} expanded={showAll} onToggle={() => setShowAll((v) => !v)} dataBtn="purchases-goods-more" />
-          <TableFootnote basis="결제완료일 기준이며 판매 건수와 같이 이후 취소·환불된 주문도 포함합니다 · 금액은 할인 반영, 배송비 제외 · 한 주문에 제품이 여러 개면 제품마다 1건으로 세므로 건수 합계는 실제 판매 건수보다 클 수 있습니다 · 개별 결제 상품은 고객별 결제 건을 묶은 값입니다 · 유입 경로는 주문 완료 화면이 주문번호와 함께 남긴 실제 기록만 표시하며, 기록을 시작한 2026.11.09 이전 주문과 기록이 남지 않은 주문은 미수집입니다 ·제품을 누르면 주문별로 펼쳐지며, 회원 등급과 주문자 메일 도메인은 관리자 로그인 때만 보입니다" />
+          <TableFootnote basis="결제완료일 기준이며 판매 건수와 마찬가지로 이후 취소·환불된 주문도 포함합니다 · 금액은 할인 반영, 배송비 제외 · 한 주문에 제품이 여러 개면 제품마다 1건으로 세므로 건수 합계는 실제 판매 건수보다 클 수 있습니다 · 개별 결제 상품은 고객별 결제 건을 묶은 값입니다 · 유입 경로는 주문 완료 화면이 주문번호와 함께 남긴 실제 기록만 표시하며, 기록을 시작한 2026.11.09 이전 주문과 기록이 남지 않은 주문은 미수집입니다 · 제품을 누르면 주문별로 펼쳐지며, 회원 등급과 주문자 메일 도메인은 관리자 로그인 때만 보입니다" />
         </>
       ) : (
         <EmptyState message="이 기간의 구매 제품 데이터가 없습니다." />

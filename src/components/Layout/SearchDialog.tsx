@@ -67,7 +67,8 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
   // 단계 선택(1차 캠페인 › 2차 광고그룹) — 표준 카테고리 필터(1차·2차)와 같은 방식. 지금 검색어가 단계 검색이면 그 값으로 시작한다
   const initialScope = parseScope(initialQuery);
   // 찾는 기준: 캠페인·광고그룹 이름, 또는 표준 카테고리(분류표) 1차·2차
-  const [scopeKind, setScopeKind] = useState<'campaign' | 'category'>(initialScope?.cat1 ? 'category' : 'campaign');
+  // 기본은 표준 카테고리 — 지금 검색어가 캠페인 단계 검색일 때만 캠페인으로 시작한다
+  const [scopeKind, setScopeKind] = useState<'campaign' | 'category'>(initialScope?.campaign ? 'campaign' : 'category');
   const [cat1, setCat1] = useState(initialScope?.cat1 || '');
   const [cat2, setCat2] = useState(initialScope?.cat2 || '');
   const [campaign, setCampaign] = useState(initialScope?.campaign || '');
@@ -208,8 +209,8 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
             value={scopeKind}
             onChange={setScopeKind}
             options={[
-              { value: 'campaign', label: '캠페인' },
               { value: 'category', label: '표준 카테고리' },
+              { value: 'campaign', label: '캠페인' },
             ]}
           />
           {scopeKind === 'campaign' ? (
@@ -292,7 +293,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
                 {isLoggedIn ? ', 고객사 이름' : ''}
               </p>
             ) : !result ? null : empty ? (
-              <p className="sd-hint">{PERIOD_LABEL}에 &quot;{q}&quot;와 일치하는 결과가 없습니다. Enter를 누르면 결과 화면에서 전체 기간으로 넓힐 수 있습니다.</p>
+              <p className="sd-hint">{PERIOD_LABEL}에 &quot;{q}&quot; 검색 결과가 없습니다. Enter를 누르면 결과 화면에서 전체 기간으로 넓힐 수 있습니다.</p>
             ) : (
               <>
                 <p className="sd-summary">

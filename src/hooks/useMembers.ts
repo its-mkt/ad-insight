@@ -127,7 +127,7 @@ export async function setMemberRole(email: string, role: MemberRole): Promise<vo
   const roleText = role === 'manager' ? '운영자로' : '뷰어로';
   // 이용 현황 권한을 못 맞췄으면 직접 확인해야 하므로 닫을 때까지 남는 주의 알림으로
   if (res.usage === 'failed' || res.usage === 'kept')
-    showToast(`${who}의 등급을 ${roleText} 바꿨지만, 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. Supabase usage_admins 를 확인해 주세요.`, 'warn');
+    showToast(`${who}의 등급을 ${roleText} 바꿨지만, 이용 현황의 계정별 조회 권한은 맞추지 못했습니다. Supabase usage_admins를 확인해 주세요.`, 'warn');
   else showToast(`${who}의 등급을 ${roleText} 바꿨습니다.`);
   await loadMembers();
 }
@@ -169,7 +169,7 @@ export async function editMember(email: string, info: { name: string; company: s
   if (res.error) {
     const text: Record<string, string> = {
       forbidden: '이 계정을 고칠 권한이 없습니다. 운영자 계정·내 계정은 소유자만 고칠 수 있습니다.',
-      not_found: '명단에 없는 계정입니다. 새로 고침한 뒤 다시 시도해 주세요.',
+      not_found: '명단에 없는 계정입니다. 새로고침한 뒤 다시 시도해 주세요.',
       bad_request: '담당자·회사·팀을 모두 입력해 주세요.',
     };
     return { error: text[res.error] || '저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' };
@@ -262,7 +262,7 @@ export async function transferOwner(
       reauth_required: { error: '본인 확인이 끝나지 않았습니다. 비밀번호를 다시 입력해 주세요.', step: 'password' },
       confirm_mismatch: { error: '받는 사람 이메일이 맞지 않습니다.', step: 'confirm' },
       not_manager: { error: '승인된 운영자에게만 넘길 수 있습니다. 먼저 등급을 운영자로 바꿔 주세요.' },
-      not_found: { error: '명단에 없는 계정입니다. 새로 고침한 뒤 다시 시도해 주세요.' },
+      not_found: { error: '명단에 없는 계정입니다. 새로고침한 뒤 다시 시도해 주세요.' },
       forbidden: { error: '소유자만 넘길 수 있습니다.' },
       busy: { error: '다른 변경을 처리하는 중입니다. 잠시 뒤 다시 시도해 주세요.' },
     };
