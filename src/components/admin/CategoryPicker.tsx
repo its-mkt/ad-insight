@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { parseCatParts } from '../../utils/format';
-import { CategoryHierarchyContext, pickableHierarchyOf } from '../../utils/categoryHierarchy';
+import { CategoryHierarchyContext } from '../../utils/categoryHierarchy';
 import { Dropdown, type DropdownOption } from '../common/Dropdown';
 
 /** 1차 목록 항목 옆 '· 2' — 분류표에 있는 2차 개수, 2차가 없으면 표시하지 않는다 */
@@ -50,7 +50,7 @@ interface CategoryPickerProps {
 }
 
 /**
- * 표준 카테고리 지정 — 1차·2차를 따로 고른다 (사이트 분류표 기준, 온코어는 쓰인 분류를 앞에 두고 아이티켓 분류표를 뒤에 붙인 목록).
+ * 표준 카테고리 지정 — 1차·2차를 따로 고른다 (사이트 분류표 기준 — 아이티켓은 분류표, 온코어는 온코어 데이터에 쓰인 분류만).
  * 저장 값은 예전과 같은 문자열("1차" 또는 "1차 > 2차")이라 시트·집계는 그대로 쓴다.
  * 1차를 바꾸면 2차는 비워지고, 2차가 없는 1차는 2차 칸이 꺼진다. 분류표에 없는 예전 값은 "(기존)"으로 남겨 둔다.
  */
@@ -60,7 +60,7 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
   onChange,
 }) => {
   const { cat1, cat2 } = parseCatParts(value || '기타');
-  const hierarchy = pickableHierarchyOf(useContext(CategoryHierarchyContext));
+  const hierarchy = useContext(CategoryHierarchyContext);
   const node = hierarchy.find((n) => n.cat1 === cat1);
   const cat2List = node?.cat2 ?? [];
   const cat1Options: DropdownOption<string>[] = [
