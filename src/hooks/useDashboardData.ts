@@ -138,8 +138,10 @@ export function useDashboardData(site: SiteId = 'itket') {
         fromApi({});
       };
     }
-    // 사이트가 바뀌면 이전 사이트 데이터를 지우고 처음부터 받는다
+    // 사이트가 바뀌면 이전 사이트 데이터를 지우고 처음부터 받는다.
+    // 판매·기기 전역 저장소도 이 사이트 기준으로 비운다 — 온코어 응답이 오기 전에 아이티켓 판매 초기값(3건·전월 7건 등)이 온코어 화면에 보이지 않게
     liveLoaded.current = false;
+    fromSiteApi({}, site);
     setData(emptyData());
     setStatus('init');
     // 실데이터 요청(수 초~수십 초)을 가장 먼저 띄워 두고, 그동안 지난번 받은 데이터(없으면 배포에 묶인 스냅숏)로 먼저 그린다.
