@@ -41,6 +41,7 @@ import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withPrev
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
+import { AiReadyContext } from './lib/aiInsight';
 
 /** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
 const cmpRangeText = (r: DayRange): string => {
@@ -399,7 +400,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <>
+    <AiReadyContext.Provider value={status === 'live' && !isSyncing}>
       <div className="app">
         <Sidebar
           currentView={currentView}
@@ -614,6 +615,6 @@ export const App: React.FC = () => {
           onSubmit={goSearch}
         />
       )}
-    </>
+    </AiReadyContext.Provider>
   );
 };

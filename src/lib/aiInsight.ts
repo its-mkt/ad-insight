@@ -1,4 +1,11 @@
+import { createContext } from 'react';
 import { supabase } from './supabase';
+
+/**
+ * 화면 데이터가 최신(실데이터 도착·동기화 끝)인지 — App 이 넣는다.
+ * 화면은 지난번 받아 둔 데이터로 먼저 그린 뒤 최신 데이터로 바꾸므로, 그 사이에 분석하면 같은 화면에서 답이 두 번 바뀐다
+ */
+export const AiReadyContext = createContext(true);
 
 /** 서버 함수(supabase/functions/ai-insight)가 돌려주는 Claude 분석 */
 export interface AiInsightResult {

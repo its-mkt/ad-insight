@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Lightbulb, RotateCw, Sparkles, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import type { Insight, InsightTone } from '../../utils/insights';
-import { AI_ERROR_TEXT, cachedAiInsight, requestAiInsight, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
+import { AI_ERROR_TEXT, AiReadyContext, cachedAiInsight, requestAiInsight, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
 import { Card } from './Card';
 import { Muted } from './Muted';
 import { Button } from './Button';
@@ -81,14 +81,17 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
       .catch((e: Error) => setAi((prev) => (prev.key === key ? { key, error: e.message } : prev)));
   };
 
-  // 자료가 바뀌면(화면·기간·필터) 같은 날 받아 둔 답을 쓰고, 없으면 바로 묻는다
+  const ready = useContext(AiReadyContext);
+
+  // 자료가 바뀌면(화면·기간·필터) 같은 날 받아 둔 답을 쓰고, 없으면 바로 묻는다.
+  // 데이터가 최신이 되기 전(받아 둔 데이터로 먼저 그린 동안·동기화 중)에는 묻지 않고 지금 답을 그대로 둔다
   useEffect(() => {
-    if (!facts) return;
+    if (!facts || !ready) return;
     const cached = cachedAiInsight(facts);
     if (cached) setAi({ key: factsKey, result: cached });
     else run(facts, factsKey);
     // facts 는 factsKey 로 대표된다
-  }, [factsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [factsKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!items.length) return null;
 
