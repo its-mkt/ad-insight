@@ -11,7 +11,7 @@ import { PeriodNav } from './components/common/PeriodNav';
 import { lastMonthOfYear, TOTAL_PERIOD_VIEWS } from './utils/allPeriod';
 
 /** 진행 중인 달을 전월 동기간과 비교하는 화면 (광고비·견적 증감을 보여 주는 화면) */
-const MTD_COMPARE_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes'];
+const MTD_COMPARE_VIEWS = ['overview', 'ads', 'cat-efficiency', 'keywords', 'quotes', 'search'];
 import { categoryOfQuery, type SearchTab } from './utils/search';
 import { addRecentSearch, clearRecentSearches, loadFavoriteSearches, sameSearch, toggleFavoriteSearch } from './utils/recentSearches';
 import { Star } from 'lucide-react';
@@ -572,6 +572,8 @@ export const App: React.FC = () => {
                   yearTotal={yearTotal}
                   dayRange={searchDay}
                   dayCovered={dayCovered}
+                  compare={mtdCompare}
+                  monthly={mtdCompare ? baseData : undefined}
                   // 승인된 계정(뷰어 포함)은 견적 목록을 본다 — 뷰어는 웹앱이 고객 정보를 *** 로 가려 준다. 로그인 전 미리보기만 로그인 안내
                   isLoggedIn={canView}
                   onLogin={openLogin}

@@ -4,7 +4,7 @@ import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SyncStatus } fr
 import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, mLabel, sourceColorVar, sumBy } from '../utils/format';
 import { compareMonthsOf, dotYm, monthsUpTo, periodStartsOf, yearRangeLabel, yearsOf, ymLabel } from '../utils/allPeriod';
 import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
-import { monthOfDay, monthsOfRange, rangeLabel, type DayRange } from '../utils/dayRange';
+import { monthOfDay, monthsOfRange, rangeLabel, type DayRange, type MonthToDateCompare } from '../utils/dayRange';
 import { parseScope, resultAdGroups, searchDashboard, type SearchTab } from '../utils/search';
 import { campaignBuckets } from '../utils/keywordGroups';
 import { mediaKo } from '../utils/constants';
@@ -51,6 +51,10 @@ interface SearchViewProps {
   dayRange?: DayRange | null;
   /** 일·기간의 광고비가 일별 자료로 정확히 모인 상태 (아니면 걸친 달 전체) */
   dayCovered?: boolean;
+  /** 진행 중인 달 보기의 비교 기준 — 주면 data 의 전달 자리가 전월 동기간 값이고, 증감을 전월 동기간 대비로 표기한다 */
+  compare?: MonthToDateCompare;
+  /** compare 가 있을 때 추이 차트를 그릴 원본 월 데이터 (전달도 한 달 전체) */
+  monthly?: DashboardData;
   /** 견적 목록을 볼 수 있는 계정인지 (승인된 계정 — 아니면 로그인 안내) */
   isLoggedIn: boolean;
   onLogin: () => void;
@@ -73,6 +77,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
   yearTotal = false,
   dayRange = null,
   dayCovered = false,
+  compare,
+  monthly,
   isLoggedIn,
   onLogin,
   onSelectAllPeriod,
@@ -91,8 +97,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
     [allPeriod, dayRange, selectedMonth]
   );
   const chartResult = useMemo(
-    () => (query && !allPeriod && !yearTotal ? searchDashboard(data, categoryMap, query, chartMonths) : result),
-    [data, categoryMap, query, allPeriod, yearTotal, chartMonths, result]
+    // 추이는 달마다 한 달 전체로 그린다 — 진행 중인 달 비교용 data 는 전달이 동기간 값으로 바뀌어 있어 원본(monthly)을 쓴다
+    () => (query && !allPeriod && !yearTotal ? searchDashboard(monthly ?? data, categoryMap, query, chartMonths) : result),
+    [data, monthly, categoryMap, query, allPeriod, yearTotal, chartMonths, result]
   );
   // 비교 기간: 한 달이면 전월, 연도 합계면 전년 동기, 전체 기간은 비교 없음 (종합 요약 KPI 와 같은 기준)
   const prevResult = useMemo(() => {
@@ -217,7 +224,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const cpaFrom = periodStartsOf(data).cpaFrom;
   // 카드 제목용 짧은 기간 (예: 11월, 전체 기간)
   const kpiPeriod = dayRange || allPeriod || yearTotal ? periodLabel : mLabel(selectedMonth);
-  const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : '전월') : undefined;
+  const cmpLabel = prevResult ? (yearTotal ? '전년 동기' : compare ? compare.cmpLabel : '전월') : undefined;
   // 견적 카드에 함께 보여 줄 고도몰 판매 건수 — 견적과 같은 규칙으로 제품명·제품 카테고리가 일치한 주문 수
   const periodSales = result.sales;
   const convCost = (r: { cost: number; conv: number }) => (r.conv > 0 ? r.cost / r.conv : null);
@@ -294,7 +301,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     result,
     prevResult,
     cmpLabel,
-    openDay: aiOpenDay({ selectedMonth, allPeriod, yearTotal, dayRange }),
+    // 전월 동기간 비교(compare)가 있으면 비교 기간이 이미 같은 날짜까지라 따로 자르지 않는다
+    openDay: compare ? undefined : aiOpenDay({ selectedMonth, allPeriod, yearTotal, dayRange }),
     months,
     allSpend: data.spend,
     allQuotes: quoteStats.quotes,
