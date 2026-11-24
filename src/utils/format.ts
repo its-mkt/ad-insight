@@ -42,6 +42,13 @@ const NOW = new Date();
 export const THIS_Y = NOW.getFullYear();
 export const THIS_M = ym(THIS_Y, NOW.getMonth() + 1);
 export const NOW_MONTH = NOW.getMonth() + 1;
+const TODAY_KEY = `${THIS_M}-${String(NOW.getDate()).padStart(2, '0')}`;
+
+/** 아직 끝나지 않은 기간인지 — 연도(YYYY)·달(YYYY-MM)·날(YYYY-MM-DD) 키가 올해·이번 달·오늘이면 true (차트 평균선에서 뺄 때) */
+export const isOpenPeriod = (key?: string | number): boolean => {
+  const k = String(key ?? '');
+  return k === String(THIS_Y) || k === THIS_M || k === TODAY_KEY;
+};
 
 export const prevM = (mo?: string): string => {
   if (!mo || typeof mo !== 'string') return '';

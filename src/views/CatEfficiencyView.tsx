@@ -89,7 +89,7 @@ function memoByKey(f: (k: string) => number): (k: string) => number {
 
 /** 화면 설명 — 아이티켓은 zbyhp·cadkorea·전화문의 견적을 합산하고, 다른 사이트는 그 사이트 견적만 */
 const catEffDescription = (site?: SiteId) =>
-  `카테고리별 광고비 소진 대비 견적 획득 성과 및 획득단가(CPA) 비교 (견적은 ${site === 'oncore' ? '온코어' : '아이티켓·zbyhp·cadkorea·전화문의 합산'})`;
+  `카테고리별 광고비 소진 대비 견적 획득 성과 및 견적당 광고비(CPA) 비교 (견적은 ${site === 'oncore' ? '온코어' : '아이티켓·zbyhp·cadkorea·전화문의 합산'})`;
 
 export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
   data,

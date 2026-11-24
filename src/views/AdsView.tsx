@@ -11,6 +11,7 @@ import {
   THIS_M,
   THIS_Y,
   ym,
+  isOpenPeriod,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { daysOfMonth, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
@@ -233,7 +234,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={monthAvgDetail(yearKeys, allSpendMonths)}
             />
             <KpiCard label="전체 MDF 소진" value={`${fmt(mdfIn(yearKeys))}원`} sub="전체 기간 합계" detail={mdfShareOf(yearKeys)} />
-            <KpiCard label="전체 전환 1건당 광고비" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
+            <KpiCard label="전체 전환당 비용" value={cpaText(cpaIn(yearKeys))} sub="전체 기간 기준" detail={<KpiDetailItems items={[['광고전환', convIn(yearKeys)]]} />} />
           </>
         ) : yearTotal ? (
           <>
@@ -267,7 +268,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
               detail={mdfShareOf(yearMonths)}
             />
             <KpiCard
-              label={`${yearLabel} 전환 1건당 광고비`}
+              label={`${yearLabel} 전환당 비용`}
               value={cpaText(cpaIn(yearMonths))}
               cur={cpaIn(yearMonths) || null}
               prev={cpaIn(lastYrMonths) || null}
@@ -334,7 +335,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           detail={mdfRatioPct ? <p>광고비 대비 <b>{mdfRatioPct}%</b></p> : <p>광고비 대비 <b>0%</b></p>}
         />
         <KpiCard
-          label={`${curCaption} 전환 1건당 광고비`}
+          label={`${curCaption} 전환당 비용`}
           value={cpaText(cpa(curM))}
           cur={cpa(curM) || null}
           prev={cpa(pv) || null}
@@ -364,6 +365,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
           labels={months.map(colLabel)}
           series={chartSet === 'media' ? series : detailSeries}
           unit="만원"
+          partialLast={isOpenPeriod(months.at(-1))}
           tools={
             <SegmentedControl<'media' | 'compare'>
               mini

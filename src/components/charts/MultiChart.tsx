@@ -16,7 +16,21 @@ interface MultiChartProps {
   defaultType?: ChartType;
   /** 제목 오른쪽, 차트 종류 버튼 앞에 놓는 도구 (예: 보기 전환) */
   tools?: React.ReactNode;
+  /** 마지막 기간이 진행 중(덜 찬 달·연도)이면 true — 평균 점선 계산에서 뺀다 */
+  partialLast?: boolean;
 }
+
+/** 계열이 이만큼 이상이면 평균 점선은 범례에 마우스를 올린 계열만 보여 준다 */
+const AVG_HOVER_ONLY_FROM = 4;
+
+/** 계열 평균 — 마감된 기간만, 수집 시작 전(앞쪽 0)은 빼고 낸다. 마감된 기간에 값이 없으면 null (평균선 없음) */
+const seriesAverage = (v: number[], count: number): number | null => {
+  const closed = v.slice(0, count);
+  const start = closed.findIndex((x) => (x || 0) > 0);
+  if (start < 0) return null;
+  const pts = closed.slice(start);
+  return pts.reduce((a, x) => a + (x || 0), 0) / pts.length;
+};
 
 const CHART_TYPE_OPTIONS: { value: ChartType; label: string; title: string }[] = [
   { value: 'line', label: '꺾은선', title: '꺾은선' },
@@ -30,9 +44,10 @@ export const MultiChart: React.FC<MultiChartProps> = ({
   labels,
   series,
   unit,
-  emptyMessage = '표시할 데이터가 없습니다',
+  emptyMessage = '표시할 데이터가 없습니다.',
   defaultType = 'line',
   tools,
+  partialLast = false,
 }) => {
   const [chartType, setChartType] = useState<ChartType>(defaultType);
   const [hoverSeries, setHoverSeries] = useState<number | null>(null);
@@ -44,7 +59,12 @@ export const MultiChart: React.FC<MultiChartProps> = ({
   const r = rem();
   const H = 16 * r;
   const L = 3.5 * r;
-  const R = 1.5 * r;
+  // 평균 점선 — 꺾은선·그룹형에서 계열마다 같은 색 점선, 오른쪽 바깥에 '평균 값'. 글자 자리만큼 오른쪽 여백을 넓힌다
+  const avgs = series.map((s) => seriesAverage(s.v, labels.length - (partialLast ? 1 : 0)));
+  const avgFs = 0.625 * r;
+  const avgText = (a: number) => `평균 ${fmt(Math.round(a))}`;
+  const avgW = Math.max(0, ...avgs.map((a) => (a === null ? 0 : measureSvgText(avgText(a), avgFs) * 1.08)));
+  const R = chartType !== 'donut' && avgW > 0 ? Math.max(1.5 * r, avgW + 0.75 * r) : 1.5 * r;
   const T = 1.5 * r;
   const B = 2 * r;
   const pw = Math.max(10, W - L - R);
@@ -54,7 +74,7 @@ export const MultiChart: React.FC<MultiChartProps> = ({
   const bw = pw / N;
 
   const totals = labels.map((_, i) => series.reduce((a, s) => a + (s.v[i] || 0), 0));
-  const maxSeries = Math.max(1, ...series.flatMap((s) => s.v));
+  const maxSeries = Math.max(1, ...series.flatMap((s) => s.v), ...avgs.map((a) => a ?? 0));
   const max = niceMax(maxSeries);
 
   const getY = (v: number) => T + ph * (1 - Math.max(0, v || 0) / max);
@@ -394,6 +414,31 @@ export const MultiChart: React.FC<MultiChartProps> = ({
               </React.Fragment>
             );
           })}
+
+        {(() => {
+          // 평균 점선과 오른쪽 글자 — 글자끼리 겹치지 않게 위아래로 띄운다. 범례에 마우스를 올린 계열만 진하게
+          // 계열이 많으면(AVG_HOVER_ONLY_FROM 개 이상) 선이 겹쳐 어지러우므로 범례에 마우스를 올린 계열의 평균만 그린다
+          const hoverOnly = series.length >= AVG_HOVER_ONLY_FROM;
+          let lastY = -999;
+          return avgs
+            .map((a, si) => (a === null || (hoverOnly && hoverSeries !== si) ? null : { si, a, y: getY(a) }))
+            .filter((x): x is { si: number; a: number; y: number } => x !== null)
+            .sort((p, q) => p.y - q.y)
+            .map(({ si, a, y }) => {
+              const ty = Math.max(y + avgFs * 0.35, lastY + avgFs * 1.3);
+              lastY = ty;
+              const dimmed = hoverSeries !== null && hoverSeries !== si;
+              const active = hoverSeries === si;
+              return (
+                <g key={`avg-${si}`} className={`chart-avg s-${si}${active ? ' on' : ''}`} style={{ opacity: dimmed ? 0.12 : undefined }}>
+                  <line x1={L} x2={W - R} y1={y} y2={y} stroke={`var(${series[si].c})`} />
+                  <text x={W - R + 0.4 * r} y={ty} fill={`var(${series[si].c})`}>
+                    {avgText(a)}
+                  </text>
+                </g>
+              );
+            });
+        })()}
 
         {labels.map((m, i) => (
           <text key={`lbl-${i}`} x={getX(i)} y={H - 0.5 * r} textAnchor="middle">

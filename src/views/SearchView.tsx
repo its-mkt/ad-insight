@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { toggledSet } from '../utils/toggleSet';
 import type { CategoryMap, DashboardData, QuoteRawRow, QuoteRow, SyncStatus } from '../types/dashboard';
-import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, mLabel, sourceColorVar, sumBy } from '../utils/format';
+import { rowsByPeriod, cat1Of, pctLabel, ctrText, fmt, fmtWon, isOpenPeriod, mLabel, sourceColorVar, sumBy } from '../utils/format';
 import { compareMonthsOf, dotYm, monthsUpTo, periodStartsOf, yearRangeLabel, yearsOf, ymLabel } from '../utils/allPeriod';
 import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
 import { monthOfDay, monthsOfRange, rangeLabel, type DayRange, type MonthToDateCompare } from '../utils/dayRange';
@@ -164,7 +164,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       <View name="search" title={TITLE}>
         <ViewHeader title={`"${query}" ${TITLE}`} highlight={query} description={DESCRIPTION} status={status} />
         <Card name="empty" id="search-empty">
-          <EmptyState message={`${periodLabel}에 "${query}"와 일치하는 결과가 없습니다.`} subMessage={SEARCH_HINT} />
+          <EmptyState message={`${periodLabel}에 "${query}" 검색 결과가 없습니다.`} subMessage={SEARCH_HINT} />
           {!allPeriod && (
             <div className="search-actions">
               <Button size="sm" className="btn-search-all" id="btn-search-all" data-btn="search-all" onClick={onSelectAllPeriod}>
@@ -327,7 +327,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       {sourceScope ? (
         <ViewNote>
-          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만(2026.10~ 추적) · 광고비·CPA 없음
+          ※ {periodLabel} 기준 · 유입 매체 "{sourceScope}" 견적만 (2026.10.12부터 추적) · 광고비·CPA 없음
         </ViewNote>
       ) : (
       <ViewNote>
@@ -471,6 +471,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             labels={axisLabels}
             series={[{ k: sourceScope, c: sourceColorVar(sourceScope), v: monthlyTotal }].filter((s) => s.v.some((x) => x))}
             unit="건"
+            partialLast={isOpenPeriod(axis.at(-1))}
             emptyMessage="일치하는 견적이 없습니다."
           />
         ) : (
@@ -480,6 +481,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             labels={axisLabels}
             series={spendSeries}
             unit="만원"
+            partialLast={isOpenPeriod(axis.at(-1))}
             emptyMessage="일치하는 광고비가 없습니다."
           />
         )}
@@ -489,6 +491,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           labels={axisLabels}
           series={quoteSeries}
           unit="건"
+          partialLast={isOpenPeriod(axis.at(-1))}
           emptyMessage="일치하는 견적이 없습니다."
         />
       </div>
@@ -562,7 +565,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             )}
             <TableFootnote
               unit="건"
-              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 (매체 추적은 2026년 10월부터)"
+              basis="산출 근거: 제목·카테고리·유입 매체·담당자 일치 건 (매체 추적은 2026.10.12부터)"
             />
           </>
         )}

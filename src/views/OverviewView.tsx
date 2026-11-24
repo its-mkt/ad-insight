@@ -13,6 +13,7 @@ import {
   sumBy,
   THIS_M,
   ym,
+  isOpenPeriod,
 } from '../utils/format';
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
@@ -98,7 +99,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           status={status}
         />
         <KpiSection id="kpiOverview">
-          <KpiPlaceholder label="데이터 상태" value="연결 대기" message="상단 [연결 설정]을 완료해 주세요" />
+          <KpiPlaceholder label="데이터 상태" value="연결 대기" message="상단 [연결 설정]을 완료해 주세요." />
         </KpiSection>
         <SecSrc sources={OVERVIEW_SOURCES} />
       </View>
@@ -447,6 +448,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           labels={allPeriod ? spendYears.map((y) => `${y}년`) : months.map(mLabel)}
           series={spendSeries}
           unit="만원"
+          partialLast={isOpenPeriod(allPeriod ? spendYears.at(-1) : months.at(-1))}
           emptyMessage="취합된 광고비 데이터가 없습니다."
         />
         <MultiChart
@@ -455,6 +457,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           labels={allPeriod ? quoteYears.map((y) => `${y}년`) : months.map(mLabel)}
           series={quoteSeries}
           unit="건"
+          partialLast={isOpenPeriod(allPeriod ? quoteYears.at(-1) : months.at(-1))}
           emptyMessage="취합된 견적 데이터가 없습니다."
         />
       </div>

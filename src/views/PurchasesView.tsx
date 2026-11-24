@@ -14,7 +14,7 @@ import { TrendTable } from '../components/quotes/TrendTable';
 import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../data/ga4OrderSources';
 import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, goodsTotalsInRange, salesCutoff, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { daysOfMonth, sameRangeLastMonth } from '../utils/dayRange';
-import { fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
+import { fmt, isOpenPeriod, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 import { lastYearMonth, monthsUpTo, ymLabel } from '../utils/allPeriod';
 
 interface PurchasesViewProps {
@@ -178,19 +178,19 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   return (
     <View name="purchases" title={TITLE}>
       <ViewHeader title={TITLE} description="고도몰 기준 판매 건수" status={status} />
-      <ViewNote>※ 고도몰 결제완료일 기준 ·{hasOrders ? `${GODOMALL_ORDERS_AS_OF} 수집` : '수집 전'}</ViewNote>
+      <ViewNote>※ 고도몰 결제완료일 기준 · {hasOrders ? `${GODOMALL_ORDERS_AS_OF} 수집` : '수집 전'}</ViewNote>
 
       <KpiSection id="kpiPurchases">
         {allPeriod ? (
           <>
             <KpiCard label="전체 기간 판매 건수" value={hasOrders ? countText(totalOf(ALL_MONTHS)) : PENDING} sub={hasOrders ? `${ALL_MONTHS[0]} ~ ${ALL_MONTHS[ALL_MONTHS.length - 1]}` : undefined} />
-            <KpiCard label="월 평균" value={hasOrders ? avgText(totalOf(ALL_MONTHS) / ALL_MONTHS.length) : PENDING} />
+            <KpiCard label="월평균" value={hasOrders ? avgText(totalOf(ALL_MONTHS) / ALL_MONTHS.length) : PENDING} />
             {peakCard(ALL_MONTHS)}
           </>
         ) : yearTotal ? (
           <>
             <KpiCard label={`${yr}년 판매 건수`} value={hasOrders ? countText(ytdTotal) : PENDING} cur={hasOrders ? ytdTotal : null} prev={lastYtdTotal} cmpLabel="전년 동기" />
-            <KpiCard label="월 평균" value={hasOrders ? avgText(ytdTotal / mm) : PENDING} cur={hasOrders ? ytdTotal / mm : null} prev={lastYtdTotal === null ? null : lastYtdTotal / mm} cmpLabel="전년 동기" />
+            <KpiCard label="월평균" value={hasOrders ? avgText(ytdTotal / mm) : PENDING} cur={hasOrders ? ytdTotal / mm : null} prev={lastYtdTotal === null ? null : lastYtdTotal / mm} cmpLabel="전년 동기" />
             {peakCard(ytd)}
           </>
         ) : (
@@ -236,7 +236,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
 
       {!isMonth && (
         <>
-          <MultiChart id="chPurchases" title={allPeriod ? '연도별 판매 건수' : '월별 판매 건수'} labels={labels} series={series} unit="건" />
+          <MultiChart id="chPurchases" title={allPeriod ? '연도별 판매 건수' : '월별 판매 건수'} labels={labels} series={series} unit="건" partialLast={isOpenPeriod(allPeriod ? YEARS.at(-1) : ytd.at(-1))} />
           <TrendTable id="purchases-table" title={allPeriod ? '연도·월별 판매 건수' : `${yr}년 월별 판매 건수`} nameLabel="연도" labels={monthKeys.map((m) => `${m}월`)} series={tableSeries} isFuture={(i, row) => (allPeriod ? row !== null && ym(row.slice(0, 4), i + 1) > AS_OF_MONTH : i >= mm)} />
         </>
       )}
@@ -244,7 +244,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
       <PurchasedGoodsTable months={allPeriod ? ALL_MONTHS : yearTotal ? ytd : [selectedMonth]} periodLabel={allPeriod ? '전체 기간' : yearTotal ? `${yr}년` : `${monthName}${partial ? ` · ${AS_OF_DAY}일까지` : ''}`} />
 
       <Card name="purchases-source" id="purchases-source" title="유입 매체별 구매 참고값" subtitle={sourceLoading ? `(${sourcePeriod})` : sourceSubtitle}>
-        {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4Closed ? '진행 중인 달의 GA4 주문 완료 값은 달 합계로만 받아 오늘 값이 섞여 있어, 마감 후 반영합니다.' : ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
+        {sourceLoading ? <SkelList /> : <SourceBarChart id="chPurchaseSource" countLabel="측정" items={sourceItems} emptyMessage={ga4Closed ? '진행 중인 달의 GA4 주문 완료 값은 달 합계로만 받아서 오늘 값이 섞여 있어, 마감 후 반영합니다.' : ga4NotYet ? '이 기간의 GA4 주문 완료 값을 아직 받지 못했습니다.' : '이 기간은 GA4 주문 완료 값이 측정되지 않았습니다.'} />}
         <ViewNote>
           ※ GA4 {purchaseBasis ? '구매 이벤트' : '주문 완료 화면 방문(중복·누락 있음)'} · 판매 고도몰 · {ga.asOf || '–'} 수집
         </ViewNote>

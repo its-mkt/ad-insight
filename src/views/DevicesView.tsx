@@ -36,7 +36,7 @@ import { GODOMALL_ORDER_LINES, GODOMALL_ORDERS, lineInCutoff } from '../data/god
 import { usePreviewMode } from '../context/PreviewModeContext';
 import { previewRealDevices } from '../data/previewPayload';
 import { monthsUpTo, sameMonthsLastYear } from '../utils/allPeriod';
-import { ctrText, fmt, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
+import { ctrText, fmt, isOpenPeriod, mLabel, prevM, sumBy, THIS_M, ym } from '../utils/format';
 
 interface DevicesViewProps {
   status: SyncStatus;
@@ -194,6 +194,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
     const keys = axis.filter((key) => chartMonths.some((m) => inKey(m, key) && g[m] && pick(g[m])));
     return {
       labels: keys.map((k) => (allPeriod ? `${k}년` : mLabel(k))),
+      partialLast: isOpenPeriod(keys.at(-1)),
       series: KPI_DEVICES.map((d) => ({
         k: DEVICE_LABELS[d],
         c: DEVICE_COLORS[d],
@@ -337,6 +338,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
           labels={visitTrend.labels}
           series={visitTrend.series}
           unit="회"
+          partialLast={visitTrend.partialLast}
           emptyMessage="GA4 방문 값이 없습니다."
         />
         <MultiChart
@@ -345,6 +347,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
           labels={convTrend.labels}
           series={convTrend.series}
           unit="회"
+          partialLast={convTrend.partialLast}
           emptyMessage={estimateUntracked ? `이 기간에 기기별 ${convName}가 없습니다.` : `기기별 ${convName}는 ${PENDING}입니다 (GA4 기기별 전환 수집을 반영하면 채워집니다).`}
         />
           </>
@@ -419,7 +422,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
             </tbody>
           </table>
         ) : liveHidden ? (
-          <EmptyState message="진행 중인 달의 GA4 값은 달 합계로만 받아 오늘 값이 섞여 있어, 마감 후 반영합니다." />
+          <EmptyState message="진행 중인 달의 GA4 값은 달 합계로만 받아서 오늘 값이 섞여 있어, 마감 후 반영합니다." />
         ) : (
           <EmptyState message={`기기 × 채널 유입은 ${PENDING}입니다.`} subMessage="GA4 수집기에 기기별 유입·전환 수집을 반영하면 지난 달까지 채워집니다." />
         )}
@@ -496,7 +499,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
         )}
         <TableFootnote
           unit="원·회"
-          basis="산출 근거: 매체 API 기기별 실적 · 네이버는 태블릿을 모바일에 포함하고, 기기 구분을 최근 7일만 조회할 수 있어 2026-11 부터 날마다 쌓은 값 · 광고전환은 매체가 집계한 전환"
+          basis="산출 근거: 매체 API 기기별 실적 · 네이버는 태블릿을 모바일에 포함하고, 기기 구분을 최근 7일만 조회할 수 있어 2026-11부터 날마다 쌓은 값 · 광고전환은 매체가 집계한 전환"
           sources={[<AdApiSource key="src" prefix="출처:" suffix="API" />]}
         />
       </Card>
