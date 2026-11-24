@@ -14,6 +14,7 @@ import {
 import { EXTERNAL_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 import { quoteInsights, INSIGHT_FOOT_QUOTE } from '../utils/insights';
 import { quoteDetailsPending } from '../utils/quoteStats';
 import { inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
@@ -374,6 +375,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
         <InsightPanel
           name="quotes"
           aiPage="견적 상세"
+          aiClosed={isClosedAiPeriod({ selectedMonth, yearTotal, dayTo: period?.range.to })}
           items={quoteInsights(
             kpiQuotes,
             yearTotal ? quotes.filter(inMonths(lastYrMonths)) : quotes.filter((r) => r.month === pv),

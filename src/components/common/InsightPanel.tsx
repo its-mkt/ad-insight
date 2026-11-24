@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Lightbulb, RotateCw, Sparkles, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import type { Insight, InsightTone } from '../../utils/insights';
-import { AI_ERROR_TEXT, AiReadyContext, cachedAiInsight, requestAiInsight, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
+import { AI_ERROR_TEXT, AiReadyContext, cachedAiInsight, requestAiInsight, todayKey, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
 import { Card } from './Card';
 import { Muted } from './Muted';
 import { Button } from './Button';
@@ -22,6 +22,8 @@ interface InsightPanelProps {
   aiPage?: string;
   /** Claude 에 함께 보낼 화면 수치 요약 (utils/aiFacts) — 규칙 문장만으로 부족한 화면에서 쓴다 */
   aiData?: Record<string, unknown>;
+  /** 끝난 기간(지난달·지난해)이면 true — 숫자가 더 바뀌지 않으므로 날짜가 바뀌어도 받아 둔 답을 계속 쓴다 (utils/aiFacts isClosedAiPeriod) */
+  aiClosed?: boolean;
   /** 카테고리 이름을 누르면 그 카테고리로 검색한다 */
   onSelectCategory?: (cat1: string) => void;
   /** 키워드를 누르면 그 키워드로 검색한다 */
@@ -33,11 +35,6 @@ const ICONS: Record<InsightTone, LucideIcon> = {
   good: TrendingUp,
   bad: TrendingDown,
   info: Lightbulb,
-};
-
-const todayKey = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 /** 인사이트 한 줄 (규칙 결과·AI 결과 공용) */
@@ -62,13 +59,13 @@ type AiState = { key: string; result?: AiInsightResult; error?: string; loading?
  * aiPage 를 주면 화면을 열 때 Claude 요약을 받아 핵심 요약 자리에 둔다 (받는 동안·실패하면 규칙 요약).
  * 규칙 문장은 utils/insights 가 만든다.
  */
-export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, aiData, onSelectCategory, onSelectKeyword }) => {
+export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, aiData, aiClosed, onSelectCategory, onSelectKeyword }) => {
   const facts = useMemo<AiInsightFacts | null>(
     () =>
       aiPage && items.length
-        ? { page: aiPage, basis, today: todayKey(), insights: items.map((it) => ({ type: it.tone, head: it.head, target: it.target, text: it.text })), ...(aiData && { data: aiData }) }
+        ? { page: aiPage, basis, ...(aiClosed ? { 기간상태: '마감' as const } : { today: todayKey() }), insights: items.map((it) => ({ type: it.tone, head: it.head, target: it.target, text: it.text })), ...(aiData && { data: aiData }) }
         : null,
-    [aiPage, aiData, basis, items]
+    [aiPage, aiData, aiClosed, basis, items]
   );
   const factsKey = facts ? JSON.stringify(facts) : '';
   const [ai, setAi] = useState<AiState>({ key: '' });

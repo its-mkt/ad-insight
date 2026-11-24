@@ -18,8 +18,9 @@ export interface AiInsightResult {
 export interface AiInsightFacts {
   page: string;
   basis: string;
-  /** 오늘 날짜 — 진행 중인 기간인지 판단하게 한다 */
-  today: string;
+  /** 오늘 날짜 — 진행 중인 기간인지 판단하게 한다. 끝난 기간이면 넣지 않고 기간상태 '마감'을 넣는다 */
+  today?: string;
+  기간상태?: '마감';
   insights: { type: string; head: string; target?: string; text: string }[];
   /** 화면 수치 요약 (KPI·추이·상위 키워드 등, utils/aiFacts) — 있으면 Claude 가 규칙 문장과 함께 읽는다 */
   data?: Record<string, unknown>;
@@ -27,8 +28,19 @@ export interface AiInsightFacts {
 
 const CACHE_PREFIX = 'adi:ai-insight:';
 
-/** 같은 날 같은 자료면 다시 묻지 않는다 (비용 절약). 저장소를 못 쓰면 그냥 매번 묻는다 */
-const cacheKey = (facts: AiInsightFacts): string => `${CACHE_PREFIX}${facts.today}:${JSON.stringify(facts)}`;
+/** 오늘 날짜 키 (YYYY-MM-DD) */
+export const todayKey = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** 끝난 기간의 답 — 날짜가 바뀌어도 지우지 않는다 (숫자가 그대로라 같은 답) */
+const CLOSED = 'closed';
+/** 끝난 기간의 답을 몇 개까지 남길지 — 넘으면 오래된 것부터 지운다 */
+const MAX_CLOSED = 40;
+
+/** 같은 날(끝난 기간은 날짜와 상관없이) 같은 자료면 다시 묻지 않는다 (비용 절약). 저장소를 못 쓰면 그냥 매번 묻는다 */
+const cacheKey = (facts: AiInsightFacts): string => `${CACHE_PREFIX}${facts.today || CLOSED}:${JSON.stringify(facts)}`;
 
 export function cachedAiInsight(facts: AiInsightFacts): AiInsightResult | null {
   try {
@@ -39,13 +51,17 @@ export function cachedAiInsight(facts: AiInsightFacts): AiInsightResult | null {
   }
 }
 
-/** 오늘이 아닌 캐시는 지운다 */
+/** 오늘이 아닌 캐시는 지운다 — 끝난 기간의 답은 남기되 MAX_CLOSED 개까지만 (저장 순서는 알 수 없어 키 순서로 앞쪽부터 지운다) */
 function pruneCache(today: string): void {
   try {
+    const closed: string[] = [];
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k?.startsWith(CACHE_PREFIX) && !k.startsWith(`${CACHE_PREFIX}${today}:`)) localStorage.removeItem(k);
+      if (!k?.startsWith(CACHE_PREFIX)) continue;
+      if (k.startsWith(`${CACHE_PREFIX}${CLOSED}:`)) closed.push(k);
+      else if (!k.startsWith(`${CACHE_PREFIX}${today}:`)) localStorage.removeItem(k);
     }
+    closed.slice(0, Math.max(0, closed.length - MAX_CLOSED)).forEach((k) => localStorage.removeItem(k));
   } catch {
     /* 저장소를 못 쓰면 넘어간다 */
   }
@@ -75,7 +91,7 @@ export async function requestAiInsight(facts: AiInsightFacts): Promise<AiInsight
     }
     throw new Error(code);
   }
-  pruneCache(facts.today);
+  pruneCache(todayKey());
   try {
     localStorage.setItem(cacheKey(facts), JSON.stringify(data.result));
   } catch {

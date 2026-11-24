@@ -27,6 +27,7 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { dotYm, monthsUpTo, periodStartsOf, sameMonthsLastYear, uncollectedMedia, yearRangeLabel, ymLabel } from '../utils/allPeriod';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 import { mediaInsights, INSIGHT_FOOT_MEDIA } from '../utils/insights';
 import { spendSeriesOf } from '../utils/chartSeries';
 
@@ -348,6 +349,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
       <InsightPanel
         name="ads"
         aiPage="매체 광고비"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
         items={mediaInsights(statsRows, statsPrev, allPeriod ? undefined : statsCmp)}
         basis={statsLabel}
         foot={INSIGHT_FOOT_MEDIA}

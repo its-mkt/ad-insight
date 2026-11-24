@@ -3,7 +3,7 @@
 import type { CampaignKeywordBucket, KeywordRow } from '../types/dashboard';
 import type { SearchResult } from './search';
 import { mediaKo } from './constants';
-import { sumBy } from './format';
+import { sumBy, THIS_M, THIS_Y } from './format';
 
 type Row = { month: string; cost?: number; count?: number };
 
@@ -107,4 +107,16 @@ export function searchAiData(i: SearchAiDataInput): Record<string, unknown> {
       키워드_수: keywordTotals(r.keywords).length,
     }),
   };
+}
+
+/**
+ * AI 요약을 받을 기간이 끝났는지 — 끝난 기간(지난달·지난해)은 숫자가 더 바뀌지 않아 받아 둔 답을 날짜가 바뀌어도 계속 쓴다.
+ * 전체 기간·올해 합계·이번 달·이번 달 날짜는 진행 중이다
+ */
+export function isClosedAiPeriod(p: { selectedMonth?: string; allPeriod?: boolean; yearTotal?: boolean; dayTo?: string }): boolean {
+  if (p.allPeriod) return false;
+  if (p.dayTo) return p.dayTo.slice(0, 7) < THIS_M;
+  if (!p.selectedMonth) return false;
+  if (p.yearTotal) return Number(p.selectedMonth.slice(0, 4)) < THIS_Y;
+  return p.selectedMonth < THIS_M;
 }

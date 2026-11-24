@@ -37,6 +37,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, monthsUpTo, periodStartsOf, yearRangeLabel } from '../utils/allPeriod';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 import { categoryInsights, groupCat1, INSIGHT_FOOT_CAT } from '../utils/insights';
 
 interface CatEfficiencyViewProps {
@@ -332,6 +333,7 @@ export const CatEfficiencyView: React.FC<CatEfficiencyViewProps> = ({
       <InsightPanel
         name="cat-eff"
         aiPage="카테고리 효율"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
         items={categoryInsights(catFilter.cat1 ? catData.filter((c) => c.k.includes(' > ')) : groupCat1(catData))}
         basis={catFilter.cat1 ? `${periodLabel} · ${catFilter.cat1}` : periodLabel}
         foot={INSIGHT_FOOT_CAT}

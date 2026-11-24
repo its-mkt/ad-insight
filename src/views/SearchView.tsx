@@ -33,7 +33,7 @@ import { SearchKeywordTable } from '../components/search/SearchKeywordTable';
 import { SearchQuoteBreakdown } from '../components/search/SearchQuoteBreakdown';
 import { SearchQuoteTable } from '../components/search/SearchQuoteTable';
 import { InsightPanel } from '../components/common/InsightPanel';
-import { searchAiData } from '../utils/aiFacts';
+import { isClosedAiPeriod, searchAiData } from '../utils/aiFacts';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 import { keywordInsights, quoteInsights, quoteRowsOfRaw, scopeCpaInsight, summaryInsight, INSIGHT_FOOT_SEARCH } from '../utils/insights';
@@ -416,7 +416,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </KpiSection>
       )}
 
-      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} aiData={searchAi} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
+      <InsightPanel name="search" aiPage={`검색 결과: ${query}`} aiData={searchAi} aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: dayRange?.to })} items={searchInsights} basis={periodLabel} foot={INSIGHT_FOOT_SEARCH} />
 
       <ChartTableToggle value={trendMode} onChange={setTrendMode} />
       {trendMode === 'table' ? (

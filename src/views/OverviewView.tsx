@@ -39,6 +39,7 @@ import { quoteSeriesOf, spendSeriesOf } from '../utils/chartSeries';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 import { cat1Stats, categoryInsights, keywordInsights, summaryInsight, INSIGHT_FOOT_CAT_KW, type InsightTotals } from '../utils/insights';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 
 interface OverviewViewProps {
   data: DashboardData;
@@ -429,6 +430,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <InsightPanel
         name="overview"
         aiPage="종합 요약"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
         items={insights}
         basis={insightBasis}
         foot={INSIGHT_FOOT_CAT_KW}

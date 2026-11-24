@@ -28,6 +28,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { cmpLabelOf, compareMonthsOf, dotYm, inMonths, mergeKeywordMonths, monthsUpTo, uncollectedItems, yearRangeLabel, ymLabel } from '../utils/allPeriod';
 import { campaignBuckets, groupKeywordRows, withGroupTotals } from '../utils/keywordGroups';
 import { InsightPanel } from '../components/common/InsightPanel';
+import { isClosedAiPeriod } from '../utils/aiFacts';
 import { adTotalsInsight, keywordInsights, INSIGHT_FOOT_KW } from '../utils/insights';
 
 interface KeywordsViewProps {
@@ -260,6 +261,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
       <InsightPanel
         name="keywords"
         aiPage="키워드·소재"
+        aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
         items={[
           ...[adTotalsInsight({ cost: totalCost, clk: totalClk, conv: totalConv }, hasPvData ? { cost: pvCost, clk: pvClk, conv: pvConv } : null, cmpLabel)].filter((x) => x != null),
           ...(period ? [] : keywordInsights(activeGroups.flatMap((g) => g.list))),
