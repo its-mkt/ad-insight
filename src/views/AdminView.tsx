@@ -25,9 +25,9 @@ const CHANNEL_OPTIONS: { value: QuoteChannel; label: string }[] = [
   { value: 'phone', label: '전화문의' },
 ];
 
-/** 표에 올릴 행 — 아이티켓은 2026-10 이후만, 다른 사이트는 건수가 적어 전체를 보여 준다 */
+/** 표에 올릴 행 — 사이트·기간 구분 없이 원장 전체를 올린다 (보는 범위는 상단 기간 바·표 필터로 고른다) */
 const toAdminRows = (raw: QuoteRawRow[], sites: QuoteRawRow[]): QuoteRawRow[] => [
-  ...raw.filter((r) => r.date >= '2026-10'),
+  ...raw,
   ...sites,
 ];
 

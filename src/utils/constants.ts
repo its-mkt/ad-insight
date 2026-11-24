@@ -35,6 +35,24 @@ export const CATEGORY_HIERARCHY: CatHierarchyNode[] = [
   { cat1: '기타', cat2: [] },
 ];
 
+/**
+ * 온코어 표준 카테고리 분류표 — 온코어 쇼핑몰 메뉴(서버·워크스테이션·데스크탑·노트북·스토리지) 순서로, 이름은 아이티켓 분류표와 같게 쓴다.
+ * 2026-11-24 쇼핑몰 카테고리 확인: 서버(Lenovo ThinkSystem·ASUS AI GPU 서버), 워크스테이션(Lenovo ThinkStation P2~P5),
+ * 데스크탑(Lenovo ThinkCentre·ASUS ExpertCenter), 노트북(Lenovo ThinkPad·ASUS ExpertBook), 스토리지(HCF All-Flash SAN·NAS)
+ * (광고그룹 매핑·견적에 이미 쓰인 이름과 맞추기 위함). 분류를 더하거나 빼려면 여기를 고친다 (utils/categoryHierarchy)
+ */
+export const ONCORE_CATEGORY_HIERARCHY: CatHierarchyNode[] = [
+  { cat1: 'Lenovo 서버', cat2: [] },
+  { cat1: 'GPU/AI 서버', cat2: [] },
+  { cat1: '서버공통(주변장비)', cat2: [] },
+  { cat1: '데스크탑 워크스테이션', cat2: [] },
+  { cat1: '데스크탑', cat2: [] },
+  { cat1: '노트북', cat2: ['Lenovo 노트북', 'ASUS 노트북'] },
+  { cat1: 'SAN 스토리지', cat2: [] },
+  { cat1: 'NAS 스토리지', cat2: [] },
+  { cat1: '기타', cat2: [] },
+];
+
 export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',

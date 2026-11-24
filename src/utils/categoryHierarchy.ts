@@ -1,15 +1,33 @@
 import { createContext } from 'react';
 import type { DashboardData } from '../types/dashboard';
-import { CATEGORY_HIERARCHY, type CatHierarchyNode } from './constants';
+import { CATEGORY_HIERARCHY, ONCORE_CATEGORY_HIERARCHY, type CatHierarchyNode } from './constants';
 import { parseCatParts } from './format';
 
+/** 사이트별로 정해 둔 분류표 */
+const SITE_HIERARCHY: Record<string, CatHierarchyNode[]> = { oncore: ONCORE_CATEGORY_HIERARCHY };
+
 /**
- * 사이트의 표준 카테고리 분류표 — 카테고리 필터(검색 창 등)가 항상 보여 줄 1차·2차 목록.
- * 아이티켓은 정해 둔 분류표(CATEGORY_HIERARCHY)를 쓰고, 분류표가 따로 없는 사이트(온코어)는
- * 그 사이트 데이터(광고그룹 매핑·견적)에 실제로 쓰인 분류를 많이 쓰인 순서로 모은다. '기타'는 맨 뒤.
+ * 사이트의 표준 카테고리 분류표 — 카테고리 필터(검색 창 등)·카테고리 지정 목록이 항상 보여 줄 1차·2차 목록.
+ * 아이티켓은 CATEGORY_HIERARCHY 그대로. 온코어는 ONCORE_CATEGORY_HIERARCHY 에, 데이터(광고그룹 매핑·견적)에만 있는
+ * 분류(예전 값 등)를 뒤에 붙인다. 분류표를 정해 두지 않은 사이트는 데이터에 쓰인 분류를 많이 쓰인 순서로 모은다. '기타'는 맨 뒤.
  */
 export function categoryHierarchyOf(site: string, data: DashboardData): CatHierarchyNode[] {
   if (site === 'itket') return CATEGORY_HIERARCHY;
+  const fromData = usedHierarchyOf(data);
+  const defined = SITE_HIERARCHY[site];
+  if (!defined) return fromData;
+  // 정해 둔 분류표 뒤에 데이터에만 있는 1차·2차를 붙인다 ('기타'는 맨 뒤 그대로)
+  const merged = defined.map((n) => {
+    const extra = fromData.find((d) => d.cat1 === n.cat1)?.cat2.filter((c) => !n.cat2.includes(c)) ?? [];
+    return { cat1: n.cat1, cat2: [...n.cat2, ...extra] };
+  });
+  const extras = fromData.filter((d) => !defined.some((n) => n.cat1 === d.cat1));
+  const etc = merged.filter((n) => n.cat1 === '기타');
+  return [...merged.filter((n) => n.cat1 !== '기타'), ...extras.filter((n) => n.cat1 !== '기타'), ...etc];
+}
+
+/** 데이터(광고그룹 매핑·견적)에 쓰인 분류를 많이 쓰인 순서로 — '기타'는 맨 뒤 */
+function usedHierarchyOf(data: DashboardData): CatHierarchyNode[] {
   const count = new Map<string, number>();
   const cat2Count = new Map<string, Map<string, number>>();
   const add = (raw?: string) => {
@@ -40,14 +58,3 @@ export function searchExamplesOf(site: string, hierarchy: CatHierarchyNode[]): s
   return [...hierarchy.map((n) => n.cat1).filter((c) => c !== '기타').slice(0, 2), '네이버'].join(', ');
 }
 
-/**
- * 카테고리를 지정할 때 고르는 목록 — 사이트 분류표를 앞에 두고, 아이티켓 분류표에만 있는 분류를 뒤에 붙인다.
- * 온코어처럼 데이터로 모은 분류표는 아직 쓰지 않은 분류가 빠져 있어, 새 분류도 고를 수 있게 한다. 아이티켓은 분류표 그대로.
- */
-export function pickableHierarchyOf(hierarchy: CatHierarchyNode[]): CatHierarchyNode[] {
-  if (hierarchy === CATEGORY_HIERARCHY) return hierarchy;
-  const stdOf = (cat1: string) => CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1)?.cat2 ?? [];
-  const merged = hierarchy.map((n) => ({ cat1: n.cat1, cat2: [...n.cat2, ...stdOf(n.cat1).filter((c) => !n.cat2.includes(c))] }));
-  const have = new Set(hierarchy.map((n) => n.cat1));
-  return [...merged, ...CATEGORY_HIERARCHY.filter((n) => !have.has(n.cat1))];
-}
