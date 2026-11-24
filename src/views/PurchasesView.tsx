@@ -178,7 +178,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
   return (
     <View name="purchases" title={TITLE}>
       <ViewHeader title={TITLE} description="고도몰 기준 판매 건수" status={status} />
-      <ViewNote>※ 고도몰 결제완료일 기준 · {hasOrders ? `${GODOMALL_ORDERS_AS_OF} 수집` : '수집 전'}</ViewNote>
+      {/* 온라인 결제만 센다 — 견적을 받고 계좌이체·세금계산서로 따로 마무리한 거래는 고도몰 주문이 아니라 빠진다 (두 사이트 같은 문구) */}
+      <ViewNote>※ 고도몰 쇼핑몰에서 결제된 주문만 집계 (견적 후 계좌이체·세금계산서 등 별도 결제 거래 제외) · 결제완료일 기준 · {hasOrders ? `${GODOMALL_ORDERS_AS_OF} 수집` : '수집 전'}</ViewNote>
 
       <KpiSection id="kpiPurchases">
         {allPeriod ? (
