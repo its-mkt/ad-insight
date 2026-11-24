@@ -117,18 +117,27 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
     <Card
       name="insight"
       id={`${name}-insight`}
+      // Claude 답을 받았을 때만 'AI 요약' — 받는 중·실패·aiPage 없음은 규칙 문장이므로 '자동 인사이트'
       title={
-        <>
-          <Lightbulb size="1rem" aria-hidden="true" className="ins-title-ic" />
-          자동 인사이트
-        </>
+        view.result ? (
+          <>
+            <Sparkles size="1rem" aria-hidden="true" className="ins-title-ic" />
+            AI 요약
+          </>
+        ) : (
+          <>
+            <Lightbulb size="1rem" aria-hidden="true" className="ins-title-ic" />
+            자동 인사이트
+          </>
+        )
       }
-      subtitle={`(${basis}${view.result ? ' · Claude 요약' : ' · 수집 데이터 규칙 분석'})`}
+      subtitle={`(${basis}${view.result ? ' · Claude 분석' : ' · 수집 데이터 규칙 분석'})`}
+      // 답을 받으면 다시 묻지 않는다 (같은 날 같은 자료는 같은 답). 실패했을 때만 다시 시도할 수 있게 둔다
       tools={
         facts &&
-        (view.result || view.error) && (
+        view.error && (
           <Button size="xs" icon={RotateCw} onClick={() => run(facts, factsKey)} className="ins-ai-btn">
-            다시 분석
+            다시 시도
           </Button>
         )
       }
