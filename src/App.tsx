@@ -42,6 +42,7 @@ import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
 import { AiInsightContext } from './lib/aiInsight';
+import { categoryHierarchyOf } from './utils/categoryHierarchy';
 
 /** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
 const cmpRangeText = (r: DayRange): string => {
@@ -399,6 +400,8 @@ export const App: React.FC = () => {
     document.body.classList.add('lock');
   };
 
+  // 검색 창의 표준 카테고리 목록 — 아이티켓은 분류표, 온코어는 온코어 데이터에 쓰인 분류
+  const categoryHierarchy = useMemo(() => categoryHierarchyOf(site, data), [site, data]);
   // AI 요약 — 최신 데이터가 왔을 때만 묻고, 답은 사이트별로 서버에 저장한다
   const aiContext = useMemo(() => ({ ready: status === 'live' && !isSyncing, site }), [status, isSyncing, site]);
 
@@ -611,6 +614,7 @@ export const App: React.FC = () => {
         <SearchDialog
           data={data}
           categoryMap={categoryMap}
+          categoryHierarchy={categoryHierarchy}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           initialQuery={currentView === 'search' ? searchQuery : ''}

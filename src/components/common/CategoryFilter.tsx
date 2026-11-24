@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { trackCategoryFilter } from '../../lib/usage';
-import { CATEGORY_HIERARCHY } from '../../utils/constants';
+import { CATEGORY_HIERARCHY, type CatHierarchyNode } from '../../utils/constants';
 import { parseCatParts } from '../../utils/format';
 import { Dropdown, type DropdownOption } from './Dropdown';
 
@@ -44,12 +44,14 @@ export interface CategoryFilterModel {
  */
 export function buildCategoryFilter(
   keys: string[],
-  state: ReturnType<typeof useCategoryFilterState>
+  state: ReturnType<typeof useCategoryFilterState>,
+  /** 항상 보여 줄 분류표 — 사이트마다 다르다 (utils/categoryHierarchy). 기본은 아이티켓 분류표 */
+  hierarchy: CatHierarchyNode[] = CATEGORY_HIERARCHY
 ): CategoryFilterModel {
   // 1차: 분류표(CATEGORY_HIERARCHY) 전체를 항상 보여 주고, 데이터에만 있는 값(옛 견적 분류 등)은 뒤에 붙인다
   const cat1Set = [
     ...new Set([
-      ...CATEGORY_HIERARCHY.map((n) => n.cat1),
+      ...hierarchy.map((n) => n.cat1),
       ...keys.map((k) => parseCatParts(k).cat1),
     ]),
   ];
@@ -65,7 +67,7 @@ export function buildCategoryFilter(
           .filter(Boolean)
       ),
     ];
-    const known = CATEGORY_HIERARCHY.find((n) => n.cat1 === c1)?.cat2 ?? [];
+    const known = hierarchy.find((n) => n.cat1 === c1)?.cat2 ?? [];
     return [...known, ...inData.filter((c) => !known.includes(c))];
   };
   const cat2Set = cat1 ? cat2Of(cat1) : [];

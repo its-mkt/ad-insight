@@ -2,7 +2,7 @@ import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Clock, Search, Star, X } from 'lucide-react';
 import type { CategoryMap, DashboardData } from '../../types/dashboard';
 import { fmt, mLabel } from '../../utils/format';
-import { mediaKo } from '../../utils/constants';
+import { mediaKo, type CatHierarchyNode } from '../../utils/constants';
 import { adDisplayTitle } from '../../utils/creativeImage';
 import { formatCategoryScope, formatScope, parseScope, searchDashboard, type SearchTab } from '../../utils/search';
 import { clearRecentSearches, loadRecentSearches, removeRecentSearch, sameSearch } from '../../utils/recentSearches';
@@ -14,6 +14,8 @@ import { TextInput } from '../common/TextInput';
 interface SearchDialogProps {
   data: DashboardData;
   categoryMap: CategoryMap;
+  /** 표준 카테고리 목록 — 사이트마다 다르다 (utils/categoryHierarchy categoryHierarchyOf) */
+  categoryHierarchy: CatHierarchyNode[];
   initialQuery: string;
   isLoggedIn: boolean;
   /** 새 검색의 기준 달(YYYY-MM) — 결과 페이지와 같은 기간으로 미리 보여 준다 */
@@ -46,6 +48,7 @@ function rankedNames(rows: { name: string; media: string; cost: number }[]): { n
 export const SearchDialog: React.FC<SearchDialogProps> = ({
   data,
   categoryMap,
+  categoryHierarchy,
   initialQuery,
   isLoggedIn,
   month,
@@ -88,7 +91,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
         : [],
     [data.spend, campaign]
   );
-  // 표준 카테고리 목록은 분류표(CATEGORY_HIERARCHY) 기준 — 데이터에 아직 없는 분류도 고를 수 있다
+  // 표준 카테고리 목록은 그 사이트의 분류표 기준 — 데이터에 아직 없는 분류도 고를 수 있다 (온코어는 온코어 데이터에 쓰인 분류)
   const categoryFilter = buildCategoryFilter([], {
     cat1,
     cat2,
@@ -97,7 +100,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({
       setCat2('');
     },
     setCat2,
-  });
+  }, categoryHierarchy);
   const keywordOptions = useMemo(
     () =>
       campaign && adgroup
