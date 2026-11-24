@@ -33,7 +33,7 @@ import { SearchKeywordTable } from '../components/search/SearchKeywordTable';
 import { SearchQuoteBreakdown } from '../components/search/SearchQuoteBreakdown';
 import { SearchQuoteTable } from '../components/search/SearchQuoteTable';
 import { InsightPanel } from '../components/common/InsightPanel';
-import { isClosedAiPeriod, searchAiData } from '../utils/aiFacts';
+import { aiOpenDay, isClosedAiPeriod, searchAiData } from '../utils/aiFacts';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { cpaInMonths, cpaSince } from '../utils/cpa';
 import { keywordInsights, quoteInsights, quoteRowsOfRaw, scopeCpaInsight, summaryInsight, INSIGHT_FOOT_SEARCH } from '../utils/insights';
@@ -294,6 +294,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
     result,
     prevResult,
     cmpLabel,
+    openDay: aiOpenDay({ selectedMonth, allPeriod, yearTotal, dayRange }),
     months,
     allSpend: data.spend,
     allQuotes: quoteStats.quotes,

@@ -5,7 +5,9 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@1.12.0';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const MODEL = 'claude-opus-5-5';
+// AI 요약은 품질이 중요해 가장 뛰어난 모델을 쓴다 (2026-11-24 사용자 허용). 이 모델이 계정 설정 등으로 거부되면 FALLBACK_MODEL 로 다시 묻는다
+const MODEL = 'claude-fable-5-2';
+const FALLBACK_MODEL = 'claude-opus-5-5';
 
 /** 열람 권한을 판정하는 수집기 웹앱 (화면의 기본값과 같음) — 바꾸려면 WHOAMI_URL 비밀값 */
 const WHOAMI_URL =
@@ -45,14 +47,17 @@ JSON 에 data 가 있으면 그 화면의 수치 요약(KPI·비교 기간·추�
 추천(actions)을 고르는 법:
 - 최대 4개(보통 2~4개), 영향이 큰 순서로 고릅니다. 마케터·담당자가 실제로 챙겨 보는 관점(예: 키워드별 성과, 카테고리별 효율, 광고비 집행·매체 배분, 견적 흐름)에서 이번 주에 손댈 수 있는 것만 넣습니다. 한 관점에서 여러 개를 내기보다 서로 다른 관점을 고르게 다루고, 할 말이 없는 관점은 억지로 채우지 않습니다. "모니터링하세요" 같은 일반론은 넣지 않습니다.
 - 각 추천에는 왜 그것인지 보여 주는 숫자 하나 이상을 붙입니다.
+- 추천마다 손댈 대상(키워드·캠페인·카테고리·매체 이름)과 방향(줄이기·늘리기·옮기기·점검)을 분명히 씁니다. 줄이자는 추천과 늘리자는 추천이 있으면 서로 이어 "어디서 줄여 어디로 옮길지" 가 보이게 합니다.
+- 건수가 아주 적은 근거(전환 1~2건, 견적 몇 건)로 확대를 권할 때는 표본이 작다는 점을 짧게 붙입니다.
 - 추천 본문(text)은 공백 포함 최대 90자로 압축합니다. 넘으면 다시 줄여 씁니다. "무엇을 할지 + 핵심 근거 숫자 1~2개" 만 남기고 배경 설명·조건 나열·반복·인사말은 뺍니다. 금액은 만원 단위로 반올림합니다 (예: "서버 예산을 스토리지로 옮겨 보세요 — 서버 CPA 12만원, 스토리지 5만원").
 - 광고비 비중이 작거나 건수가 적어 우연일 수 있는 변화는 크게 다루지 않습니다.
 
 숫자와 사실에 대해서는 엄격합니다:
 - 숫자는 JSON 에 있는 값만 씁니다. 새 숫자·추정치·예측치(예: 다음 달 예상 견적)를 만들지 않습니다. 계산이 필요하면 JSON 의 두 값으로 바로 나오는 비율·차이만 씁니다. 큰 금액을 만원 단위로 반올림해 쓰는 것은 괜찮습니다.
 - JSON 에 없는 사실(경쟁사, 시즌, 시장 상황)은 단정하지 않고, 필요하면 확인해 볼 것으로만 적습니다.
-- '전환'은 광고 매체가 집계한 전환이고 '견적'은 실제 견적 접수입니다. 둘을 섞지 않습니다.
-- 진행 중인 기간(어제까지 집계)이면 덜 찬 값이라는 점을 감안해 단정하지 않습니다.
+- '전환'은 광고 매체가 집계한 전환이고 '견적'은 실제 견적 접수입니다. 둘을 섞지 않습니다. 성과 판정(좋다·나쁘다)은 견적 기준으로 하고, 키워드·캠페인별 추천은 키워드별 견적이 수집되지 않아 매체 전환 기준이므로 그 추천에는 '전환' 이라는 말을 그대로 씁니다.
+- 추정CPA 는 광고비 ÷ 그 범위의 전체 견적(직접·전화 등 광고 외 유입 포함)입니다. 광고만으로 얻은 견적의 단가가 아니므로 '광고 효율' 로 단정할 때는 견적 구성의 광고 유입 건수를 함께 봅니다.
+- 진행 중인 기간(이번기간_집계 가 있거나 오늘이 그 기간 안)이면 덜 찬 값입니다. 한 달 전체 값(참고_…_한달전체)과 바로 비교해 '줄었다' 고 판정하지 않습니다. 같은기간 값이 있으면 그것과 비교하고, 없으면 증감 판정을 하지 않고 비중·CPA 같은 비율로만 판단합니다.
 
 한국어 존댓말(~합니다/~해 보세요)로, 마케터끼리 쓰는 말투로 짧고 단정하게 씁니다.`;
 
@@ -135,9 +140,9 @@ Deno.serve(async (req: Request) => {
   if (stored.data) return json({ result: stored.data.result, model: stored.data.model, cached: true }, 200, origin);
 
   const client = new Anthropic(); // ANTHROPIC_API_KEY 비밀값을 읽는다
-  try {
-    const response = await client.beta.messages.create({
-      model: MODEL,
+  const ask = (model: string) =>
+    client.beta.messages.create({
+      model,
       max_tokens: 16000,
       // 안전 분류기가 거절하면 서버가 다른 모델로 다시 돌린다 (거절 범주별 기본 경로)
       betas: ['server-side-fallback-2026-07-01'],
@@ -146,6 +151,15 @@ Deno.serve(async (req: Request) => {
       system: SYSTEM,
       messages: [{ role: 'user', content: `대시보드 화면 자료(JSON):\n${JSON.stringify(facts)}` }],
     });
+  try {
+    let response;
+    try {
+      response = await ask(MODEL);
+    } catch (e) {
+      // 상위 모델을 이 계정에서 쓸 수 없으면(데이터 보관 설정·권한 등 400/403/404) 기본 모델로 다시 묻는다
+      if (e instanceof Anthropic.APIError && [400, 403, 404].includes(e.status ?? 0)) response = await ask(FALLBACK_MODEL);
+      else throw e;
+    }
     if (response.stop_reason === 'refusal') return json({ error: 'refusal' }, 422, origin);
     if (response.stop_reason === 'max_tokens') return json({ error: 'truncated' }, 502, origin);
     const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');

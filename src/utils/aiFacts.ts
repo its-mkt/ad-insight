@@ -35,6 +35,8 @@ export interface SearchAiDataInput {
   /** 비교 기간 결과 (전월·전년 동기). 없으면 비교하지 않는다 */
   prevResult: SearchResult | null;
   cmpLabel?: string;
+  /** 이번 달이 진행 중이면 오늘이 며칠인지 — 비교 기간을 전월 같은 날짜까지로 맞춘다 (전월 전체와 비교하면 덜 찬 이번 달이 줄어든 것처럼 보인다) */
+  openDay?: number;
   /** 검색 기간의 달 목록 — null 이면 전체 기간 */
   months: string[] | null;
   /** 전체 광고비 행·견적 행 (같은 기간 전체 대비 비중을 낸다) */
@@ -81,14 +83,27 @@ export function searchAiData(i: SearchAiDataInput): Record<string, unknown> {
       ...(r.sales != null && { 판매_주문: r.sales }),
       ...(cpaOk && { 추정CPA: won(r.cpa), 같은기간_전체평균CPA: won(i.overallCpa) }),
     },
+    ...(i.openDay && { 이번기간_집계: `1~${i.openDay}일 (진행 중인 달)` }),
     ...(p &&
-      i.cmpLabel && {
-        [`비교기간_${i.cmpLabel}`]: {
-          ...(ads && { 광고비: won(p.cost), 매체집계_전환: p.conv }),
-          견적: p.quotes.length,
-          ...(cpaOk && p.cpa > 0 && { 추정CPA: won(p.cpa) }),
-        },
-      }),
+      i.cmpLabel &&
+      (i.openDay
+        ? {
+            // 진행 중인 달은 전월 같은 날짜까지의 견적으로 비교한다. 광고비는 달 합계로만 있어 같은 기간 값이 없으므로 참고로만 둔다
+            [`비교기간_${i.cmpLabel}_같은기간`]: { 범위: `1~${i.openDay}일`, 견적: p.quotes.filter((q) => Number(q.date.slice(8, 10)) <= i.openDay!).length },
+            [`참고_${i.cmpLabel}_한달전체`]: {
+              설명: '한 달 전체 값이라 진행 중인 이번 달과 바로 비교하면 안 됨',
+              ...(ads && { 광고비: won(p.cost) }),
+              견적: p.quotes.length,
+              ...(cpaOk && p.cpa > 0 && { 추정CPA: won(p.cpa) }),
+            },
+          }
+        : {
+            [`비교기간_${i.cmpLabel}`]: {
+              ...(ads && { 광고비: won(p.cost), 매체집계_전환: p.conv }),
+              견적: p.quotes.length,
+              ...(cpaOk && p.cpa > 0 && { 추정CPA: won(p.cpa) }),
+            },
+          })),
     추이: i.trend.labels.map((label, k) => ({
       기간: label,
       ...(ads && { 광고비: won(i.trend.spend[k] || 0) }),
@@ -119,4 +134,9 @@ export function isClosedAiPeriod(p: { selectedMonth?: string; allPeriod?: boolea
   if (!p.selectedMonth) return false;
   if (p.yearTotal) return Number(p.selectedMonth.slice(0, 4)) < THIS_Y;
   return p.selectedMonth < THIS_M;
+}
+
+/** 이번 달 한 달을 보고 있으면 오늘이 며칠인지 (진행 중인 달의 비교를 전월 같은 날짜까지로 맞출 때), 아니면 undefined */
+export function aiOpenDay(p: { selectedMonth?: string; allPeriod?: boolean; yearTotal?: boolean; dayRange?: unknown }): number | undefined {
+  return !p.dayRange && !p.allPeriod && !p.yearTotal && p.selectedMonth === THIS_M ? new Date().getDate() : undefined;
 }
