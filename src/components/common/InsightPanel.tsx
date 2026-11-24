@@ -7,7 +7,6 @@ import { Muted } from './Muted';
 import { Button } from './Button';
 import { Notice } from './Notice';
 import { MoreButton } from './MoreButton';
-import { SkelBar } from './SkeletonView';
 
 interface InsightPanelProps {
   /** 화면 이름 — 카드 id(`{name}-insight`)에 쓴다 */
@@ -31,6 +30,9 @@ interface InsightPanelProps {
   /** 키워드를 누르면 그 키워드로 검색한다 */
   onSelectKeyword?: (keyword: string) => void;
 }
+
+/** 자세히 보기 목록 최대 개수 (Claude 추천도 최대 4개로 받는다) */
+const MAX_DETAILS = 4;
 
 const ICONS: Record<InsightTone, LucideIcon> = {
   summary: ClipboardList,
@@ -78,7 +80,7 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
 
   const run = (f: AiInsightFacts, key: string) => {
     setAi({ key, loading: true });
-    requestAiInsight(f)
+    requestAiInsight(f, slot)
       .then((result) => setAi((prev) => (prev.key === key ? { key, result } : prev)))
       .catch((e: Error) => setAi((prev) => (prev.key === key ? { key, error: e.message } : prev)));
   };
@@ -100,8 +102,9 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
   // Claude 답이 있으면 추천이 규칙 문장을 이미 반영하므로 규칙 목록은 보여 주지 않는다.
   // 없으면(받는 중·실패·aiPage 없음) 규칙 요약(없으면 첫 줄)을 핵심 요약 자리에 쓰고 나머지를 자세히 보기에 둔다
   const ruleKey = ruleSummary ?? items[0];
-  const details = view.result ? [] : items.filter((it) => it !== ruleKey);
-  const detailCount = (view.result?.actions.length ?? 0) + details.length;
+  // 목록은 최대 4개 — 규칙 문장은 요약 → 확대 → 축소 순서로 오므로 앞에서부터 자른다
+  const details = view.result ? [] : items.filter((it) => it !== ruleKey).slice(0, MAX_DETAILS);
+  const detailCount = Math.min(view.result?.actions.length ?? 0, MAX_DETAILS) + details.length;
   const targetOf = (it: Insight) => {
     if (!it.target) return undefined;
     const onSelect = it.category
@@ -146,7 +149,8 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
       }
     >
       {/* 핵심 요약 — 항상 보인다 */}
-      <div className="ins-key" aria-live="polite">
+      {/* Claude 요약을 받는 동안에도 규칙 요약이 이미 보이므로 스켈레톤은 두지 않는다 — 받으면 이 자리가 AI 요약으로 바뀐다 */}
+      <div className="ins-key" aria-live="polite" aria-busy={view.loading || undefined}>
         {view.result ? (
           <p className="ins-key-text">
             <Sparkles size="0.875rem" aria-hidden="true" className="ins-key-ic" />
@@ -159,12 +163,6 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
             {ruleKey.tone !== 'summary' && targetOf(ruleKey)}
             {ruleKey.text}
           </p>
-        )}
-        {view.loading && (
-          <div className="ins-ai-skel" aria-label="Claude 요약을 받는 중">
-            <SkelBar w="88%" />
-            <SkelBar w="64%" />
-          </div>
         )}
       </div>
 
@@ -186,11 +184,11 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
             <div className="ins-ai">
               <p className="ins-ai-head">
                 <Sparkles size="0.875rem" aria-hidden="true" />
-                Claude 추천
-                <Muted small>아래 숫자만으로 해석한 내용입니다</Muted>
+                AI 추천
+                <Muted small>수집된 숫자만 근거로 추천합니다 · 실행 전 확인 필요</Muted>
               </p>
               <ul className="ins-list">
-                {view.result.actions.map((a, i) => (
+                {view.result.actions.slice(0, MAX_DETAILS).map((a, i) => (
                   <InsightLine key={i} tone={a.tone} head={a.title} text={a.text} />
                 ))}
               </ul>

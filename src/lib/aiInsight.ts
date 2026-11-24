@@ -79,7 +79,7 @@ export const AI_ERROR_TEXT: Record<string, string> = {
   forbidden: '승인된 계정으로 로그인해야 AI 분석을 쓸 수 있습니다.',
   rate_limit: '요청이 많아 잠시 뒤 다시 시도해 주세요.',
   api_key: 'AI 연결 설정(API 키)이 되어 있지 않습니다. 관리자에게 알려 주세요.',
-  refusal: 'AI 가 이 자료에 답하지 않았습니다.',
+  refusal: 'AI가 이 자료에 답하지 않았습니다.',
   network: 'AI 분석 서버에 연결하지 못했습니다. (서버 함수가 아직 배포되지 않았을 수 있습니다)',
 };
 

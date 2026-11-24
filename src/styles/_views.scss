@@ -3313,11 +3313,9 @@ tr.kw-more-row td {
 
 /* 자동 인사이트 — Claude 분석 영역 (InsightPanel 의 aiPage) */
 .card-insight {
+  // 바깥 상자 없이 — 추천 카드들이 각자 테두리를 가지므로 묶음 상자는 겹쳐 보이기만 한다
   .ins-ai {
     margin-bottom: 0.75rem;
-    padding: 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--acc) 25%, transparent);
-    background: color-mix(in srgb, var(--acc) 4%, var(--card));
   }
 
   .ins-ai-head {
@@ -3339,11 +3337,6 @@ tr.kw-more-row td {
     font-size: 0.875rem;
     line-height: 1.6;
     color: var(--ink);
-  }
-
-  .ins-ai-skel {
-    display: grid;
-    gap: 0.5rem;
   }
 }
 
@@ -3368,10 +3361,6 @@ tr.kw-more-row td {
     color: var(--acc);
   }
 
-  .ins-key .ins-ai-skel {
-    margin-top: 0.5rem;
-  }
-
   .ins-more {
     margin-top: 0.5rem;
   }
@@ -3384,6 +3373,80 @@ tr.kw-more-row td {
     .ins-ai {
       margin-bottom: 0;
     }
-  }
 
+    // 추천·인사이트는 작은 카드로 2열 — 머리말(대상)은 윗줄, 본문은 아랫줄에 작게
+    .ins-list {
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+      gap: 0.625rem;
+    }
+
+    // 플랫 카드 — 테두리·띠·둥근 모서리 없이 톤 색을 옅게 깐 면과 동그란 아이콘으로만 구분한다
+    .ins-item {
+      --tone: var(--sub);
+      height: 100%;
+      box-sizing: border-box;
+      gap: 0.75rem;
+      margin: 0; // 공통 li + li 위쪽 간격을 받지 않게 (격자 칸 높이를 맞춘다)
+      padding: 0.75rem 0.875rem 0.8125rem;
+      border: 0;
+      border-radius: 0;
+      background: color-mix(in srgb, var(--tone) 7%, var(--card));
+    }
+
+    .ins-good {
+      --tone: var(--ok);
+    }
+
+    .ins-bad {
+      --tone: var(--warn);
+    }
+
+    .ins-ic {
+      box-sizing: content-box;
+      margin-top: 0;
+      padding: 0.3125rem;
+      border-radius: 50%;
+      color: var(--tone);
+      background: color-mix(in srgb, var(--tone) 14%, var(--card));
+    }
+
+    // 강약 — 대상(카테고리·키워드)이 있으면 머리말(축소 검토 등)은 톤 색의 작은 꼬리표, 대상이 가장 굵게.
+    // 대상이 없는 AI 추천은 머리말이 곧 제목이라 굵게 둔다
+    .ins-head {
+      display: inline-block;
+      margin-top: 0.125rem;
+      font-size: 0.9375rem;
+      font-weight: 700;
+    }
+
+    .ins-head:has(+ .ins-target) {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--tone);
+    }
+
+    .ins-target {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    button.ins-target {
+      color: var(--ink);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--accink);
+        text-decoration: underline;
+      }
+    }
+
+    .ins-text {
+      display: block;
+      margin-top: 0.1875rem;
+      font-size: 0.8125rem;
+      line-height: 1.55;
+      color: var(--ink2);
+    }
+  }
 }
