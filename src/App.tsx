@@ -41,7 +41,7 @@ import { applyDayRange, dailyMonthsToLoad, rangeCovered, withDailyHist, withPrev
 import type { SpendDailyRow } from './types/dashboard';
 import { clipForGuest, guestLastDay } from './utils/guestCutoff';
 import { setSalesCutoff } from './data/godomallOrders';
-import { AiReadyContext } from './lib/aiInsight';
+import { AiInsightContext } from './lib/aiInsight';
 
 /** 기간 선택 안내문의 비교 구간 — 말일을 맞춰 일수가 줄면 일수도 붙인다 */
 const cmpRangeText = (r: DayRange): string => {
@@ -399,8 +399,11 @@ export const App: React.FC = () => {
     document.body.classList.add('lock');
   };
 
+  // AI 요약 — 최신 데이터가 왔을 때만 묻고, 답은 사이트별로 서버에 저장한다
+  const aiContext = useMemo(() => ({ ready: status === 'live' && !isSyncing, site }), [status, isSyncing, site]);
+
   return (
-    <AiReadyContext.Provider value={status === 'live' && !isSyncing}>
+    <AiInsightContext.Provider value={aiContext}>
       <div className="app">
         <Sidebar
           currentView={currentView}
@@ -615,6 +618,6 @@ export const App: React.FC = () => {
           onSubmit={goSearch}
         />
       )}
-    </AiReadyContext.Provider>
+    </AiInsightContext.Provider>
   );
 };

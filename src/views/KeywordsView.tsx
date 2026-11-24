@@ -261,6 +261,7 @@ export const KeywordsView: React.FC<KeywordsViewProps> = ({
       <InsightPanel
         name="keywords"
         aiPage="키워드·소재"
+        aiScope={[media, type, catFilter.cat1, catFilter.cat2].join('/')}
         aiClosed={isClosedAiPeriod({ selectedMonth, allPeriod, yearTotal, dayTo: period?.range.to })}
         items={[
           ...[adTotalsInsight({ cost: totalCost, clk: totalClk, conv: totalConv }, hasPvData ? { cost: pvCost, clk: pvClk, conv: pvConv } : null, cmpLabel)].filter((x) => x != null),

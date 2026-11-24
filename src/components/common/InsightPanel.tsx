@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Lightbulb, RotateCw, Sparkles, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import type { Insight, InsightTone } from '../../utils/insights';
-import { AI_ERROR_TEXT, AiReadyContext, cachedAiInsight, requestAiInsight, todayKey, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
+import { AI_ERROR_TEXT, AiInsightContext, aiSlotKey, cachedAiInsight, requestAiInsight, todayKey, type AiInsightFacts, type AiInsightResult } from '../../lib/aiInsight';
 import { Card } from './Card';
 import { Muted } from './Muted';
 import { Button } from './Button';
@@ -24,6 +24,8 @@ interface InsightPanelProps {
   aiData?: Record<string, unknown>;
   /** 끝난 기간(지난달·지난해)이면 true — 숫자가 더 바뀌지 않으므로 날짜가 바뀌어도 받아 둔 답을 계속 쓴다 (utils/aiFacts isClosedAiPeriod) */
   aiClosed?: boolean;
+  /** 화면 필터 (카테고리·매체 선택 등을 이은 문자열) — 필터마다 따로 답을 저장한다. 기간·검색어는 basis·aiPage 로 이미 나뉜다 */
+  aiScope?: string;
   /** 카테고리 이름을 누르면 그 카테고리로 검색한다 */
   onSelectCategory?: (cat1: string) => void;
   /** 키워드를 누르면 그 키워드로 검색한다 */
@@ -59,7 +61,7 @@ type AiState = { key: string; result?: AiInsightResult; error?: string; loading?
  * aiPage 를 주면 화면을 열 때 Claude 요약을 받아 핵심 요약 자리에 둔다 (받는 동안·실패하면 규칙 요약).
  * 규칙 문장은 utils/insights 가 만든다.
  */
-export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, aiData, aiClosed, onSelectCategory, onSelectKeyword }) => {
+export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, foot, aiPage, aiData, aiClosed, aiScope = '', onSelectCategory, onSelectKeyword }) => {
   const facts = useMemo<AiInsightFacts | null>(
     () =>
       aiPage && items.length
@@ -67,7 +69,10 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
         : null,
     [aiPage, aiData, aiClosed, basis, items]
   );
-  const factsKey = facts ? JSON.stringify(facts) : '';
+  const { ready, site } = useContext(AiInsightContext);
+  const slot = { site, scope: aiScope };
+  // 답의 자리 — 진행 중인 기간은 하루, 끝난 기간은 계속 같은 답 (서버 저장소와 같은 키라 모두 같은 답을 본다)
+  const slotKey = facts ? aiSlotKey(facts, slot) : '';
   const [ai, setAi] = useState<AiState>({ key: '' });
   const [open, setOpen] = useState(false);
 
@@ -78,21 +83,19 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
       .catch((e: Error) => setAi((prev) => (prev.key === key ? { key, error: e.message } : prev)));
   };
 
-  const ready = useContext(AiReadyContext);
-
-  // 자료가 바뀌면(화면·기간·필터) 같은 날 받아 둔 답을 쓰고, 없으면 바로 묻는다.
-  // 데이터가 최신이 되기 전(받아 둔 데이터로 먼저 그린 동안·동기화 중)에는 묻지 않고 지금 답을 그대로 둔다
+  // 이 브라우저에 받아 둔 답이 있으면 바로 쓰고, 없으면 서버에 묻는다 (서버가 저장한 답이 있으면 Claude 를 부르지 않는다).
+  // 데이터가 최신이 되기 전(받아 둔 데이터로 먼저 그린 동안·동기화 중)에는 묻지 않는다 — 그날 처음 만드는 답이 옛 숫자로 고정되지 않게
   useEffect(() => {
-    if (!facts || !ready) return;
-    const cached = cachedAiInsight(facts);
-    if (cached) setAi({ key: factsKey, result: cached });
-    else run(facts, factsKey);
-    // facts 는 factsKey 로 대표된다
-  }, [factsKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!facts) return;
+    const cached = cachedAiInsight(slotKey);
+    if (cached) setAi({ key: slotKey, result: cached });
+    else if (ready) run(facts, slotKey);
+    // facts 는 slotKey 가 바뀔 때의 값을 쓴다 (같은 자리면 숫자가 바뀌어도 다시 묻지 않는다)
+  }, [slotKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!items.length) return null;
 
-  const view: AiState = ai.key === factsKey ? ai : { key: factsKey, loading: !!facts };
+  const view: AiState = ai.key === slotKey ? ai : { key: slotKey, loading: !!facts };
   const ruleSummary = items.find((it) => it.tone === 'summary');
   // Claude 답이 있으면 추천이 규칙 문장을 이미 반영하므로 규칙 목록은 보여 주지 않는다.
   // 없으면(받는 중·실패·aiPage 없음) 규칙 요약(없으면 첫 줄)을 핵심 요약 자리에 쓰고 나머지를 자세히 보기에 둔다
@@ -136,7 +139,7 @@ export const InsightPanel: React.FC<InsightPanelProps> = ({ name, items, basis, 
       tools={
         facts &&
         view.error && (
-          <Button size="xs" icon={RotateCw} onClick={() => run(facts, factsKey)} className="ins-ai-btn">
+          <Button size="xs" icon={RotateCw} onClick={() => run(facts, slotKey)} className="ins-ai-btn">
             다시 시도
           </Button>
         )

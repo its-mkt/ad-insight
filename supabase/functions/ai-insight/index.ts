@@ -1,4 +1,5 @@
 // AI 인사이트 — 화면이 이미 계산한 숫자(KPI·규칙 인사이트)를 Claude 에 보내 요약·추천 문장을 받는다.
+// 답은 ai_insight_cache 테이블(supabase/ai_insight.sql)에 저장해 모두 같은 답을 본다 — 진행 중인 기간은 하루, 끝난 기간은 계속.
 // 배포: supabase functions deploy ai-insight   (비밀값: supabase secrets set ANTHROPIC_API_KEY=...)
 // 숫자는 화면이 넘긴 것만 쓰게 하고(새 숫자 금지), 견적 고객 정보는 화면에서 아예 보내지 않는다.
 import Anthropic from 'npm:@anthropic-ai/sdk@1.12.0';
@@ -15,6 +16,12 @@ const WHOAMI_URL =
 const ALLOWED_ORIGINS = ['https://its.itket.com', 'http://localhost:2000', 'http://127.0.0.1:2000'];
 
 const VIEW_ROLES = new Set(['admin', 'manager', 'member']);
+
+/** 답을 저장할 사이트 */
+const SITES = new Set(['itket', 'oncore']);
+
+/** 오늘 날짜 (YYYY-MM-DD, 한국 시간) — 화면(lib/aiInsight todayKey)과 같은 기준 */
+const todayKst = (): string => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
 /** 한 번에 받는 자료 크기 상한 (글자 수) — 화면 요약만 보내므로 넉넉하다 */
 const MAX_BODY = 20000;
@@ -36,9 +43,9 @@ JSON 에 data 가 있으면 그 화면의 수치 요약(KPI·비교 기간·추�
 - 부차적인 사실(유입 경로 세부, 개별 키워드 등)은 요약에 넣지 말고 추천으로 보냅니다.
 
 추천(actions)을 고르는 법:
-- 2~3개만, 영향이 큰 순서로, 이번 주에 실제로 손댈 수 있는 것만 고릅니다 (예산 이동, 입찰·키워드 정리, 소재·랜딩 점검, 카테고리 확대·축소). "모니터링하세요" 같은 일반론은 넣지 않습니다.
+- 최대 4개(보통 2~4개), 영향이 큰 순서로 고릅니다. 마케터·담당자가 실제로 챙겨 보는 관점(예: 키워드별 성과, 카테고리별 효율, 광고비 집행·매체 배분, 견적 흐름)에서 이번 주에 손댈 수 있는 것만 넣습니다. 한 관점에서 여러 개를 내기보다 서로 다른 관점을 고르게 다루고, 할 말이 없는 관점은 억지로 채우지 않습니다. "모니터링하세요" 같은 일반론은 넣지 않습니다.
 - 각 추천에는 왜 그것인지 보여 주는 숫자 하나 이상을 붙입니다.
-- 추천 본문(text)은 한 문장, 60자 안팎으로 압축합니다. "무엇을 → 근거 숫자" 만 남기고 배경 설명·반복·인사말은 뺍니다 (예: "서버 예산을 스토리지로 옮겨 보세요 — 서버 CPA 12만원, 스토리지 5만원").
+- 추천 본문(text)은 공백 포함 최대 90자로 압축합니다. 넘으면 다시 줄여 씁니다. "무엇을 할지 + 핵심 근거 숫자 1~2개" 만 남기고 배경 설명·조건 나열·반복·인사말은 뺍니다. 금액은 만원 단위로 반올림합니다 (예: "서버 예산을 스토리지로 옮겨 보세요 — 서버 CPA 12만원, 스토리지 5만원").
 - 광고비 비중이 작거나 건수가 적어 우연일 수 있는 변화는 크게 다루지 않습니다.
 
 숫자와 사실에 대해서는 엄격합니다:
@@ -55,13 +62,13 @@ const OUTPUT_SCHEMA = {
     summary: { type: 'string', description: '첫 문장은 성과 판정, 둘째 문장은 가장 큰 이유와 핵심 숫자 — 2문장, 120자 안팎' },
     actions: {
       type: 'array',
-      description: '영향이 큰 순서의 추천 행동 2~3개 (이번 주에 실행할 수 있는 것만)',
+      description: '영향이 큰 순서의 추천 행동 최대 4개, 서로 다른 관점(키워드·카테고리·광고비·견적 등) (이번 주에 실행할 수 있는 것만)',
       items: {
         type: 'object',
         properties: {
           tone: { type: 'string', enum: ['good', 'bad', 'info'] },
           title: { type: 'string', description: '10자 안팎의 짧은 머리말 (예: 예산 이동, 키워드 정리)' },
-          text: { type: 'string', description: '무엇을 할지 + 근거 숫자, 한 문장 60자 안팎' },
+          text: { type: 'string', description: '무엇을 할지 + 근거 숫자, 공백 포함 최대 90자' },
         },
         required: ['tone', 'title', 'text'],
         additionalProperties: false,
@@ -108,12 +115,24 @@ Deno.serve(async (req: Request) => {
 
   const raw = await req.text();
   if (raw.length > MAX_BODY) return json({ error: 'too_large' }, 413, origin);
-  let facts: unknown;
+  // 본문: { site, scope, facts } — 답은 사이트·화면·기간·필터·날짜(끝난 기간은 closed)마다 하나만 저장해 모두 같은 답을 본다
+  type Facts = { page?: unknown; basis?: unknown; 기간상태?: unknown };
+  let body: { site?: unknown; scope?: unknown; facts?: Facts };
   try {
-    facts = JSON.parse(raw);
+    body = JSON.parse(raw);
   } catch {
     return json({ error: 'bad_json' }, 400, origin);
   }
+  const facts = body.facts;
+  const site = String(body.site || '');
+  const scope = String(body.scope || '').slice(0, 300);
+  if (!facts || typeof facts.page !== 'string' || typeof facts.basis !== 'string' || !SITES.has(site)) return json({ error: 'bad_request' }, 400, origin);
+  // 진행 중인 기간은 그날 처음 만든 답으로 하루 고정, 끝난 기간은 계속 같은 답 — 화면 aiSlotKey 와 같은 규칙
+  const day = facts.기간상태 === '마감' ? 'closed' : todayKst();
+  const cacheKey = [day, site, facts.page, facts.basis, scope].join('|');
+  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const stored = await db.from('ai_insight_cache').select('result, model').eq('cache_key', cacheKey).maybeSingle();
+  if (stored.data) return json({ result: stored.data.result, model: stored.data.model, cached: true }, 200, origin);
 
   const client = new Anthropic(); // ANTHROPIC_API_KEY 비밀값을 읽는다
   try {
@@ -130,7 +149,13 @@ Deno.serve(async (req: Request) => {
     if (response.stop_reason === 'refusal') return json({ error: 'refusal' }, 422, origin);
     if (response.stop_reason === 'max_tokens') return json({ error: 'truncated' }, 502, origin);
     const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-    return json({ result: JSON.parse(text), model: response.model }, 200, origin);
+    const result = JSON.parse(text);
+    // 같은 자리에 동시에 물은 사람이 있으면 먼저 저장된 답을 돌려준다 (모두 같은 답)
+    await db
+      .from('ai_insight_cache')
+      .upsert({ cache_key: cacheKey, site, page: facts.page, basis: facts.basis, scope, day, facts, result, model: response.model }, { onConflict: 'cache_key', ignoreDuplicates: true });
+    const saved = await db.from('ai_insight_cache').select('result, model').eq('cache_key', cacheKey).maybeSingle();
+    return json({ result: saved.data?.result ?? result, model: saved.data?.model ?? response.model }, 200, origin);
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return json({ error: 'rate_limit' }, 429, origin);
     if (e instanceof Anthropic.AuthenticationError) return json({ error: 'api_key' }, 500, origin);
