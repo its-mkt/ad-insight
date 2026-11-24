@@ -39,3 +39,15 @@ export function searchExamplesOf(site: string, hierarchy: CatHierarchyNode[]): s
   if (site === 'itket') return 'HPE, 워크스테이션, 네이버, cadkorea';
   return [...hierarchy.map((n) => n.cat1).filter((c) => c !== '기타').slice(0, 2), '네이버'].join(', ');
 }
+
+/**
+ * 카테고리를 지정할 때 고르는 목록 — 사이트 분류표를 앞에 두고, 아이티켓 분류표에만 있는 분류를 뒤에 붙인다.
+ * 온코어처럼 데이터로 모은 분류표는 아직 쓰지 않은 분류가 빠져 있어, 새 분류도 고를 수 있게 한다. 아이티켓은 분류표 그대로.
+ */
+export function pickableHierarchyOf(hierarchy: CatHierarchyNode[]): CatHierarchyNode[] {
+  if (hierarchy === CATEGORY_HIERARCHY) return hierarchy;
+  const stdOf = (cat1: string) => CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1)?.cat2 ?? [];
+  const merged = hierarchy.map((n) => ({ cat1: n.cat1, cat2: [...n.cat2, ...stdOf(n.cat1).filter((c) => !n.cat2.includes(c))] }));
+  const have = new Set(hierarchy.map((n) => n.cat1));
+  return [...merged, ...CATEGORY_HIERARCHY.filter((n) => !have.has(n.cat1))];
+}

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { EXTERNAL_LINKS } from '../../utils/constants';
 import { fmt, parseCatParts, quoteKey, sourceColorVar } from '../../utils/format';
 import { downloadCsv, toCsv } from '../../utils/csv';
 import type { DayRange } from '../../utils/dayRange';
-import { CATEGORY_HIERARCHY, QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
+import { QUOTE_PHONE_SHEET, QUOTE_SITES } from '../../utils/constants';
+import { CategoryHierarchyContext } from '../../utils/categoryHierarchy';
 import { SkelBar, SkelRows } from '../common/SkeletonView';
 import { Dropdown } from '../common/Dropdown';
 import { FilterReset } from '../common/FilterReset';
@@ -106,25 +107,27 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
   const [pageSize, setPageSize] = useState(50);
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date', 'asc');
 
+  // 사이트 분류표 (아이티켓 분류표 · 온코어 데이터의 분류) — 필터 목록 순서에 쓴다
+  const hierarchy = useContext(CategoryHierarchyContext);
   // 필터 목록: 실제 견적에 붙은 값만 (분류표 순서, 분류표 밖 값은 뒤에). 표에서 분류를 바꿔 값이 사라져도 고른 값은 목록에 남긴다
   const cat1List = useMemo(() => {
     const used = new Set(quotes.map((q) => parseCatParts(q.category || '').cat1).filter(Boolean));
     if (selectedCat1 !== 'ALL') used.add(selectedCat1);
-    const known = CATEGORY_HIERARCHY.map((n) => n.cat1);
+    const known = hierarchy.map((n) => n.cat1);
     return ['ALL', ...known.filter((c) => used.has(c)), ...[...used].filter((c) => !known.includes(c))];
-  }, [quotes, selectedCat1]);
+  }, [quotes, selectedCat1, hierarchy]);
 
   const cat2List = useMemo(() => {
     if (selectedCat1 === 'ALL') return [];
     const parts = quotes.map((q) => parseCatParts(q.category || '')).filter((p) => p.cat1 === selectedCat1);
     const used = new Set(parts.map((p) => p.cat2).filter(Boolean));
     if (selectedCat2 !== 'ALL' && selectedCat2 !== NO_CAT2) used.add(selectedCat2);
-    const known = CATEGORY_HIERARCHY.find((n) => n.cat1 === selectedCat1)?.cat2 ?? [];
+    const known = hierarchy.find((n) => n.cat1 === selectedCat1)?.cat2 ?? [];
     const list = [...known.filter((c) => used.has(c)), ...[...used].filter((c) => !known.includes(c))];
     // 2차가 있는 1차에서만 '2차 없음'이 의미가 있다
     const hasNone = parts.some((p) => !p.cat2) || selectedCat2 === NO_CAT2;
     return list.length ? [...list, ...(hasNone ? [NO_CAT2] : [])] : [];
-  }, [quotes, selectedCat1, selectedCat2]);
+  }, [quotes, selectedCat1, selectedCat2, hierarchy]);
 
   const sources = useMemo(() => {
     return ['ALL', ...Array.from(new Set(quotes.map((q) => q.source).filter(Boolean)))];
@@ -373,7 +376,7 @@ export const QuotesRawAdminTable: React.FC<QuotesRawAdminTableProps> = ({
             options={cat1List.map((c) => ({
               value: c,
               label: c === 'ALL' ? '1차 카테고리 전체' : c,
-              hint: cat2CountHint(CATEGORY_HIERARCHY.find((n) => n.cat1 === c)?.cat2.length ?? 0),
+              hint: cat2CountHint(hierarchy.find((n) => n.cat1 === c)?.cat2.length ?? 0),
             }))}
             onChange={(v) => { setSelectedCat1(v); setSelectedCat2('ALL'); setPage(1); }}
           />

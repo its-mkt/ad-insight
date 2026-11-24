@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import type { QuoteRawRow } from '../../types/dashboard';
 import { fmt, parseCatParts, sourceColorVar } from '../../utils/format';
 import { originOf } from '../../utils/quoteOrigin';
-import { CATEGORY_HIERARCHY, QUOTE_SITES } from '../../utils/constants';
+import { QUOTE_SITES } from '../../utils/constants';
+import { CategoryHierarchyContext } from '../../utils/categoryHierarchy';
 import { useAuth } from '../../context/AuthContext';
 import { useSort } from '../../hooks/useSort';
 import { Card } from '../common/Card';
@@ -90,6 +91,8 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
   const [source, setSource] = useState(ALL);
   const [rep, setRep] = useState(ALL);
   const [page, setPage] = useState(1);
+  // 사이트 분류표 (아이티켓 분류표 · 온코어 데이터의 분류) — 필터 목록 순서에 쓴다
+  const hierarchy = useContext(CategoryHierarchyContext);
   // 어드민 원본 리스트와 같이 접수날짜 오름차순으로 시작한다
   const { sortKey, sortOrder, toggleSort } = useSort<SortKey>('date', 'asc');
 
@@ -120,11 +123,11 @@ export const QuoteListTable: React.FC<QuoteListTableProps> = ({ rows, periodLabe
       });
   }, [rows, origin, cat1, cat2, source, rep, sortKey, sortOrder]);
 
-  // 어드민 필터와 같은 순서 — 카테고리는 분류표 순서, 담당자는 가나다순에 미지정을 맨 뒤로
-  const cat1Values = inHierarchyOrder(rows.map((r) => catsOf(r).cat1), CATEGORY_HIERARCHY.map((n) => n.cat1));
+  // 어드민 필터와 같은 순서 — 카테고리는 사이트 분류표 순서, 담당자는 가나다순에 미지정을 맨 뒤로
+  const cat1Values = inHierarchyOrder(rows.map((r) => catsOf(r).cat1), hierarchy.map((n) => n.cat1));
   const cat2Parts = cat1 === ALL ? [] : rows.filter((r) => catsOf(r).cat1 === cat1).map((r) => catsOf(r).cat2);
   const cat2Values = [
-    ...inHierarchyOrder(cat2Parts.filter(Boolean), CATEGORY_HIERARCHY.find((n) => n.cat1 === cat1)?.cat2 ?? []),
+    ...inHierarchyOrder(cat2Parts.filter(Boolean), hierarchy.find((n) => n.cat1 === cat1)?.cat2 ?? []),
     ...(cat2Parts.some((c) => !c) && cat2Parts.some(Boolean) ? [NO_CAT2] : []),
   ];
   // 1차 목록 뒤에 붙는 2차 개수 — 이 기간에 실제로 고를 수 있는 2차만 센다 ('전체'·'2차 없음' 제외). 없으면 표시하지 않는다
