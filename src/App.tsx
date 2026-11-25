@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SiteId, ViewId } from './types/dashboard';
-import { BREAKPOINTS, VALID_VIEWS, VIEW_TITLES } from './utils/constants';
+import { MOBILE_LAYOUT_QUERY, VALID_VIEWS, VIEW_TITLES } from './utils/constants';
 import { normalizeRoutePath, parseRoute, routePath, SITES } from './utils/route';
 import { prevM, THIS_M, THIS_Y } from './utils/format';
 import { fetchDailyHist, siteConnected, useDashboardData } from './hooks/useDashboardData';
@@ -375,7 +375,7 @@ export const App: React.FC = () => {
       }
     };
     const onResize = () => {
-      if (window.innerWidth > BREAKPOINTS.md) closeDrawer();
+      if (!window.matchMedia(MOBILE_LAYOUT_QUERY).matches) closeDrawer();
     };
     window.addEventListener('popstate', onRouteChange);
     window.addEventListener('hashchange', onRouteChange);

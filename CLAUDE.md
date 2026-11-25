@@ -73,7 +73,9 @@
 ### 반응형 기준 폭
 - 기준 폭은 `sm 480 · md 768 · lg 1024 · xl 1280 · xxl 1440` (px) 다섯 개만 쓴다 — `src/styles/_mixins.scss` 의 `$breakpoints`, TS 는 `BREAKPOINTS` (`utils/constants`)
 - 미디어 쿼리에 숫자를 직접 쓰지 않는다: `@include mixins.down(md) { … }` (이하) · `mixins.up(md)` (초과) · `mixins.between(lg, xl)` (사이)
-- 모바일 규칙은 되도록 원래 규칙 안에 함께 둔다 (`.kpi .v { font-size: 1.5rem; @include mixins.down(md) { … } }`). `_views.scss` 의 큰 모바일 묶음은 해당 요소를 고칠 때 옮긴다
+- 휴대폰 배치(서랍 메뉴·2열 KPI 등)는 `@include mixins.mobile { … }` — md 이하 + 휴대폰 가로(lg 이하·높이 500px 이하). TS 는 `MOBILE_LAYOUT_QUERY`
+- 모바일 규칙은 되도록 원래 규칙 안에 함께 둔다 (`.kpi .v { font-size: 1.5rem; @include mixins.mobile { … } }`). `_views.scss` 의 큰 모바일 묶음은 해당 요소를 고칠 때 옮긴다
+- 손가락으로 누르는 버튼은 보이는 크기를 키우지 말고 블록 맨 끝에 `@include mixins.touch-target;` (누르는 영역만 44px, 옆 버튼과 붙은 줄은 `$axis: y`) — `.btn`·탭·드롭다운·기간 조작·페이지·더보기 버튼은 적용돼 있다
 - 모바일이라고 글자 기준(`html` font-size)을 줄이지 않는다 — 좁아서 꼭 줄여야 하는 요소만 따로 줄인다
 
 ### 금지

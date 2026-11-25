@@ -499,6 +499,8 @@
   &.sclose {
     display: none;
   }
+
+  @include mixins.touch-target;
 }
 
 .scrim {

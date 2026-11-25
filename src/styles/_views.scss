@@ -619,6 +619,8 @@ tr.kw-more-row td {
       transform: rotate(180deg);
     }
   }
+
+  @include mixins.touch-target;
 }
 
 .tbl-src {
@@ -1788,7 +1790,7 @@ tr.kw-more-row td {
   }
 }
 
-@include mixins.down(md) {
+@include mixins.mobile {
   // 글자 크기 기준(html)은 데스크톱과 같은 16px — 모바일이라고 전체를 줄이지 않는다.
   // 좁아서 꼭 줄여야 하는 요소(KPI 큰 값 등)만 아래에서 따로 줄인다
   html {
@@ -2582,7 +2584,7 @@ td > .empty {
   margin: 0.75rem 0 0;
 }
 
-@include mixins.down(md) {
+@include mixins.mobile {
   .search-backdrop {
     padding: 0;
   }
@@ -2670,7 +2672,7 @@ td > .empty {
   font-weight: 600;
 }
 
-@include mixins.down(md) {
+@include mixins.mobile {
   .top .crumb-detail {
     max-width: 8rem;
   }
@@ -3195,7 +3197,7 @@ td > .empty {
     }
   }
 
-  @include mixins.down(md) {
+  @include mixins.mobile {
     .access-gate-shell {
       grid-template-columns: minmax(0, 1fr);
       max-width: 26rem;

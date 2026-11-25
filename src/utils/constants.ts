@@ -56,6 +56,9 @@ export const ONCORE_CATEGORY_HIERARCHY: CatHierarchyNode[] = [
 /** 반응형 기준 폭(px) — 스타일의 $breakpoints(styles/_mixins.scss)와 같은 값으로 둔다 */
 export const BREAKPOINTS = { sm: 480, md: 768, lg: 1024, xl: 1280, xxl: 1440 } as const;
 
+/** 휴대폰 배치 조건 — 스타일의 mixins.mobile 과 같다 (md 이하, 또는 lg 이하이면서 높이 500px 이하인 가로 화면) */
+export const MOBILE_LAYOUT_QUERY = `(max-width: ${BREAKPOINTS.md}px), (max-width: ${BREAKPOINTS.lg}px) and (max-height: 500px)`;
+
 export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',
