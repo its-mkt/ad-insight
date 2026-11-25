@@ -1810,6 +1810,12 @@ tr.kw-more-row td {
   :root {
     --hdr-btn: 2.5rem;
   }
+  // 모바일은 html 글자 크기가 14px 라 데스크톱(1.125rem=18px)보다 아이콘이 작아진다 — 헤더 아이콘(메뉴·검색)은 키워서 맞춘다
+  .top .acts > .btn.ic svg,
+  .top > .btn.burger svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
   .top {
     order: 1;
     position: sticky;
@@ -3374,10 +3380,25 @@ tr.kw-more-row td {
       margin-bottom: 0;
     }
 
-    // 추천·인사이트는 작은 카드로 2열 — 머리말(대상)은 윗줄, 본문은 아랫줄에 작게
+    // 추천·인사이트는 작은 카드로 4열·2열·1열만 — 3열이면 4개 묶음이 3+1 로 갈라져 끝 줄이 외톨이가 된다.
+    // 열 수는 화면이 아니라 이 영역 폭으로 정한다 (사이드바 접힘에 따라 폭이 달라짐)
+    container-type: inline-size;
+
     .ins-list {
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+      grid-template-columns: 1fr;
       gap: 0.625rem;
+    }
+
+    @container (min-width: 40rem) {
+      .ins-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @container (min-width: 72rem) {
+      .ins-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
     }
 
     // 플랫 카드 — 테두리·띠·둥근 모서리 없이 톤 색을 옅게 깐 면과 동그란 아이콘으로만 구분한다
