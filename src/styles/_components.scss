@@ -359,15 +359,16 @@ span.seg,
   padding: 0.25rem;
   box-shadow: none;
 
-  // 모바일: 항목이 많으면 가로로 밀어 보고(스크롤바 숨김), 버튼은 손가락으로 누르기 쉽게 조금 키운다
+  // 모바일: 크기는 데스크톱 그대로(누르는 영역은 버튼의 touch-target 이 44px 로 넓힌다).
+  // 항목이 많아 넘치면 가로 스크롤 대신 줄을 바꾼다 — 스크롤 영역은 넓힌 누르는 영역을 잘라 버린다
+  // 표 칸 안(계정 관리 승인 단계 등)은 줄을 바꾸지 않는다 — 표가 가로로 스크롤되므로 칸을 조금 넘어도 된다
   @include mixins.mobile {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-wrap: wrap;
     max-width: 100%;
 
-    &::-webkit-scrollbar {
-      display: none;
+    td & {
+      flex-wrap: nowrap;
+      max-width: none;
     }
   }
 
@@ -385,12 +386,6 @@ span.seg,
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
-
-    @include mixins.mobile {
-      flex: none;
-      height: 2rem; // 데스크톱 1.5rem(24px) → 32px. 묶음 전체 높이는 42px
-      font-size: 0.875rem;
-    }
 
     &:hover:not(.on):not(:disabled) {
       color: var(--ink);
