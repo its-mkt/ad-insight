@@ -17,12 +17,15 @@ $breakpoints: (
 /** 휴대폰을 가로로 눕힌 화면의 높이 상한 — 이보다 낮고 lg 이하이면 휴대폰 배치를 쓴다 */
 $phone-landscape-height: 500px;
 
+/** 휴대폰 배치 미디어 조건 — mobile·touch-target 이 함께 쓴다 (TS 쪽은 utils/constants 의 MOBILE_LAYOUT_QUERY) */
+$mobile-media: '(max-width: #{map.get($breakpoints, md)}), (max-width: #{map.get($breakpoints, lg)}) and (max-height: #{$phone-landscape-height})';
+
 /**
  * 휴대폰 배치 (사이드바 → 서랍 메뉴, 헤더 줄이기 등) — md 이하, 또는 lg 이하이면서 높이가 낮은 가로 화면(휴대폰 가로 844×390 등).
  * 화면 배치를 휴대폰용으로 바꾸는 규칙은 down(md) 대신 이것을 쓴다. TS 쪽 같은 조건은 utils/constants 의 MOBILE_LAYOUT_QUERY
  */
 @mixin mobile {
-  @media (max-width: map.get($breakpoints, md)), (max-width: map.get($breakpoints, lg)) and (max-height: $phone-landscape-height) {
+  @media #{$mobile-media} {
     @content;
   }
 }
@@ -55,7 +58,7 @@ $phone-landscape-height: 500px;
  * 쓰는 요소는 position 이 static 이어야 한다 (relative 로 바꾼다). 블록 맨 끝에 둔다
  */
 @mixin touch-target($min: 2.75rem, $axis: both) {
-  @media (pointer: coarse), (max-width: map.get($breakpoints, md)), (max-width: map.get($breakpoints, lg)) and (max-height: $phone-landscape-height) {
+  @media (pointer: coarse), #{$mobile-media} {
     position: relative;
 
     &::after {

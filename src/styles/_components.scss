@@ -1263,13 +1263,13 @@ table.data-tbl {
   }
 }
 
-// 카테고리 매칭 표는 숫자 열이 있어 첫 열을 조금 줄인다
 // 추이 표(TrendTable) 이름 칸 — 매체·카테고리 이름이 짧아 줄을 바꾸지 않는다.
 // 자동 폭 배치에서 월 열이 많으면 이름 칸이 단어 폭까지 눌려 'Google / SA' 처럼 꺾인다 (휴대폰은 이 칸이 왼쪽에 고정된다)
 table.trend-tbl td:first-child {
   white-space: nowrap;
 }
 
+// 카테고리 매칭 표는 숫자 열이 있어 첫 열을 조금 줄인다
 table.data-tbl-map .col-d-name {
   width: auto;
 }

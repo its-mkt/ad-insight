@@ -53,11 +53,10 @@ const hoverOnlyOnPointerDevices = {
     const hover = rule.selectors.filter((s) => HOVER_RE.test(s));
     const rest = rule.selectors.filter((s) => !HOVER_RE.test(s));
     const media = new AtRule({ name: 'media', params: HOVER_MEDIA });
+    media.append(rule.clone({ selectors: hover }));
     if (rest.length === 0) {
-      media.append(rule.clone({ selectors: hover }));
       rule.replaceWith(media);
     } else {
-      media.append(rule.clone({ selectors: hover }));
       rule.selectors = rest;
       rule.before(media);
     }
