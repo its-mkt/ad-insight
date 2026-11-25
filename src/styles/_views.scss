@@ -1760,6 +1760,10 @@ tr.kw-more-row td {
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  // 견적 상세 막대 목록 4장은 태블릿 폭에서도 2열 — 1열이면 짧은 목록이 화면 폭 끝까지 늘어나 길게만 쌓인다 (휴대폰은 아래에서 1열)
+  .grid.grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .btn.ic {
     width: 2.25rem;
     padding: 0;
@@ -2029,7 +2033,8 @@ tr.kw-more-row td {
       font-size: 1rem;
     }
   }
-  .grid {
+  .grid,
+  .grid.grid-4 {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     margin-bottom: 0.75rem;
@@ -2077,6 +2082,89 @@ tr.kw-more-row td {
   .mod-h > div {
     flex-basis: 12rem;
   }
+
+  // 기간 조작부(‹ 연·월 › 달력 초기화) — 화면 전체 숫자를 바꾸는 손가락 조작이라 헤더 버튼(--hdr-btn)과 같은 높이로 키운다 (2rem=28px 는 누르기 어렵다)
+  .period-nav-bar {
+    .month-picker,
+    .date-picker {
+      height: var(--hdr-btn);
+    }
+    .month-picker .mp-step,
+    .date-picker .dp-clear {
+      width: var(--hdr-btn);
+    }
+    .date-picker .dp-trigger {
+      min-width: var(--hdr-btn);
+    }
+    .period-nav-left > .btn.ic {
+      width: var(--hdr-btn);
+      height: var(--hdr-btn);
+    }
+  }
+  .pagination .pag-btn {
+    min-width: 2.5rem;
+    height: 2.5rem;
+  }
+  // KPI 증감 옆 '전월' — 모바일 14px 기준에서 8.75px 로 읽기 어려워 증감 글자와 같은 크기로
+  .d small {
+    font-size: 0.75rem;
+  }
+
+  // 데이터 연결 · 무결성 검증 표 — 좁은 화면에서 26rem 고정 열이 잘리고 상세 열만 길게 접혀 줄이 비어 보인다.
+  // 줄마다 [검증 항목 · 결과] 윗줄, [대조 수치·상세] 아랫줄의 카드형으로 바꾼다
+  table.data-tbl-audit {
+    min-width: 0;
+    table-layout: auto;
+
+    colgroup,
+    thead {
+      display: none;
+    }
+    tbody,
+    tr,
+    td {
+      display: block;
+    }
+    tbody tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.375rem 0.75rem;
+      align-items: start;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    tbody td {
+      padding: 0;
+      border: 0;
+      white-space: normal;
+    }
+    tbody td:nth-child(2) {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+}
+
+// 4개짜리 KPI 묶음은 4열 또는 2열로만 — 자동 맞춤(auto-fit)이면 태블릿 폭에서 3+1 로 갈라져 끝 카드가 외톨이가 된다.
+// 4열이 좁아지는 폭(사이드바가 있는 769~920px)은 2열로 둔다
+.kpis:has(> :nth-child(4):last-child) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  @media (max-width: 920px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// 빈 표 안내(EmptyRow) — 넓은 표(가로 스크롤)에서는 문구가 표 전체 폭 가운데에 놓여 화면 밖으로 밀린다.
+// 문구를 보이는 폭(카드 안쪽 폭, 100cqi)에 맞추고 왼쪽에 붙여 스크롤해도 따라오게 한다
+.card:has(td > .empty) {
+  container-type: inline-size;
+}
+td > .empty {
+  position: sticky;
+  left: 0;
+  max-width: calc(100cqi - 1rem); // 칸 좌우 여백(0.5rem×2)만큼 뺀다
+  box-sizing: border-box;
 }
 
 @media (max-width: 480px) {
