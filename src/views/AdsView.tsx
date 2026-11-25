@@ -21,7 +21,8 @@ import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { ChartTableToggle, SegmentedControl, type ChartTableMode } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { SpendDetailTable } from '../components/ads/SpendDetailTable';
 import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
@@ -59,7 +60,7 @@ const ADS_SOURCES: SourceLinkItem[] = [
 ];
 
 export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, compare }) => {
-  const [mode, setMode] = useState<ChartTableMode>('chart');
+  const [mode, setMode] = useChartTableMode();
   const [chartSet, setChartSet] = useState<'media' | 'compare'>('media');
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
     (a, b) => b - a

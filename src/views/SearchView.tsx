@@ -15,7 +15,8 @@ import { ViewHeader } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiSpendQuoteDetail, KpiSection, QuoteSalesValue } from '../components/charts/KpiCard';
 import { originGroupCounts } from '../utils/quoteOrigin';
 import { MultiChart } from '../components/charts/MultiChart';
-import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { ChartTableToggle } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -111,7 +112,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const quoteStats = useQuoteStats(data);
   const [tab, setTab] = useState<SearchTab | null>(initialTab || null);
   const [showAll, setShowAll] = useState(false);
-  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
+  const [trendMode, setTrendMode] = useChartTableMode();
   // 견적 구성(카테고리·유입 매체·문의 유형·담당자)은 표의 더보기와 따로 펼친다
   const [breakdownAll, setBreakdownAll] = useState(false);
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { DashboardData, QuoteRawRow, SiteId, SyncStatus } from '../types/dashboard';
 import {
   rowsByPeriod,
@@ -23,7 +23,8 @@ import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { SourceShareTable } from '../components/quotes/SourceShareTable';
-import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { ChartTableToggle } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
@@ -81,7 +82,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
   // 건수·CPA 모두 아이티켓에 다른 사이트(zbyhp·cadkorea)·전화문의를 더해 센다 (2026-11-06 사용자 결정)
   const { quotes, quotesRaw } = useQuoteStats(data);
   const { quotes: trendQuotes, quotesRaw: trendRaw } = useQuoteStats(monthly ?? data);
-  const [mode, setMode] = useState<ChartTableMode>('chart');
+  const [mode, setMode] = useChartTableMode();
 
   if (!quotes.length) {
     return (

@@ -28,7 +28,8 @@ import { originGroupCounts } from '../utils/quoteOrigin';
 import { colTip } from '../utils/columnTips';
 import { GODOMALL_ORDERS, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { MultiChart } from '../components/charts/MultiChart';
-import { ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { ChartTableToggle } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
 import { SourceBarChart } from '../components/charts/SourceBarChart';
@@ -87,7 +88,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const hasSpend = data.spend.length > 0;
   const hasQuotes = data.quotes.length > 0;
   const [visibleCount, setVisibleCount] = useState(LIST_LIMIT);
-  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
+  const [trendMode, setTrendMode] = useChartTableMode();
   const prevMonthRef = useRef('');
 
   if (!hasSpend && !hasQuotes) {

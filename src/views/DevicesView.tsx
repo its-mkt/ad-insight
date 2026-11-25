@@ -3,6 +3,7 @@ import type { SiteId, SyncStatus } from '../types/dashboard';
 import { KpiCard, KpiDetailItems, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
 import { CardChartTableTabs, ChartTableToggle, type ChartTableMode } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { RowBarsChart, type RowBarsRow, type RowBarsSeries } from '../components/charts/RowBarsChart';
 import { TrendTable } from '../components/quotes/TrendTable';
 import { Card } from '../components/common/Card';
@@ -97,7 +98,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({ status, selectedMonth,
   const chartMonths = useMemo(() => (allPeriod ? allMonths : monthsUpTo(selectedMonth)), [allPeriod, allMonths, selectedMonth]);
 
   const [ga4, setGa4] = useState<Record<string, Ga4DeviceMonth> | null>(null);
-  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
+  const [trendMode, setTrendMode] = useChartTableMode();
   useEffect(() => {
     let alive = true;
     const months = [...new Set([...scope, ...prevScope, ...chartMonths])];
