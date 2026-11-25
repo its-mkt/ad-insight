@@ -1789,13 +1789,13 @@ tr.kw-more-row td {
 }
 
 @media (max-width: 768px) {
+  // 글자 크기 기준(html)은 데스크톱과 같은 16px — 모바일이라고 전체를 줄이지 않는다.
+  // 좁아서 꼭 줄여야 하는 요소(KPI 큰 값 등)만 아래에서 따로 줄인다
   html {
-    font-size: 87.5%; // 브라우저 기본 16px일 때 14px
     -webkit-text-size-adjust: 100%;
   }
   body {
     -webkit-tap-highlight-color: transparent;
-    font-size: 1rem;
   }
   .app {
     display: flex;
@@ -1813,12 +1813,6 @@ tr.kw-more-row td {
   }
   :root {
     --hdr-btn: 2.5rem;
-  }
-  // 모바일은 html 글자 크기가 14px 라 데스크톱(1.125rem=18px)보다 아이콘이 작아진다 — 헤더 아이콘(메뉴·검색)은 키워서 맞춘다
-  .top .acts > .btn.ic svg,
-  .top > .btn.burger svg {
-    width: 1.375rem;
-    height: 1.375rem;
   }
   .top {
     order: 1;
@@ -1839,7 +1833,6 @@ tr.kw-more-row td {
 
     h1 {
       grid-area: t;
-      font-size: 1.125rem;
       line-height: 1.25;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1854,7 +1847,6 @@ tr.kw-more-row td {
     .crumb {
       color: var(--ink);
       font-weight: 700;
-      font-size: 1.125rem;
       line-height: 1.25;
 
       &::before {
@@ -1871,7 +1863,6 @@ tr.kw-more-row td {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.75rem;
     line-height: 1.2;
     justify-self: start;
     align-self: start;
@@ -1958,11 +1949,9 @@ tr.kw-more-row td {
   .brand {
     padding-right: 3.5rem;
     min-height: 2.75rem;
-    font-size: 1rem;
   }
   .toc .nv {
     min-height: 2.75rem;
-    font-size: 1rem;
   }
   .period-nav-bar {
     order: 2;
@@ -1995,9 +1984,7 @@ tr.kw-more-row td {
     padding: 0.75rem;
     min-width: 0;
 
-    .l {
-      font-size: 0.875rem;
-    }
+    // 2열이라 큰 값만 줄인다 (24px → 20px)
     .v {
       font-size: 1.25rem;
       margin: 0.25rem 0;
@@ -2006,7 +1993,6 @@ tr.kw-more-row td {
   .d {
     display: block;
     margin: 0;
-    font-size: 0.75rem;
   }
   .card {
     padding: 1rem;
@@ -2030,7 +2016,7 @@ tr.kw-more-row td {
       flex: none;
       min-height: 2.5rem;
       padding: 0.5rem 0.75rem;
-      font-size: 1rem;
+      font-size: 0.875rem; // 손가락으로 누르는 구간 선택은 데스크톱(12px)보다 조금 크게
     }
   }
   .grid,
@@ -2038,9 +2024,6 @@ tr.kw-more-row td {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     margin-bottom: 0.75rem;
-  }
-  table {
-    font-size: 0.875rem;
   }
   th,
   td {
@@ -2071,7 +2054,7 @@ tr.kw-more-row td {
     background: var(--grp-google-bg);
   }
   .tip {
-    font-size: 1rem;
+    font-size: 0.875rem;
   }
   .leg {
     gap: 0.5rem 0.75rem;
@@ -2104,10 +2087,6 @@ tr.kw-more-row td {
   .pagination .pag-btn {
     min-width: 2.5rem;
     height: 2.5rem;
-  }
-  // KPI 증감 옆 '전월' — 모바일 14px 기준에서 8.75px 로 읽기 어려워 증감 글자와 같은 크기로
-  .d small {
-    font-size: 0.75rem;
   }
 
   // 데이터 연결 · 무결성 검증 표 — 좁은 화면에서 26rem 고정 열이 잘리고 상세 열만 길게 접혀 줄이 비어 보인다.
@@ -2170,10 +2149,6 @@ td > .empty {
 @media (max-width: 480px) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .top h1,
-  .top .crumb {
-    font-size: 1rem;
   }
 }
 
