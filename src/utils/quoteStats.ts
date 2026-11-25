@@ -16,15 +16,20 @@ export function withCurrentQuoteCategories(data: DashboardData, manual: Map<stri
     ...r,
     category: manual.get(String(r.sno ?? '')) || quoteCategoryOf(r.subject || '', r.sourceDetail),
   }));
+  return { ...data, quotes: quoteRowsOf(quotesRaw), quotesRaw };
+}
+
+/** 견적 접수 건(1건씩)을 달·카테고리·유입별 건수로 모은다 — month 를 주면 모두 그 달로 센다 (없으면 접수일의 달) */
+export function quoteRowsOf(raw: QuoteRawRow[], month?: string): QuoteRow[] {
   const agg = new Map<string, QuoteRow>();
-  quotesRaw.forEach((r) => {
-    const month = r.date.slice(0, 7);
-    const k = [month, r.category, r.source].join('\u0001');
+  raw.forEach((r) => {
+    const m = month ?? r.date.slice(0, 7);
+    const k = [m, r.category, r.source].join('\u0001');
     const cur = agg.get(k);
     if (cur) cur.count += 1;
-    else agg.set(k, { month, category: r.category, source: r.source, count: 1 });
+    else agg.set(k, { month: m, category: r.category, source: r.source, count: 1 });
   });
-  return { ...data, quotes: [...agg.values()], quotesRaw };
+  return [...agg.values()];
 }
 
 /**

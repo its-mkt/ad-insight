@@ -192,6 +192,12 @@ const sumInto = (a: SpendRow, b: SpendRow): void => {
   a.conv += b.conv;
 };
 
+/** 카테고리 값이 찾는 표준 카테고리(1차, 2차를 골랐으면 2차까지)에 드는지 */
+const inScopeCat = (category: string, scope: SearchScope): boolean => {
+  const p = parseCatParts(category);
+  return p.cat1 === scope.cat1 && (!scope.cat2 || p.cat2 === scope.cat2);
+};
+
 /** 이름이 일치하는 견적을 찾을 행 — 어드민 원본이 내려오면 그쪽(제목·고객 정보 있음), 아니면 통계용 행을 쓴다 */
 const quoteRowsOf = (data: DashboardData): QuoteRawRow[] => {
   const adminRows = [...(data.quotesSites || []), ...(data.quotesPhone || [])];
@@ -245,10 +251,7 @@ export function searchDashboard(
       // 표준 카테고리로 찾기 — 분류표 비율만큼만 더한다 (카테고리 효율 화면의 금액과 맞춘다)
       const cats = catsOf(categoryMap, { ...r, month: '', cost: 0, imp: 0, clk: 0, conv: 0 });
       const w = cats
-        .filter(({ c }) => {
-          const p = parseCatParts(c);
-          return p.cat1 === scope.cat1 && (!scope.cat2 || p.cat2 === scope.cat2);
-        })
+        .filter(({ c }) => inScopeCat(c, scope))
         .reduce((a, { w: cw }) => a + cw, 0);
       weights.set(k, w);
       return w;
@@ -355,8 +358,7 @@ export function searchDashboard(
       // 표준 카테고리 검색: 견적의 카테고리가 같은 1차(·2차)인 것
       if (scope?.cat1) {
         if (!r.date || !inPeriod(r.date.slice(0, 7)) || !r.category) return false;
-        const p = parseCatParts(r.category);
-        return p.cat1 === scope.cat1 && (!scope.cat2 || p.cat2 === scope.cat2);
+        return inScopeCat(r.category, scope);
       }
       if (!quoteTokens.length || !r.date || !inPeriod(r.date.slice(0, 7))) return false;
       const plain = [r.subject, r.category, r.sourceDetail, r.salesRep, r.sno, r.company, r.name, r.receiver];
@@ -378,8 +380,7 @@ export function searchDashboard(
       if (!saleInPeriod(l)) return false;
       if (scope?.source) return sameName(l.source, scope.source);
       if (scope?.cat1) {
-        const p = parseCatParts(l.category);
-        return p.cat1 === scope.cat1 && (!scope.cat2 || p.cat2 === scope.cat2);
+        return inScopeCat(l.category, scope);
       }
       if (!quoteTokens.length) return false;
       const plain = [l.goodsName, l.category, l.detail];

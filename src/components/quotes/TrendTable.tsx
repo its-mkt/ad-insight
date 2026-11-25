@@ -35,7 +35,7 @@ export const TrendTable: React.FC<TrendTableProps> = ({ id, title, subtitle, tot
     <Card name={id} id={id} title={title} subtitle={subtitle}>
       {series.length && labels.length ? (
         <div className="tw">
-          <table className="stk">
+          <table className="stk trend-tbl">
             <thead>
               <tr>
                 <Th>{nameLabel}</Th>

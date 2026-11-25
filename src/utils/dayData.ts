@@ -1,5 +1,6 @@
-import type { DashboardData, QuoteRawRow, QuoteRow, SpendDailyRow, SpendRow } from '../types/dashboard';
+import type { DashboardData, QuoteRawRow, SpendDailyRow, SpendRow } from '../types/dashboard';
 import { prevM } from './format';
+import { quoteRowsOf } from './quoteStats';
 import { inDayRange, monthsOfRange, sameRangeLastMonth, type DayRange } from './dayRange';
 
 const DAILY_MEDIA = ['Google', 'Naver'];
@@ -83,18 +84,6 @@ interface ApplyOptions {
   /** 견적도 기간에 맞춰 다시 센다. 검색 결과는 견적을 실제 날짜로 직접 거르므로 끈다 */
   quotes?: boolean;
 }
-
-/** 접수 건을 month 한 달의 카테고리·유입별 건수로 모은다 */
-const quoteRowsOf = (raw: QuoteRawRow[], month: string): QuoteRow[] => {
-  const agg = new Map<string, QuoteRow>();
-  raw.forEach((r) => {
-    const k = [month, r.category, r.source].join('\u0001');
-    const cur = agg.get(k);
-    if (cur) cur.count += 1;
-    else agg.set(k, { month, category: r.category, source: r.source, count: 1 });
-  });
-  return [...agg.values()];
-};
 
 /**
  * 일·기간으로 본다 — 광고비·노출·클릭·전환은 일별 자료로, 견적은 접수일로 다시 모아 "종료일이 속한 달" 한 달로 넘긴다.

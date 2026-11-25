@@ -53,6 +53,15 @@ export const ONCORE_CATEGORY_HIERARCHY: CatHierarchyNode[] = [
   { cat1: '기타', cat2: [] },
 ];
 
+/** 반응형 기준 폭(px) — 스타일의 $breakpoints(styles/_mixins.scss)와 같은 값으로 둔다 */
+export const BREAKPOINTS = { sm: 480, md: 768, lg: 1024, xl: 1280, xxl: 1440 } as const;
+
+/** 휴대폰을 가로로 눕힌 화면의 높이 상한(px) — 스타일의 $phone-landscape-height 와 같은 값 */
+export const PHONE_LANDSCAPE_HEIGHT = 500;
+
+/** 휴대폰 배치 조건 — 스타일의 mixins.mobile 과 같다 (md 이하, 또는 lg 이하이면서 높이 500px 이하인 가로 화면) */
+export const MOBILE_LAYOUT_QUERY = `(max-width: ${BREAKPOINTS.md}px), (max-width: ${BREAKPOINTS.lg}px) and (max-height: ${PHONE_LANDSCAPE_HEIGHT}px)`;
+
 export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',
@@ -106,6 +115,13 @@ export const EXTERNAL_LINKS = {
     'https://docs.google.com/spreadsheets/d/1mxrTeh7bo50RTz_2_UNyQxtQrljoEK4-xgPy9fr8nIg/edit',
   quotesRawSheet:
     'https://docs.google.com/spreadsheets/d/18tMYBQLuIhkmX_x_c8MK-aNXlGvOgz1TWauvqo8Dmjg/edit?gid=0#gid=0',
+} as const;
+
+/** 화면 출처 줄(SecSrc)에 여러 화면이 함께 쓰는 항목 */
+export const SOURCE_LINKS = {
+  googleAds: { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
+  naverSearchAd: { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
+  masterSheet: { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
 } as const;
 
 /** 매체 영문 이름 → 한글 표기 (검색·표·안내 문구 공용) */

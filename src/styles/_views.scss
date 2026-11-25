@@ -619,6 +619,8 @@ tr.kw-more-row td {
       transform: rotate(180deg);
     }
   }
+
+  @include mixins.touch-target;
 }
 
 .tbl-src {
@@ -1182,7 +1184,7 @@ tr.kw-more-row td {
   }
 }
 
-@media (max-width: 480px) {
+@include mixins.down(sm) {
   .cr-gallery .cr-img {
     height: 5.5rem;
     min-width: 5.5rem;
@@ -1747,18 +1749,22 @@ tr.kw-more-row td {
 }
 
 /* ── 반응형 미디어 쿼리 ── */
-@media (max-width: 1280px) {
+@include mixins.down(xl) {
   .kpis {
     grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   }
 }
 
-@media (max-width: 1024px) {
+@include mixins.down(lg) {
   .app {
     grid-template-columns: 12rem minmax(0, 1fr);
   }
   .grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  // 견적 상세 막대 목록 4장은 태블릿 폭에서도 2열 — 1열이면 짧은 목록이 화면 폭 끝까지 늘어나 길게만 쌓인다 (휴대폰은 아래에서 1열)
+  .grid.grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .btn.ic {
     width: 2.25rem;
@@ -1784,14 +1790,14 @@ tr.kw-more-row td {
   }
 }
 
-@media (max-width: 768px) {
+@include mixins.mobile {
+  // 글자 크기 기준(html)은 데스크톱과 같은 16px — 모바일이라고 전체를 줄이지 않는다.
+  // 좁아서 꼭 줄여야 하는 요소(KPI 큰 값 등)만 아래에서 따로 줄인다
   html {
-    font-size: 87.5%; // 브라우저 기본 16px일 때 14px
     -webkit-text-size-adjust: 100%;
   }
   body {
     -webkit-tap-highlight-color: transparent;
-    font-size: 1rem;
   }
   .app {
     display: flex;
@@ -1807,15 +1813,16 @@ tr.kw-more-row td {
     display: inline-flex;
     align-self: center;
   }
+  // 모바일 헤더 높이 = 버튼(--hdr-btn) + 위아래 여백 0.5rem×2 + 아래 테두리 1px. 기간 조작 바(top)·토스트 위치도 이 값을 따른다
   :root {
-    --hdr-btn: 2.5rem;
+    --th: calc(var(--hdr-btn) + 1rem + 1px);
   }
   .top {
     order: 1;
     position: sticky;
     top: 0;
     height: auto;
-    min-height: 3.75rem;
+    min-height: var(--th);
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: 'b t a';
@@ -1829,7 +1836,6 @@ tr.kw-more-row td {
 
     h1 {
       grid-area: t;
-      font-size: 1.125rem;
       line-height: 1.25;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1844,7 +1850,6 @@ tr.kw-more-row td {
     .crumb {
       color: var(--ink);
       font-weight: 700;
-      font-size: 1.125rem;
       line-height: 1.25;
 
       &::before {
@@ -1861,7 +1866,6 @@ tr.kw-more-row td {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.75rem;
     line-height: 1.2;
     justify-self: start;
     align-self: start;
@@ -1879,19 +1883,16 @@ tr.kw-more-row td {
     align-self: center;
     gap: 0.5rem;
   }
+  // 아이콘 버튼은 헤더 버튼과 같은 크기(--hdr-btn) — 아이콘 크기는 데스크톱 그대로 둔다
   .btn.ic {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: var(--hdr-btn);
+    height: var(--hdr-btn);
     padding: 0;
     justify-content: center;
     border-radius: 0;
 
     span {
       display: none;
-    }
-    svg {
-      width: 1.25rem;
-      height: 1.25rem;
     }
   }
   .side {
@@ -1948,21 +1949,27 @@ tr.kw-more-row td {
   .brand {
     padding-right: 3.5rem;
     min-height: 2.75rem;
-    font-size: 1rem;
   }
   .toc .nv {
     min-height: 2.75rem;
-    font-size: 1rem;
   }
   .period-nav-bar {
     order: 2;
     padding: 0.5rem 1rem;
     flex-wrap: wrap;
     gap: 0.5rem;
-    top: 3.75rem;
 
+    // 360px 폭에서도 [‹ 연·월 › 달력]과 초기화 버튼이 한 줄에 들어가게 간격을 좁힌다
     .period-nav-left {
       width: 100%;
+      gap: 0.5rem;
+    }
+    .month-picker .date-picker {
+      margin-left: 0;
+    }
+    .month-picker .mp-year .dd-trigger {
+      min-width: 0;
+      padding: 0 0.375rem 0 0.5rem;
     }
 
     // 좁은 화면에서는 필터가 다음 줄로 내려가므로 왼쪽부터 둔다
@@ -1985,9 +1992,7 @@ tr.kw-more-row td {
     padding: 0.75rem;
     min-width: 0;
 
-    .l {
-      font-size: 0.875rem;
-    }
+    // 2열이라 큰 값만 줄인다 (24px → 20px)
     .v {
       font-size: 1.25rem;
       margin: 0.25rem 0;
@@ -1996,7 +2001,6 @@ tr.kw-more-row td {
   .d {
     display: block;
     margin: 0;
-    font-size: 0.75rem;
   }
   .card {
     padding: 1rem;
@@ -2006,30 +2010,11 @@ tr.kw-more-row td {
       padding: 1rem;
     }
   }
-  .seg {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    max-width: 100%;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    button {
-      flex: none;
-      min-height: 2.5rem;
-      padding: 0.5rem 0.75rem;
-      font-size: 1rem;
-    }
-  }
-  .grid {
+  .grid,
+  .grid.grid-4 {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
     margin-bottom: 0.75rem;
-  }
-  table {
-    font-size: 0.875rem;
   }
   th,
   td {
@@ -2060,7 +2045,7 @@ tr.kw-more-row td {
     background: var(--grp-google-bg);
   }
   .tip {
-    font-size: 1rem;
+    font-size: 0.875rem;
   }
   .leg {
     gap: 0.5rem 0.75rem;
@@ -2071,15 +2056,90 @@ tr.kw-more-row td {
   .mod-h > div {
     flex-basis: 12rem;
   }
+
+  // 기간 조작부(‹ 연·월 › 달력 초기화) — 화면 전체 숫자를 바꾸는 손가락 조작이라 헤더 버튼(--hdr-btn)과 같은 높이로 키운다 (2rem=28px 는 누르기 어렵다)
+  .period-nav-bar {
+    .month-picker,
+    .date-picker {
+      height: var(--hdr-btn);
+    }
+    .month-picker .mp-step,
+    .date-picker .dp-clear {
+      width: var(--hdr-btn);
+    }
+    .date-picker .dp-trigger {
+      min-width: var(--hdr-btn);
+    }
+    .period-nav-left > .btn.ic {
+      width: var(--hdr-btn);
+      height: var(--hdr-btn);
+    }
+  }
+  .pagination .pag-btn {
+    min-width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  // 데이터 연결 · 무결성 검증 표 — 좁은 화면에서 26rem 고정 열이 잘리고 상세 열만 길게 접혀 줄이 비어 보인다.
+  // 줄마다 [검증 항목 · 결과] 윗줄, [대조 수치·상세] 아랫줄의 카드형으로 바꾼다
+  table.data-tbl-audit {
+    min-width: 0;
+    table-layout: auto;
+
+    colgroup,
+    thead {
+      display: none;
+    }
+    tbody,
+    tr,
+    td {
+      display: block;
+    }
+    tbody tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.375rem 0.75rem;
+      align-items: start;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    tbody td {
+      padding: 0;
+      border: 0;
+      white-space: normal;
+    }
+    tbody td:nth-child(2) {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
 }
 
-@media (max-width: 480px) {
-  .kpis {
+// 4개짜리 KPI 묶음은 4열 또는 2열로만 — 자동 맞춤(auto-fit)이면 태블릿 폭에서 3+1 로 갈라져 끝 카드가 외톨이가 된다.
+// 4열이면 카드가 좁아지는 lg(1024px) 이하는 2열로 둔다
+.kpis:has(> :nth-child(4):last-child) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  @include mixins.down(lg) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .top h1,
-  .top .crumb {
-    font-size: 1rem;
+}
+
+// 빈 표 안내(EmptyRow) — 넓은 표(가로 스크롤)에서는 문구가 표 전체 폭 가운데에 놓여 화면 밖으로 밀린다.
+// 문구를 보이는 폭(카드 안쪽 폭, 100cqi)에 맞추고 왼쪽에 붙여 스크롤해도 따라오게 한다
+.card:has(td > .empty) {
+  container-type: inline-size;
+}
+td > .empty {
+  position: sticky;
+  left: 0;
+  max-width: calc(100cqi - 1rem); // 칸 좌우 여백(0.5rem×2)만큼 뺀다
+  box-sizing: border-box;
+}
+
+@include mixins.down(sm) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2524,7 +2584,7 @@ tr.kw-more-row td {
   margin: 0.75rem 0 0;
 }
 
-@media (max-width: 768px) {
+@include mixins.mobile {
   .search-backdrop {
     padding: 0;
   }
@@ -2612,7 +2672,7 @@ tr.kw-more-row td {
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
+@include mixins.mobile {
   .top .crumb-detail {
     max-width: 8rem;
   }
@@ -3137,7 +3197,7 @@ tr.kw-more-row td {
     }
   }
 
-  @media (max-width: 768px) {
+  @include mixins.mobile {
     .access-gate-shell {
       grid-template-columns: minmax(0, 1fr);
       max-width: 26rem;
@@ -3361,7 +3421,10 @@ tr.kw-more-row td {
     color: var(--acc);
   }
 
+  // 다른 더보기 버튼(.kw-more-wrap)처럼 가운데 정렬
   .ins-more {
+    display: flex;
+    justify-content: center;
     margin-top: 0.5rem;
   }
 
@@ -3374,10 +3437,25 @@ tr.kw-more-row td {
       margin-bottom: 0;
     }
 
-    // 추천·인사이트는 작은 카드로 2열 — 머리말(대상)은 윗줄, 본문은 아랫줄에 작게
+    // 추천·인사이트는 작은 카드로 4열·2열·1열만 — 3열이면 4개 묶음이 3+1 로 갈라져 끝 줄이 외톨이가 된다.
+    // 열 수는 화면이 아니라 이 영역 폭으로 정한다 (사이드바 접힘에 따라 폭이 달라짐)
+    container-type: inline-size;
+
     .ins-list {
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+      grid-template-columns: 1fr;
       gap: 0.625rem;
+    }
+
+    @container (min-width: 40rem) {
+      .ins-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @container (min-width: 72rem) {
+      .ins-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
     }
 
     // 플랫 카드 — 테두리·띠·둥근 모서리 없이 톤 색을 옅게 깐 면과 동그란 아이콘으로만 구분한다

@@ -25,6 +25,44 @@ function releaseInfo(): { tag: string; commit: string } {
 }
 const release = releaseInfo();
 
+/**
+ * 마우스 기기에서만 호버 — `:hover` 가 든 규칙을 모두 `@media (hover: hover) and (pointer: fine)` 안으로 옮긴다.
+ * 휴대폰·태블릿은 누르면 :hover 가 걸린 채 남아(눌렀던 버튼 바탕이 그대로 남는 등) 호버 효과를 끈다.
+ * 트랙패드·마우스를 연결한 태블릿은 조건을 만족해 호버가 보인다. 스타일 파일마다 감싸지 않고 여기서 한 번에 처리한다.
+ * `a:hover, a:focus-visible` 처럼 섞인 선택자는 :hover 쪽만 떼어 옮긴다.
+ */
+const HOVER_MEDIA = '(hover: hover) and (pointer: fine)';
+const HOVER_RE = /:hover\b/;
+// postcss 를 직접 의존성으로 두지 않아 타입은 쓰는 만큼만 적는다
+type CssNode = { type: string; name?: string; params?: string; parent?: CssNode };
+type CssRule = CssNode & {
+  selector: string;
+  selectors: string[];
+  clone(over: { selectors: string[] }): CssRule;
+  before(node: unknown): void;
+  replaceWith(node: unknown): void;
+  remove(): void;
+};
+const hoverOnlyOnPointerDevices = {
+  postcssPlugin: 'hover-only-on-pointer-devices',
+  Rule(rule: CssRule, { AtRule }: { AtRule: new (o: { name: string; params: string }) => { append(n: unknown): void } }) {
+    if (!HOVER_RE.test(rule.selector)) return;
+    for (let p = rule.parent; p; p = p.parent) {
+      if (p.type === 'atrule' && p.name === 'media' && p.params === HOVER_MEDIA) return;
+    }
+    const hover = rule.selectors.filter((s) => HOVER_RE.test(s));
+    const rest = rule.selectors.filter((s) => !HOVER_RE.test(s));
+    const media = new AtRule({ name: 'media', params: HOVER_MEDIA });
+    media.append(rule.clone({ selectors: hover }));
+    if (rest.length === 0) {
+      rule.replaceWith(media);
+    } else {
+      rule.selectors = rest;
+      rule.before(media);
+    }
+  },
+};
+
 /** 로컬 데이터 파일 요청 — 배포 경로(/ad-insight/)가 붙은 주소와 붙지 않은 주소 모두 */
 const LOCAL_DATA_URL = /^(\/ad-insight)?\/data\/latest\.json/;
 
@@ -36,6 +74,9 @@ export default defineConfig(({ command }) => ({
   define: {
     __APP_RELEASE__: JSON.stringify(command === 'serve' ? `${release.tag}-dev` : release.tag),
     __APP_COMMIT__: JSON.stringify(release.commit),
+  },
+  css: {
+    postcss: { plugins: [hoverOnlyOnPointerDevices] },
   },
   plugins: [
     react(),

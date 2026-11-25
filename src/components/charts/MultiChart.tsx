@@ -79,6 +79,9 @@ export const MultiChart: React.FC<MultiChartProps> = ({
 
   const getY = (v: number) => T + ph * (1 - Math.max(0, v || 0) / max);
   const getX = (i: number) => L + (i + 0.5) * bw;
+  // 꺾은선 값 글자가 옆 점 글자와 겹칠 만큼 칸이 좁으면(휴대폰) 마지막 달부터 몇 칸 걸러 하나씩만 적는다. 마우스를 올린 달·계열은 모두 보인다
+  const valStep = Math.max(1, Math.ceil((measureSvgText(fmt(maxSeries), 0.625 * r) + 4) / bw));
+  const showVal = (i: number, si: number) => (N - 1 - i) % valStep === 0 || hoverSlice === i || hoverSeries === si;
 
   const handleSlicePointerMove = (e: React.PointerEvent<SVGRectElement>, idx: number) => {
     setHoverSlice(idx);
@@ -340,7 +343,7 @@ export const MultiChart: React.FC<MultiChartProps> = ({
               const x = getX(i);
               const pts = series
                 .map((s, si) => ({ si, c: s.c, v: s.v[i] || 0, y: getY(s.v[i] || 0) }))
-                .filter((pt) => pt.v > 0)
+                .filter((pt) => pt.v > 0 && showVal(i, pt.si))
                 .sort((a, b) => a.y - b.y);
               let lastY = -999;
               return pts.map((pt) => {

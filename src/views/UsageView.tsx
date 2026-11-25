@@ -6,7 +6,8 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { ViewNote } from '../components/common/Note';
 import { Notice } from '../components/common/Notice';
-import { ChartTableToggle, SegmentedControl, type ChartTableMode, type SegmentOption } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl, type SegmentOption } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { SkelKpi, SkelTable } from '../components/common/SkeletonView';
 import { NumTd, TreeChildRow, TreeParentRow, childLabelOf, EmptyRow } from '../components/common/TableRows';
 import { TabBar, TabButton } from '../components/common/TabButton';
@@ -53,7 +54,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ selectedMonth, allPeriod =
   const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set());
   // 처음에는 계정별 — 누가 쓰는지가 가장 먼저 궁금하다 (2026-11-19 사용자 결정). 계정별 기록이 없으면 첫 탭(화면별)
   const [tab, setTab] = useState<UsageTab>('accounts');
-  const [trendMode, setTrendMode] = useState<ChartTableMode>('chart');
+  const [trendMode, setTrendMode] = useChartTableMode();
 
   const today = toDayKey(new Date());
   const { cur: range, prev: prevRange, label, cmpLabel } = usagePeriodOf(selectedMonth, allPeriod, yearTotal, dayRange, today);

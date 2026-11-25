@@ -29,7 +29,7 @@ export const DataAuditTable: React.FC<DataAuditTableProps> = ({ audit, loading =
       }
     >
       <div className="tw">
-        <table className="stk data-tbl" id="tbDataAudit">
+        <table className="stk data-tbl data-tbl-audit" id="tbDataAudit">
           <colgroup>
             <col className="col-d-name" />
             <col />

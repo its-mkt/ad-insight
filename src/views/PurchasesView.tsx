@@ -11,6 +11,7 @@ import { View } from '../components/common/View';
 import { ViewHeader } from '../components/common/ViewHeader';
 import { PurchasedGoodsTable } from '../components/quotes/PurchasedGoodsTable';
 import { TrendTable } from '../components/quotes/TrendTable';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { GA4_SOURCE_LABELS, ga4OrderSourceSet, loadGa4OrderSources } from '../data/ga4OrderSources';
 import { GODOMALL_DAILY, GODOMALL_ORDERS, GODOMALL_ORDERS_AS_OF, goodsInMonth, goodsTotalsInRange, salesCutoff, salesInMonths, salesInRange } from '../data/godomallOrders';
 import { daysOfMonth, sameRangeLastMonth } from '../utils/dayRange';
@@ -63,6 +64,8 @@ const peakCard = (months: string[]) => {
 
 /** 고도몰 주문통계의 구매건수 (결제완료일 기준) */
 export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMonth, allPeriod = false, yearTotal = false, untilMonth, cutoffDay, site = 'itket' }) => {
+  // 판매 건수 추이 그래프 — PC 는 그래프+표, 휴대폰 배치는 표만 (useChartTableMode 의 처음 보기)
+  const [trendMode] = useChartTableMode();
   // 최신 GA4 값을 받으면 다시 그린다
   const [, setGa4Loaded] = useState(0);
   // GA4 값을 받는 중인지 — 받은 값이 아직 하나도 없으면 그동안 자리표시를 보여 준다
@@ -237,7 +240,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ status, selectedMo
 
       {!isMonth && (
         <>
-          <MultiChart id="chPurchases" title={allPeriod ? '연도별 판매 건수' : '월별 판매 건수'} labels={labels} series={series} unit="건" partialLast={isOpenPeriod(allPeriod ? YEARS.at(-1) : ytd.at(-1))} />
+          {/* 휴대폰 배치에서는 그래프를 빼고 바로 아래 같은 숫자의 표만 둔다 (다른 화면의 "모바일은 표 먼저"와 같은 기준) */}
+          {trendMode === 'chart' && <MultiChart id="chPurchases" title={allPeriod ? '연도별 판매 건수' : '월별 판매 건수'} labels={labels} series={series} unit="건" partialLast={isOpenPeriod(allPeriod ? YEARS.at(-1) : ytd.at(-1))} />}
           <TrendTable id="purchases-table" title={allPeriod ? '연도·월별 판매 건수' : `${yr}년 월별 판매 건수`} nameLabel="연도" labels={monthKeys.map((m) => `${m}월`)} series={tableSeries} isFuture={(i, row) => (allPeriod ? row !== null && ym(row.slice(0, 4), i + 1) > AS_OF_MONTH : i >= mm)} />
         </>
       )}

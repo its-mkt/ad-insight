@@ -32,7 +32,7 @@
 | 새 탭 외부 링크 | `ExtLink` (직접 `target="_blank"` 쓰지 않는다) |
 | 광고 API 출처 각주 | `AdApiSource` + `TableFootnote` |
 | 탭 / 구간 선택 | `TabButton`, `SegmentedControl` — 밑줄 탭 바 틀(`.kw-tabs`)은 `TabBar` (`common/TabButton`, `className`·`id`·`ref`) |
-| 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) |
+| 추이 카드 위 그래프/표 전환 바 | `ChartTableToggle` (`common/SegmentedControl`) — 보기 상태는 `useChartTableMode()` (`hooks/useChartTableMode`, 처음 보기 PC 그래프·휴대폰 배치 표) |
 | 카드 제목 줄의 그래프/표 탭 (표만 있던 카드에 그래프 보기 더하기) | `CardChartTableTabs` (`common/SegmentedControl`, Card 의 `tools`) |
 | 줄마다 계열 비교 막대 — 비중(100% 누적)·지표 비교(나란히) | `RowBarsChart` (`charts/RowBarsChart`, `mode` share·compare, 미리보기 실제 비중은 `valuesHidden`) |
 | 입력칸 / 필터 초기화 버튼 | `TextInput`, `FilterReset` |
@@ -69,6 +69,14 @@
 - 숫자·날짜·유입 경로 칸은 `src/styles/_variables.scss` 의 공통 너비를 쓴다: `--col-date`(날짜) · `--col-count`(건수·수량·노출·클릭·전환) · `--col-rate`(비율) · `--col-unit-price`(CPC·CPA 단가) · `--col-amount`(금액) · `--col-source`(유입 경로) · `--col-duration`(체류시간)
 - 이름 칸은 너비를 주지 않아 남는 폭을 쓰게 하고, 표 `min-width` 는 숫자 칸 합 + 이름 칸 최소 폭으로 잡는다
 - 새 종류가 필요하면 표마다 rem 을 적지 말고 토큰을 추가한다
+
+### 반응형 기준 폭
+- 기준 폭은 `sm 480 · md 768 · lg 1024 · xl 1280 · xxl 1440` (px) 다섯 개만 쓴다 — `src/styles/_mixins.scss` 의 `$breakpoints`, TS 는 `BREAKPOINTS` (`utils/constants`)
+- 미디어 쿼리에 숫자를 직접 쓰지 않는다: `@include mixins.down(md) { … }` (이하) · `mixins.up(md)` (초과) · `mixins.between(lg, xl)` (사이)
+- 휴대폰 배치(서랍 메뉴·2열 KPI 등)는 `@include mixins.mobile { … }` — md 이하 + 휴대폰 가로(lg 이하·높이 500px 이하). TS 는 `MOBILE_LAYOUT_QUERY`
+- 모바일 규칙은 되도록 원래 규칙 안에 함께 둔다 (`.kpi .v { font-size: 1.5rem; @include mixins.mobile { … } }`). `_views.scss` 의 큰 모바일 묶음은 해당 요소를 고칠 때 옮긴다
+- 손가락으로 누르는 버튼은 보이는 크기를 키우지 말고 블록 맨 끝에 `@include mixins.touch-target;` (누르는 영역만 44px, 옆 버튼과 붙은 줄은 `$axis: y`) — `.btn`·탭·드롭다운·기간 조작·페이지·더보기 버튼은 적용돼 있다
+- 모바일이라고 글자 기준(`html` font-size)을 줄이지 않는다 — 좁아서 꼭 줄여야 하는 요소만 따로 줄인다
 
 ### 금지
 - 위 표에 있는 요소를 `className` 만 복사해 인라인으로 다시 만들기

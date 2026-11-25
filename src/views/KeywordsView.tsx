@@ -7,7 +7,7 @@ import type {
 } from '../types/dashboard';
 import { catSum, catsOf, ctrText, fmt, fmtWon, sumBy, THIS_M } from '../utils/format';
 import { adStatKey, groupAdsByAdgroup, selectRoundRobinAds, type AdStat } from '../utils/creativeImage';
-import { EXTERNAL_LINKS } from '../utils/constants';
+import { SOURCE_LINKS } from '../utils/constants';
 import type { DayPeriod, MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { ViewNote } from '../components/common/Note';
@@ -50,9 +50,9 @@ interface KeywordsViewProps {
 }
 
 const KEYWORDS_SOURCES: SourceLinkItem[] = [
-  { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
-  { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
-  { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+  SOURCE_LINKS.googleAds,
+  SOURCE_LINKS.naverSearchAd,
+  SOURCE_LINKS.masterSheet,
   { label: '키워드·소재·입찰가·품질지수 포함' },
 ];
 

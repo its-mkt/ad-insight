@@ -1,5 +1,6 @@
-import type { DashboardData, QuoteRawRow, QuoteRow, SpendRow } from '../types/dashboard';
+import type { DashboardData, SpendRow } from '../types/dashboard';
 import { inDayRange, toDayKey, type DayRange } from './dayRange';
+import { quoteRowsOf } from './quoteStats';
 
 /**
  * 로그인하지 않은 사람에게는 진행 중인 달을 "어제까지"만 보여 준다.
@@ -19,18 +20,6 @@ export const todayKey = () => toDayKey(new Date());
 export const guestLastDay = (today = todayKey()): string => {
   const d = new Date(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10) - 1);
   return toDayKey(d);
-};
-
-/** 접수 건을 그 달의 카테고리·유입별 건수로 모은다 */
-const quoteRowsOf = (raw: QuoteRawRow[], month: string): QuoteRow[] => {
-  const agg = new Map<string, QuoteRow>();
-  raw.forEach((r) => {
-    const k = JSON.stringify([r.category, r.source]);
-    const cur = agg.get(k);
-    if (cur) cur.count += 1;
-    else agg.set(k, { month, category: r.category, source: r.source, count: 1 });
-  });
-  return [...agg.values()];
 };
 
 export interface GuestClip {

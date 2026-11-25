@@ -13,15 +13,16 @@ import {
   ym,
   isOpenPeriod,
 } from '../utils/format';
-import { EXTERNAL_LINKS } from '../utils/constants';
-import { daysOfMonth, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
+import { EXTERNAL_LINKS, SOURCE_LINKS } from '../utils/constants';
+import { cmpCaptionOf, daysOfMonth, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
 import { ViewHeader, SecSrc, type SourceLinkItem } from '../components/common/ViewHeader';
 import { KpiCard, KpiDetailItems, KpiPlaceholder, KpiSection } from '../components/charts/KpiCard';
 import { MultiChart } from '../components/charts/MultiChart';
-import { ChartTableToggle, SegmentedControl, type ChartTableMode } from '../components/common/SegmentedControl';
+import { ChartTableToggle, SegmentedControl } from '../components/common/SegmentedControl';
+import { useChartTableMode } from '../hooks/useChartTableMode';
 import { SpendDetailTable } from '../components/ads/SpendDetailTable';
 import { MediaCompareTable, MediaStatsTabs } from '../components/ads/MediaStatsTable';
 import { Card } from '../components/common/Card';
@@ -50,16 +51,16 @@ interface AdsViewProps {
 }
 
 const ADS_SOURCES: SourceLinkItem[] = [
-  { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
-  { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
+  SOURCE_LINKS.googleAds,
+  SOURCE_LINKS.naverSearchAd,
   { label: 'Meta Ads 시트 (수동 입력)' },
   { label: '네이버 커머스 API', href: EXTERNAL_LINKS.naverSmartStore },
   { label: 'MDF 업로드 시트' },
-  { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+  SOURCE_LINKS.masterSheet,
 ];
 
 export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, allPeriod = false, yearTotal = false, monthly, period, compare }) => {
-  const [mode, setMode] = useState<ChartTableMode>('chart');
+  const [mode, setMode] = useChartTableMode();
   const [chartSet, setChartSet] = useState<'media' | 'compare'>('media');
   const years = [...new Set(data.spend.map((r) => Number(r.month.slice(0, 4))))].sort(
     (a, b) => b - a
@@ -138,7 +139,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ data, status, selectedMonth, a
       : monthsOfY[monthsOfY.length - 1];
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
+  const cmp = cmpCaptionOf(period, compare);
   // 전환이 없으면 0원이 아니라 '–' 로 보여 준다 (0원은 공짜 전환처럼 읽힌다)
   const cpaText = (v: number) => (v > 0 ? `${fmt(v)}원` : '–');
   const cpa = (mo: string) => {
