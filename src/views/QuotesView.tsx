@@ -12,13 +12,13 @@ import {
   ym,
   isOpenPeriod,
 } from '../utils/format';
-import { EXTERNAL_LINKS } from '../utils/constants';
+import { EXTERNAL_LINKS, SOURCE_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { InsightPanel } from '../components/common/InsightPanel';
 import { isClosedAiPeriod } from '../utils/aiFacts';
 import { quoteInsights, INSIGHT_FOOT_QUOTE } from '../utils/insights';
 import { quoteDetailsPending } from '../utils/quoteStats';
-import { inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
+import { cmpCaptionOf, inDayRange, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { QuoteListTable } from '../components/quotes/QuoteListTable';
 import { originGroupCounts, originOf } from '../utils/quoteOrigin';
 import { TrendTable } from '../components/quotes/TrendTable';
@@ -60,7 +60,7 @@ interface QuotesViewProps {
 
 const QUOTES_SOURCES: SourceLinkItem[] = [
   { label: '아이티켓 고도몰 견적 목록', href: EXTERNAL_LINKS.itketEstimateList },
-  { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+  SOURCE_LINKS.masterSheet,
   { label: '견적 접수 원본 시트', href: EXTERNAL_LINKS.quotesRawSheet },
   { label: '1시간 자동 동기화' },
 ];
@@ -206,7 +206,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({ data, status, isSyncing 
     ? rowsByPeriod(quotes)(yr).filter((r) => r.month <= curM)
     : quotes.filter((r) => r.month === curM);
   const kpiLabel = yearTotal ? `${yr}년` : period ? period.label : mLabel(curM);
-  const cmp = period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
+  const cmp = cmpCaptionOf(period, compare);
   const kpiTotal = sumBy(kpiQuotes, (r) => r.count);
 
   const kpiTopCatKey = quoteCat1Order(kpiQuotes).find((c) => c !== '기타');

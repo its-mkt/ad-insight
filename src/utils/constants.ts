@@ -117,6 +117,13 @@ export const EXTERNAL_LINKS = {
     'https://docs.google.com/spreadsheets/d/18tMYBQLuIhkmX_x_c8MK-aNXlGvOgz1TWauvqo8Dmjg/edit?gid=0#gid=0',
 } as const;
 
+/** 화면 출처 줄(SecSrc)에 여러 화면이 함께 쓰는 항목 */
+export const SOURCE_LINKS = {
+  googleAds: { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
+  naverSearchAd: { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
+  masterSheet: { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+} as const;
+
 /** 매체 영문 이름 → 한글 표기 (검색·표·안내 문구 공용) */
 export const MEDIA_KO: Record<string, string> = { Google: '구글', Naver: '네이버', Meta: '메타' };
 

@@ -131,6 +131,10 @@ export const dayPeriodOf = (r: DayRange): DayPeriod => {
   return { label, days, cmpLabel: '전월 동기간', range: r, prevRange, prevDays: rangeDays(prevRange) };
 };
 
+/** 증감 비교 문구 — 일·기간 선택이면 그 기준, 진행 중인 달이면 전월 동기간, 아니면 '전월' */
+export const cmpCaptionOf = (period?: { cmpLabel: string } | null, compare?: { cmpLabel: string } | null): string =>
+  period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
+
 /** 진행 중인 달 보기의 비교 기준 — 전월 1일~같은 날짜 (2026-11-19 사용자 요청: 전월 전체와 비교하면 증감이 늘 하락으로 보인다) */
 export interface MonthToDateCompare {
   /** 비교 문구 — '전월 동기간' */

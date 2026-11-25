@@ -15,10 +15,10 @@ import {
   ym,
   isOpenPeriod,
 } from '../utils/format';
-import { EXTERNAL_LINKS } from '../utils/constants';
+import { SOURCE_LINKS } from '../utils/constants';
 import { useQuoteStats } from '../hooks/useQuoteStats';
 import { CompareLegend } from '../components/common/Legend';
-import type { DayPeriod, MonthToDateCompare } from '../utils/dayRange';
+import { cmpCaptionOf, type DayPeriod, type MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
 import { PendingTag } from '../components/common/Muted';
 import { ViewNote } from '../components/common/Note';
@@ -64,9 +64,9 @@ interface OverviewViewProps {
 }
 
 const OVERVIEW_SOURCES: SourceLinkItem[] = [
-  { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
-  { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
-  { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+  SOURCE_LINKS.googleAds,
+  SOURCE_LINKS.naverSearchAd,
+  SOURCE_LINKS.masterSheet,
   { label: '1시간 자동 동기화' },
 ];
 
@@ -121,7 +121,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const pv = prevM(curM);
   const curCaption = period ? period.label : mLabel(curM);
   const pvCaption = period ? period.cmpLabel : compare ? compare.cmpLabel : mLabel(pv);
-  const cmp = period ? period.cmpLabel : compare ? compare.cmpLabel : '전월';
+  const cmp = cmpCaptionOf(period, compare);
   const yr = curM.slice(0, 4);
   const mm = +curM.slice(5, 7);
   const months = monthsUpTo(curM);

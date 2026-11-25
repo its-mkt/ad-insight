@@ -13,7 +13,7 @@ import {
   sumBy,
   THIS_M,
 } from '../utils/format';
-import { EXTERNAL_LINKS } from '../utils/constants';
+import { SOURCE_LINKS } from '../utils/constants';
 import { CompareLegend } from '../components/common/Legend';
 import type { DayPeriod, MonthToDateCompare } from '../utils/dayRange';
 import { View } from '../components/common/View';
@@ -57,9 +57,9 @@ interface CatEfficiencyViewProps {
 }
 
 const CAT_EFF_SOURCES: SourceLinkItem[] = [
-  { label: 'Google Ads API', href: EXTERNAL_LINKS.googleAds },
-  { label: '네이버 검색광고 API', href: EXTERNAL_LINKS.naverSearchAd },
-  { label: '취합 스프레드시트', href: EXTERNAL_LINKS.masterSheet },
+  SOURCE_LINKS.googleAds,
+  SOURCE_LINKS.naverSearchAd,
+  SOURCE_LINKS.masterSheet,
   { label: '광고비·클릭·전환 + 고도몰 견적 시트 교차 집계' },
 ];
 
