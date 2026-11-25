@@ -362,8 +362,10 @@ span.seg,
   // 모바일: 크기는 데스크톱 그대로(누르는 영역은 버튼의 touch-target 이 44px 로 넓힌다).
   // 항목이 많아 넘치면 가로 스크롤 대신 줄을 바꾼다 — 스크롤 영역은 넓힌 누르는 영역을 잘라 버린다
   // 표 칸 안(계정 관리 승인 단계 등)은 줄을 바꾸지 않는다 — 표가 가로로 스크롤되므로 칸을 조금 넘어도 된다
+  // 줄이 꺾일 때 줄 간격을 (44px − 버튼 24px) 로 벌려, 위아래 줄 버튼의 넓힌 누르는 영역이 겹치지 않게 한다 (한 줄이면 영향 없음)
   @include mixins.mobile {
     flex-wrap: wrap;
+    row-gap: 1.25rem;
     max-width: 100%;
 
     td & {
@@ -602,7 +604,8 @@ span.seg,
       outline-offset: 1px;
     }
 
-    @include mixins.touch-target;
+    // 세로만 넓힌다 — 가로로 넓히면 4px 옆 연·월 선택칸을 덮는다
+    @include mixins.touch-target($axis: y);
   }
 
   .mp-step {
@@ -631,15 +634,19 @@ span.seg,
     }
   }
 
-  // 다크 테마의 .dd-trigger 배경(--side)보다 우선해 선택칸 바탕을 그대로 보이게 한다
-  .dd .dd-trigger,
-  :root[data-theme='dark'] & .dd .dd-trigger {
+  // 크기·여백은 다크 테마 선택자에 묶지 않는다 — 우선순위가 올라가 휴대폰 여백 축소(_views.scss period-nav-bar)를 이겨 버린다
+  .dd .dd-trigger {
     height: 100%;
     padding: 0 0.5rem 0 0.75rem;
     border: 0;
-    background: transparent;
     font-size: 0.875rem;
     font-weight: 700;
+  }
+
+  // 다크 테마의 .dd-trigger 배경(--side)보다 우선해 선택칸 바탕을 그대로 보이게 한다
+  .dd .dd-trigger,
+  :root[data-theme='dark'] & .dd .dd-trigger {
+    background: transparent;
 
     &:hover:not(:disabled) {
       background: var(--accbg);
@@ -1882,7 +1889,8 @@ td.future {
       flex-shrink: 0;
     }
 
-    @include mixins.touch-target;
+    // 세로만 넓힌다 — 트리거와 ✕ 가 붙어 있어 가로로 넓히면 ✕ 의 영역이 트리거 끝을 덮는다(누르면 기간이 풀림)
+    @include mixins.touch-target($axis: y);
   }
 
   .dp-trigger {
