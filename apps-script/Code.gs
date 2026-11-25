@@ -1306,9 +1306,8 @@ function doGet(e) {
   // 시트는 일별 기록 요청에서만 연다 — 스냅숏 응답은 캐시만 읽으므로 열 필요가 없다 (요청마다 0.3~1초)
   if (p.daily) return json_(dailyHistResponse_(SpreadsheetApp.openById(CFG.SHEET_ID), p.daily, out));
   const isAdmin = isStaffRole_(acc.role); // 관리자도 원문(가리지 않은 값)을 받는다 (2026-11-19 사용자 결정)
-  // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다).
-  // fmt=cols 면 열 형식(표마다 열 이름 한 번 + 값 배열, 12.6MB → 5.2MB) — 화면이 옛·새 형식을 모두 읽으므로 이 값을 모르는 옛 화면은 그대로 객체 형식을 받는다
-  return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin, p.fmt === 'cols'))
+  // 응답 본문은 미리 만들어 둔 스냅숏으로 돌려준다 (시트 30여 개를 요청마다 읽으면 20초 넘게 걸린다)
+  return ContentService.createTextOutput('{"served":' + JSON.stringify(out.served) + ',' + apiSnapshot_(isAdmin))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -1366,42 +1365,19 @@ function previewDeviceShares_() {
  * doGet 응답 본문(served 제외)을 관리자용·공개용 두 벌로 만들어 스크립트 캐시에 gzip 으로 둔다.
  * 키에 API_CACHE_V 가 들어가 syncAll 이 끝나거나 doPost 로 데이터가 바뀌면(bumpApiCache_) 새로 만든다. */
 const API_SNAPSHOT_TTL_SEC = 6 * 60 * 60; // CacheService 최대 보관 시간
-function apiSnapshotKey_(isAdmin, cols) { return (cols ? 'snapc:' : 'snap:') + (PROPS.getProperty('API_CACHE_V') || '0') + ':' + (isAdmin ? 'admin' : 'public'); }
-/** 스냅숏 본문 — '{"served":…,' 뒤에 붙는 나머지 (첫 '{' 를 뺀 JSON). cols 면 열 형식. 없으면 지금 만든다 */
-function apiSnapshot_(isAdmin, cols) {
-  const hit = cacheGetText_(apiSnapshotKey_(isAdmin, cols));
-  return hit || buildApiSnapshots_()[(isAdmin ? 'admin' : 'public') + (cols ? 'Cols' : '')];
+function apiSnapshotKey_(isAdmin) { return 'snap:' + (PROPS.getProperty('API_CACHE_V') || '0') + ':' + (isAdmin ? 'admin' : 'public'); }
+/** 스냅숏 본문 — '{"served":…,' 뒤에 붙는 나머지 (첫 '{' 를 뺀 JSON). 없으면 지금 만든다 */
+function apiSnapshot_(isAdmin) {
+  const hit = cacheGetText_(apiSnapshotKey_(isAdmin));
+  return hit || buildApiSnapshots_()[isAdmin ? 'admin' : 'public'];
 }
-/** 시트를 한 번 읽어 관리자용·공개용 본문을 객체 형식·열 형식 두 벌씩 만들고 캐시에 둔다 */
+/** 시트를 한 번 읽어 관리자용·공개용 본문을 만들고 캐시에 둔다 */
 function buildApiSnapshots_() {
   const admin = apiPayload_(SpreadsheetApp.openById(CFG.SHEET_ID));
-  const pub = publicPayloadOf_(admin);
-  const bodies = {
-    admin: JSON.stringify(admin).slice(1),
-    public: JSON.stringify(pub).slice(1),
-    adminCols: JSON.stringify(columnarPayload_(admin)).slice(1),
-    publicCols: JSON.stringify(columnarPayload_(pub)).slice(1),
-  };
-  cachePutText_(apiSnapshotKey_(true, false), bodies.admin, API_SNAPSHOT_TTL_SEC);
-  cachePutText_(apiSnapshotKey_(false, false), bodies.public, API_SNAPSHOT_TTL_SEC);
-  cachePutText_(apiSnapshotKey_(true, true), bodies.adminCols, API_SNAPSHOT_TTL_SEC);
-  cachePutText_(apiSnapshotKey_(false, true), bodies.publicCols, API_SNAPSHOT_TTL_SEC);
+  const bodies = { admin: JSON.stringify(admin).slice(1), public: JSON.stringify(publicPayloadOf_(admin)).slice(1) };
+  cachePutText_(apiSnapshotKey_(true), bodies.admin, API_SNAPSHOT_TTL_SEC);
+  cachePutText_(apiSnapshotKey_(false), bodies.public, API_SNAPSHOT_TTL_SEC);
   return bodies;
-}
-/**
- * 열 형식 — 행 객체 배열을 { _cols: 열 이름들, _rows: 값 배열들 } 로 바꾼다 (행마다 반복되던 열 이름을 한 번만 보낸다).
- * 행에 없는 열은 null 로 채우고, 화면(src/data/columnar.ts)은 null 칸을 빼고 행 객체로 되돌린다 (시트 값은 null 이 없다)
- */
-function columnarPayload_(payload) {
-  const out = {};
-  Object.keys(payload).forEach((k) => {
-    const v = payload[k];
-    if (!Array.isArray(v) || !v.length || !v[0] || typeof v[0] !== 'object' || Array.isArray(v[0])) { out[k] = v; return; }
-    const cols = [], seen = {};
-    v.forEach((r) => Object.keys(r).forEach((c) => { if (!seen[c]) { seen[c] = 1; cols.push(c); } }));
-    out[k] = { _cols: cols, _rows: v.map((r) => cols.map((c) => (r[c] === undefined ? null : r[c]))) };
-  });
-  return out;
 }
 /** syncAll 끝 — 새 데이터 기준으로 버전을 올리고 미리 만든다 (Google Ads 스크립트는 g_* 를 직접 써서 따로 알리지 않는다) */
 function warmApiSnapshots_(t0) {
