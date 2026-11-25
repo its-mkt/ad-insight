@@ -53,6 +53,9 @@ export const ONCORE_CATEGORY_HIERARCHY: CatHierarchyNode[] = [
   { cat1: '기타', cat2: [] },
 ];
 
+/** 반응형 기준 폭(px) — 스타일의 $breakpoints(styles/_mixins.scss)와 같은 값으로 둔다 */
+export const BREAKPOINTS = { sm: 480, md: 768, lg: 1024, xl: 1280, xxl: 1440 } as const;
+
 export const VALID_VIEWS: ViewId[] = [
   'overview',
   'ads',

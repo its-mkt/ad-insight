@@ -1,4 +1,39 @@
 // 여러 스타일 파일이 함께 쓰는 믹스인 (CSS 를 직접 내보내지 않는다)
+@use 'sass:map';
+
+/**
+ * 반응형 기준 폭 — 미디어 쿼리에 숫자를 직접 쓰지 않고 이 이름만 쓴다 (사용자 지정 2026-11-25).
+ * sm 휴대폰 · md 태블릿 세로(사이드바가 서랍으로 바뀜) · lg 태블릿 가로·작은 노트북 · xl 노트북 · xxl 큰 모니터
+ * TS 쪽 같은 값은 utils/constants 의 BREAKPOINTS
+ */
+$breakpoints: (
+  sm: 480px,
+  md: 768px,
+  lg: 1024px,
+  xl: 1280px,
+  xxl: 1440px,
+);
+
+/** 기준 폭 이하 (max-width) — @include mixins.down(md) { … } */
+@mixin down($name) {
+  @media (max-width: map.get($breakpoints, $name)) {
+    @content;
+  }
+}
+
+/** 기준 폭 초과 (min-width: 기준+1px) — @include mixins.up(md) { … } */
+@mixin up($name) {
+  @media (min-width: map.get($breakpoints, $name) + 1px) {
+    @content;
+  }
+}
+
+/** 두 기준 폭 사이 ($from 초과 ~ $to 이하) — @include mixins.between(lg, xl) { … } */
+@mixin between($from, $to) {
+  @media (min-width: map.get($breakpoints, $from) + 1px) and (max-width: map.get($breakpoints, $to)) {
+    @content;
+  }
+}
 
 /** 스켈레톤 shimmer — 회색 면 위로 밝은 띠가 지나간다. @keyframes skel-shimmer 는 _components.scss */
 @mixin skel-shimmer {

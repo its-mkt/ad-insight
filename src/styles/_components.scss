@@ -685,11 +685,11 @@ span.seg,
   }
 }
 
-// 4열 고정 (좁으면 2열). 표가 넓어도 칸 비율이 바뀌지 않게 하고, 넘치는 표는 카드 안에서 스크롤한다
+// 4열 고정 (xxl 1440px 이하는 2열). 표가 넓어도 칸 비율이 바뀌지 않게 하고, 넘치는 표는 카드 안에서 스크롤한다
 .grid-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 
-  @media (max-width: 1400px) {
+  @include mixins.down(xxl) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

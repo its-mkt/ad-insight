@@ -1182,7 +1182,7 @@ tr.kw-more-row td {
   }
 }
 
-@media (max-width: 480px) {
+@include mixins.down(sm) {
   .cr-gallery .cr-img {
     height: 5.5rem;
     min-width: 5.5rem;
@@ -1747,13 +1747,13 @@ tr.kw-more-row td {
 }
 
 /* ── 반응형 미디어 쿼리 ── */
-@media (max-width: 1280px) {
+@include mixins.down(xl) {
   .kpis {
     grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   }
 }
 
-@media (max-width: 1024px) {
+@include mixins.down(lg) {
   .app {
     grid-template-columns: 12rem minmax(0, 1fr);
   }
@@ -1788,7 +1788,7 @@ tr.kw-more-row td {
   }
 }
 
-@media (max-width: 768px) {
+@include mixins.down(md) {
   // 글자 크기 기준(html)은 데스크톱과 같은 16px — 모바일이라고 전체를 줄이지 않는다.
   // 좁아서 꼭 줄여야 하는 요소(KPI 큰 값 등)만 아래에서 따로 줄인다
   html {
@@ -2131,11 +2131,11 @@ tr.kw-more-row td {
 }
 
 // 4개짜리 KPI 묶음은 4열 또는 2열로만 — 자동 맞춤(auto-fit)이면 태블릿 폭에서 3+1 로 갈라져 끝 카드가 외톨이가 된다.
-// 4열이 좁아지는 폭(사이드바가 있는 769~920px)은 2열로 둔다
+// 4열이면 카드가 좁아지는 lg(1024px) 이하는 2열로 둔다
 .kpis:has(> :nth-child(4):last-child) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 
-  @media (max-width: 920px) {
+  @include mixins.down(lg) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2152,7 +2152,7 @@ td > .empty {
   box-sizing: border-box;
 }
 
-@media (max-width: 480px) {
+@include mixins.down(sm) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2599,7 +2599,7 @@ td > .empty {
   margin: 0.75rem 0 0;
 }
 
-@media (max-width: 768px) {
+@include mixins.down(md) {
   .search-backdrop {
     padding: 0;
   }
@@ -2687,7 +2687,7 @@ td > .empty {
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
+@include mixins.down(md) {
   .top .crumb-detail {
     max-width: 8rem;
   }
@@ -3212,7 +3212,7 @@ td > .empty {
     }
   }
 
-  @media (max-width: 768px) {
+  @include mixins.down(md) {
     .access-gate-shell {
       grid-template-columns: minmax(0, 1fr);
       max-width: 26rem;

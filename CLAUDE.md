@@ -70,6 +70,12 @@
 - 이름 칸은 너비를 주지 않아 남는 폭을 쓰게 하고, 표 `min-width` 는 숫자 칸 합 + 이름 칸 최소 폭으로 잡는다
 - 새 종류가 필요하면 표마다 rem 을 적지 말고 토큰을 추가한다
 
+### 반응형 기준 폭
+- 기준 폭은 `sm 480 · md 768 · lg 1024 · xl 1280 · xxl 1440` (px) 다섯 개만 쓴다 — `src/styles/_mixins.scss` 의 `$breakpoints`, TS 는 `BREAKPOINTS` (`utils/constants`)
+- 미디어 쿼리에 숫자를 직접 쓰지 않는다: `@include mixins.down(md) { … }` (이하) · `mixins.up(md)` (초과) · `mixins.between(lg, xl)` (사이)
+- 모바일 규칙은 되도록 원래 규칙 안에 함께 둔다 (`.kpi .v { font-size: 1.5rem; @include mixins.down(md) { … } }`). `_views.scss` 의 큰 모바일 묶음은 해당 요소를 고칠 때 옮긴다
+- 모바일이라고 글자 기준(`html` font-size)을 줄이지 않는다 — 좁아서 꼭 줄여야 하는 요소만 따로 줄인다
+
 ### 금지
 - 위 표에 있는 요소를 `className` 만 복사해 인라인으로 다시 만들기
   (예: `<td className="n">…</td>` 대신 `NumTd`, `<div className="empty">` 대신 `EmptyState`)
