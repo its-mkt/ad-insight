@@ -2008,23 +2008,6 @@ tr.kw-more-row td {
       padding: 1rem;
     }
   }
-  .seg {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    max-width: 100%;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    button {
-      flex: none;
-      min-height: 2.5rem;
-      padding: 0.5rem 0.75rem;
-      font-size: 0.875rem; // 손가락으로 누르는 구간 선택은 데스크톱(12px)보다 조금 크게
-    }
-  }
   .grid,
   .grid.grid-4 {
     grid-template-columns: minmax(0, 1fr);
