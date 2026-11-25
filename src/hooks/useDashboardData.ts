@@ -15,7 +15,8 @@ import { readCachedPayload, writeCachedPayload } from '../utils/payloadCache';
 import { supabase } from '../lib/supabase';
 import { ACCESS_CHANGED_EVENT, currentAccessToken, withAccessToken } from '../lib/access';
 import { takePrefetched } from '../lib/prefetch';
-import { getCfg, webAppUrl } from '../lib/webApp';
+import { dashboardDataUrl, getCfg, webAppUrl } from '../lib/webApp';
+import { expandColumnar } from '../data/columnar';
 import { usePreviewMode } from '../context/PreviewModeContext';
 import { useAuth } from '../context/AuthContext';
 import { isPreviewDeviceShares, previewPayload, setPreviewRealDevices } from '../data/previewPayload';
@@ -84,7 +85,7 @@ export function useDashboardData(site: SiteId = 'itket') {
     setIsSyncing(true);
 
     try {
-      const fetchUrl = webAppUrl(c);
+      const fetchUrl = dashboardDataUrl(c);
       // 승인된 계정에만 데이터가, 관리자에게만 고객 정보가 내려온다 (Apps Script doGet 이 토큰과 admins·members 명단을 확인)
       const url = withAccessToken(fetchUrl, await currentAccessToken());
       const fetchJson = async () => {
@@ -94,7 +95,8 @@ export function useDashboardData(site: SiteId = 'itket') {
       };
       // 처음 접속이면 권한 확인과 함께 미리 보낸 요청(AuthContext)의 응답을 쓴다 — 실패했으면 다시 받는다
       const pre = takePrefetched<RawApiPayload>(url);
-      const j = (pre && (await pre.catch(() => null))) || (await fetchJson());
+      // 열 형식(fmt=cols)으로 온 표는 받은 즉시 행 객체로 되돌린다 — 옛 웹앱이면 객체 형식 그대로 온다 (data/columnar)
+      const j = expandColumnar((pre && (await pre.catch(() => null))) || (await fetchJson()));
       // 쓰는 도중 승인이 해제되거나 로그인이 만료되면 권한을 다시 확인해 로그인 화면으로 돌린다
       if (j.error === 'login_required') window.dispatchEvent(new Event(ACCESS_CHANGED_EVENT));
       if (j.error) throw new Error(j.error);

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { appendQuery, getCfg, webAppUrl } from './webApp';
+import { appendQuery, dashboardDataUrl, getCfg } from './webApp';
 import { parseRoute } from '../utils/route';
 import { prefetchJson } from './prefetch';
 
@@ -57,5 +57,5 @@ export async function postAuthedAction<T = Record<string, unknown>>(action: stri
 /** 처음 접속 — 권한 확인과 함께 지금 주소 사이트의 데이터 요청을 미리 출발시킨다 (useDashboardData 의 첫 요청이 이어받는다) */
 export function prefetchDashboardData(token: string): void {
   const c = getCfg(parseRoute().site);
-  if (token && c.url) prefetchJson(withAccessToken(webAppUrl(c), token));
+  if (token && c.url) prefetchJson(withAccessToken(dashboardDataUrl(c), token));
 }

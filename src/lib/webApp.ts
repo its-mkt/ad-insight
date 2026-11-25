@@ -48,5 +48,8 @@ export const webAppUrl = (c: { url: string; key: string }, params: Record<string
   return q ? appendQuery(c.url, q) : c.url;
 };
 
+/** 대시보드 데이터 요청 주소 — 열 형식(fmt=cols)으로 받는다. 미리 받기(lib/access)와 화면 요청(useDashboardData)이 같은 주소를 써야 이어받는다 */
+export const dashboardDataUrl = (c: { url: string; key: string }): string => webAppUrl(c, { fmt: 'cols' });
+
 /** 주소 뒤에 이미 인코딩된 조회 문자열('a=1&b=2')을 붙인다 — 주소에 '?' 가 있으면 '&' 로 잇는다 */
 export const appendQuery = (url: string, query: string): string => `${url}${url.includes('?') ? '&' : '?'}${query}`;
