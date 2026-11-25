@@ -3421,7 +3421,10 @@ td > .empty {
     color: var(--acc);
   }
 
+  // 다른 더보기 버튼(.kw-more-wrap)처럼 가운데 정렬
   .ins-more {
+    display: flex;
+    justify-content: center;
     margin-top: 0.5rem;
   }
 
